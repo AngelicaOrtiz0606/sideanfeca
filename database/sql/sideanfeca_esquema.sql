@@ -1,7 +1,7 @@
 /*==============================================================*/
 /* PROYECTO:  SIDEANFECA                                        */
 /* DBMS:      PostgreSQL 18                                     */
-/* Versión:   script_12                                      */
+/* Versión:   script_13                                      */
 /*                                                              */
 /* - Usuarios, roles, privilegios y bitácora: tablas propias    */
 /*   (sección 8). Laravel autentica con USUARIO y autoriza con  */
@@ -373,15 +373,20 @@ create index INPA_TIPO_ANIO_IDX on INSTITUCION_PARTICIPACION (INPA_TIPO, INPA_FE
    Laravel valida que tenga al menos una designación. */
 create table PERSONA (
    PERS_ID_PERSONA       SERIAL not null,
-   PERS_NOMBRE           VARCHAR(100) not null,
-   PERS_PRIMER_APELLIDO VARCHAR(50) not null,
-   PERS_SEGUNDO_APELLIDO VARCHAR(50) null,
+   PERS_NOMBRE           VARCHAR(60) not null,
+   PERS_PRIMER_APELLIDO VARCHAR(45) not null,
+   PERS_SEGUNDO_APELLIDO VARCHAR(45) null,
+   PERS_CURP             VARCHAR(18) null,
    PERS_GENERO           VARCHAR(1) not null,
    PERS_ID_INSTITUCION_EDUCATIVA INT4 null,
    PERS_ID_ORGANIZACION  INT4 null,
    PERS_ACTIVO           BOOL not null default true,
    constraint PK_PERSONA primary key (PERS_ID_PERSONA),
    constraint CKC_PERS_GENERO check (PERS_GENERO in ('F','M')),
+   /* CURP opcional. Si se captura: 18 caracteres, en mayúsculas, y única. */
+   constraint CKC_PERS_CURP check (PERS_CURP is null or
+       PERS_CURP ~ '^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]$'),
+   constraint PERS_CURP_UQ unique (PERS_CURP),
    /* Exactamente una pertenencia: si una es nula, la otra no */
    constraint CKC_PERS_PERTENENCIA check (
        (PERS_ID_INSTITUCION_EDUCATIVA is null) <> (PERS_ID_ORGANIZACION is null)
@@ -670,18 +675,41 @@ create table USUARIO (
    USUA_ID_PERSONA       INT4 null,
    USUA_ID_ROL           INT4 not null,
    USUA_NOMBRE_USUARIO   VARCHAR(30) not null,
+   USUA_CORREO           VARCHAR(254) not null,
    USUA_CONTRASENIA      VARCHAR(255) not null,
    USUA_FECHA_REGISTRO   TIMESTAMP not null default now(),
    USUA_ACTIVO           BOOL not null default true,
    constraint PK_USUARIO primary key (USUA_ID_USUARIO),
    constraint USUA_NOMBRE_USUARIO_UQ unique (USUA_NOMBRE_USUARIO),
    constraint USUA_PERSONA_UQ unique (USUA_ID_PERSONA),
+   constraint CKC_USUA_CORREO check (USUA_CORREO ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
    constraint FK_USUA_PERSONA foreign key (USUA_ID_PERSONA)
       references PERSONA (PERS_ID_PERSONA),
    constraint FK_USUA_ROL foreign key (USUA_ID_ROL)
       references ROL (ROL_ID_ROL)
 );
 create index USUA_ROL_FK on USUARIO (USUA_ID_ROL);
+
+/* Un correo no se repite, sin importar mayúsculas. */
+create unique index USUA_CORREO_UQ on USUARIO (lower(USUA_CORREO));
+
+/* Recuperación de contraseña. Se guarda solo el HASH del token
+   (nunca el token en texto plano), con fecha de expiración y de uso. */
+create table RECUPERACION_CONTRASENIA (
+   RECO_ID_RECUPERACION  SERIAL not null,
+   RECO_ID_USUARIO       INT4 not null,
+   RECO_TOKEN_HASH       VARCHAR(64) not null,
+   RECO_FECHA_CREACION   TIMESTAMP not null default now(),
+   RECO_FECHA_EXPIRA     TIMESTAMP not null,
+   RECO_FECHA_USO        TIMESTAMP null,
+   constraint PK_RECUPERACION_CONTRASENIA primary key (RECO_ID_RECUPERACION),
+   constraint RECO_TOKEN_HASH_UQ unique (RECO_TOKEN_HASH),
+   constraint CKC_RECO_FECHAS check (RECO_FECHA_EXPIRA > RECO_FECHA_CREACION),
+   constraint FK_RECO_USUARIO foreign key (RECO_ID_USUARIO)
+      references USUARIO (USUA_ID_USUARIO)
+);
+create index RECO_USUARIO_FK on RECUPERACION_CONTRASENIA (RECO_ID_USUARIO);
+
 
 /* Bitácora: registro de cada alta, modificación, activación o
    desactivación. Quién lo hizo = USUARIO (puede no tener persona). */
