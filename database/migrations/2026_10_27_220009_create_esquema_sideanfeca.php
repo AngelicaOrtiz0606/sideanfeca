@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::unprepared(file_get_contents(database_path('sql/sideanfeca_esquema.sql')));
+        DB::unprepared(file_get_contents(database_path('sql/esquema_sideanfeca.sql')));
     }
 
     public function down(): void

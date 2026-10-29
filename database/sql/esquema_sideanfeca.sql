@@ -1,7 +1,7 @@
 /*==============================================================*/
 /* PROYECTO:  SIDEANFECA                                        */
 /* DBMS:      PostgreSQL 18                                     */
-/* Versión:   script_13                                      */
+/* Versión:   script_17                                      */
 /*                                                              */
 /* - Usuarios, roles, privilegios y bitácora: tablas propias    */
 /*   (sección 8). Laravel autentica con USUARIO y autoriza con  */
@@ -21,6 +21,23 @@
 
 create extension if not exists btree_gist;
 
+
+/*==============================================================*/
+/* REGLAS DE BORRADO (script 16)
+   Por defecto NO se borra nada que tenga relación.
+   DELETE normal:
+     - Contactos y grados de la persona: CASCADE.
+     - Membresía del puesto en directorios: CASCADE.
+     - Persona con designaciones o con cuenta: RESTRICT.
+   Borrado definitivo de datos (función eliminar_persona_definitiva):
+     - Solo con el privilegio eliminar_definitivo, y no sobre uno mismo.
+     - Persona sin cuenta: se borra completa, con sus designaciones.
+     - Persona con cuenta: se borran contactos, grados, designaciones,
+       CURP y pertenencias; se conserva el nombre; la cuenta se desactiva.
+   Designaciones: solo se borran dentro de esa función (trigger).
+   Cuentas (USUARIO): nunca se borran. La bitácora y las recuperaciones
+   de contraseña dependen de ellas. Una cuenta se desactiva.
+   Bitácora: no se edita ni se borra, y no guarda nombres, solo IDs. */
 
 /*==============================================================*/
 /* 1. GEOGRAFÍA                                                 */
@@ -147,13 +164,12 @@ create table COORDINACION_NACIONAL (
    CONA_ID_COORDINACION_NACIONAL SERIAL not null,
    CONA_NOMBRE           VARCHAR(70) not null,
    CONA_DESCRIPCION      VARCHAR(100) null,
-   CONA_FECHA_INICIO     DATE not null,
-   CONA_FECHA_FIN        DATE null,
+   CONA_ORDEN            INT4 not null,
    constraint PK_COORDINACION_NACIONAL primary key (CONA_ID_COORDINACION_NACIONAL),
    constraint CONA_NOMBRE_UQ unique (CONA_NOMBRE),
-   constraint CKC_CONA_FECHAS check (
-       CONA_FECHA_FIN is null or CONA_FECHA_FIN >= CONA_FECHA_INICIO
-   )
+   /* Orden de visualización: se puede reordenar en una sola transacción */
+   constraint CONA_ORDEN_UQ unique (CONA_ORDEN) deferrable initially deferred,
+   constraint CKC_CONA_ORDEN check (CONA_ORDEN >= 1)
 );
 
 /* Cargos. El nivel define el ámbito de sus puestos:
@@ -368,9 +384,10 @@ create index INPA_TIPO_ANIO_IDX on INSTITUCION_PARTICIPACION (INPA_TIPO, INPA_FE
 /* 4. PERSONAS                                                  */
 /*==============================================================*/
 
-/* Toda persona pertenece a UNA institución O a UNA organización
-   (exactamente una). Sus cargos se registran en DESIGNACION.
-   Laravel valida que tenga al menos una designación. */
+/* Persona: información personal. Pertenencia opcional (institución u
+   organización). La designación sí la exige (ver validar_designacion).
+   Una persona con cuenta conserva su nombre al borrarse sus datos
+   (ver eliminar_persona_definitiva). */
 create table PERSONA (
    PERS_ID_PERSONA       SERIAL not null,
    PERS_NOMBRE           VARCHAR(60) not null,
@@ -387,10 +404,6 @@ create table PERSONA (
    constraint CKC_PERS_CURP check (PERS_CURP is null or
        PERS_CURP ~ '^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]$'),
    constraint PERS_CURP_UQ unique (PERS_CURP),
-   /* Exactamente una pertenencia: si una es nula, la otra no */
-   constraint CKC_PERS_PERTENENCIA check (
-       (PERS_ID_INSTITUCION_EDUCATIVA is null) <> (PERS_ID_ORGANIZACION is null)
-   ),
    constraint FK_PERS_INSTITUCION foreign key (PERS_ID_INSTITUCION_EDUCATIVA)
       references INSTITUCION_EDUCATIVA (INED_ID_INSTITUCION_EDUCATIVA),
    constraint FK_PERS_ORGANIZACION foreign key (PERS_ID_ORGANIZACION)
@@ -405,7 +418,7 @@ create table PERSONA_NIVEL_ACADEMICO (
    PENA_ID_NIVEL_ACADEMICO INT4 not null,
    constraint PK_PERSONA_NIVEL_ACADEMICO primary key (PENA_ID_PERSONA, PENA_ID_NIVEL_ACADEMICO),
    constraint FK_PENA_PERSONA foreign key (PENA_ID_PERSONA)
-      references PERSONA (PERS_ID_PERSONA),
+      references PERSONA (PERS_ID_PERSONA) on delete cascade,
    constraint FK_PENA_NIVEL foreign key (PENA_ID_NIVEL_ACADEMICO)
       references NIVEL_ACADEMICO (NIAC_ID_NIVEL_ACADEMICO)
 );
@@ -423,7 +436,7 @@ create table CONTACTO (
    CONT_VISIBLE          BOOL not null default true,
    constraint PK_CONTACTO primary key (CONT_ID_CONTACTO),
    constraint FK_CONT_PERSONA foreign key (CONT_ID_PERSONA)
-      references PERSONA (PERS_ID_PERSONA),
+      references PERSONA (PERS_ID_PERSONA) on delete cascade,
    constraint FK_CONT_TIPO foreign key (CONT_ID_TIPO_CONTACTO)
       references TIPO_CONTACTO (TICO_ID_TIPO_CONTACTO)
 );
@@ -548,19 +561,23 @@ returns trigger as $$
 declare
     v_inst_puesto  INT4;
     v_inst_persona INT4;
+    v_org_persona  INT4;
 begin
     select PUES_ID_INSTITUCION_EDUCATIVA into v_inst_puesto
-    from PUESTO
-    where PUES_ID_PUESTO = new.DESI_ID_PUESTO;
+    from PUESTO where PUES_ID_PUESTO = new.DESI_ID_PUESTO;
 
-    if v_inst_puesto is not null then
-        select PERS_ID_INSTITUCION_EDUCATIVA into v_inst_persona
-        from PERSONA
-        where PERS_ID_PERSONA = new.DESI_ID_PERSONA;
+    select PERS_ID_INSTITUCION_EDUCATIVA, PERS_ID_ORGANIZACION
+      into v_inst_persona, v_org_persona
+    from PERSONA where PERS_ID_PERSONA = new.DESI_ID_PERSONA;
 
-        if v_inst_persona is distinct from v_inst_puesto then
-            raise exception 'La persona debe pertenecer a la institución del puesto.';
-        end if;
+    -- Toda designación exige pertenencia a una institución u organización
+    if v_inst_persona is null and v_org_persona is null then
+        raise exception 'Para tener designación, la persona debe pertenecer a una institución u organización.';
+    end if;
+
+    -- Si el puesto es institucional, la persona debe ser de esa misma institución
+    if v_inst_puesto is not null and v_inst_persona is distinct from v_inst_puesto then
+        raise exception 'La persona debe pertenecer a la institución del puesto.';
     end if;
 
     return new;
@@ -598,7 +615,7 @@ create table PUESTO_DIRECTORIO (
        deferrable initially deferred,
    constraint CKC_PUDI_ORDEN check (PUDI_ORDEN >= 1),
    constraint FK_PUDI_PUESTO foreign key (PUDI_ID_PUESTO)
-      references PUESTO (PUES_ID_PUESTO),
+      references PUESTO (PUES_ID_PUESTO) on delete cascade,
    constraint FK_PUDI_TIPO foreign key (PUDI_ID_TIPO_DIRECTORIO)
       references TIPO_DIRECTORIO (TIDI_ID_TIPO_DIRECTORIO)
 );
@@ -666,23 +683,22 @@ create table ROL_PRIVILEGIO (
 );
 create index ROPR_PRIVILEGIO_FK on ROL_PRIVILEGIO (ROPR_ID_PRIVILEGIO);
 
-/* Cuentas de acceso al sistema.
-   USUA_ID_PERSONA es opcional: el superusuario puede ser una persona
-   del directorio; una administradora puede no serlo.
-   Cada persona tiene como máximo un usuario. */
+/* Cuentas de acceso al sistema. Entra con correo.
+   La cuenta no se borra si tiene bitácora: se desactiva. */
 create table USUARIO (
    USUA_ID_USUARIO       SERIAL not null,
    USUA_ID_PERSONA       INT4 null,
    USUA_ID_ROL           INT4 not null,
-   USUA_NOMBRE_USUARIO   VARCHAR(30) not null,
    USUA_CORREO           VARCHAR(254) not null,
    USUA_CONTRASENIA      VARCHAR(255) not null,
    USUA_FECHA_REGISTRO   TIMESTAMP not null default now(),
    USUA_ACTIVO           BOOL not null default true,
    constraint PK_USUARIO primary key (USUA_ID_USUARIO),
-   constraint USUA_NOMBRE_USUARIO_UQ unique (USUA_NOMBRE_USUARIO),
    constraint USUA_PERSONA_UQ unique (USUA_ID_PERSONA),
    constraint CKC_USUA_CORREO check (USUA_CORREO ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+   /* Cuenta activa siempre tiene persona. Una cuenta desactivada puede
+      quedar sin persona si la persona se borró definitivamente. */
+   constraint CKC_USUA_ACTIVA_PERSONA check (USUA_ACTIVO = false or USUA_ID_PERSONA is not null),
    constraint FK_USUA_PERSONA foreign key (USUA_ID_PERSONA)
       references PERSONA (PERS_ID_PERSONA),
    constraint FK_USUA_ROL foreign key (USUA_ID_ROL)
@@ -723,7 +739,7 @@ create table BITACORA (
    BITA_DESCRIPCION      VARCHAR(100) null,
    constraint PK_BITACORA primary key (BITA_ID_BITACORA),
    constraint CKC_BITA_ACCION check (BITA_ACCION in
-      ('Registro','Modificacion','Activacion','Desactivacion')),
+      ('Registro','Modificacion','Activacion','Desactivacion','Eliminacion')),
    constraint FK_BITA_USUARIO foreign key (BITA_ID_USUARIO)
       references USUARIO (USUA_ID_USUARIO)
 );
@@ -741,6 +757,121 @@ $$ language plpgsql;
 create trigger trg_bitacora_solo_insercion
 before update or delete on BITACORA
 for each row execute function bitacora_solo_insercion();
+
+
+/* Una cuenta nunca se borra: la bitácora y las recuperaciones de
+   contraseña dependen de ella. Se desactiva con USUA_ACTIVO = false. */
+create or replace function bloquear_borrado_usuario()
+returns trigger as $$
+begin
+    raise exception 'Las cuentas no se borran. Desactívala con USUA_ACTIVO = false.';
+end;
+$$ language plpgsql;
+
+create trigger trg_bloquear_borrado_usuario
+before delete on USUARIO
+for each row execute function bloquear_borrado_usuario();
+
+
+/*==============================================================*/
+/* 7b. BORRADO DEFINITIVO DE DATOS                              */
+/*   Solo el superadmin (privilegio eliminar_definitivo) y solo  */
+/*   desde eliminar_persona_definitiva. Nunca en cascada.       */
+/*==============================================================*/
+
+/* Bloquea el borrado directo de designaciones. Solo la función de
+   borrado definitivo activa el permiso, y solo dentro de su transacción. */
+create or replace function bloquear_borrado_designacion()
+returns trigger as $$
+begin
+    if coalesce(current_setting('sideanfeca.borrado_definitivo', true), '') <> 'on' then
+        raise exception 'Las designaciones no se borran directamente. Usa eliminar_persona_definitiva.';
+    end if;
+    return old;
+end;
+$$ language plpgsql;
+
+create trigger trg_bloquear_borrado_designacion
+before delete on DESIGNACION
+for each row execute function bloquear_borrado_designacion();
+
+/* p_actor: cuenta que ejecuta. p_persona: persona a borrar.
+   - Sin cuenta: se borra la fila completa.
+   - Con cuenta: se borran contactos, grados, designaciones, CURP,
+     segundo apellido y pertenencias; se conserva el nombre; la cuenta
+     se desactiva y sus recuperaciones de contraseña se conservan.
+   La bitácora guarda solo IDs, sin nombres. */
+create or replace function eliminar_persona_definitiva(p_actor INT4, p_persona INT4)
+returns text as $$
+declare
+    v_permiso boolean;
+    v_cuenta  INT4;
+begin
+    -- 1. Quien ejecuta: cuenta activa con el privilegio
+    select exists (
+        select 1
+        from USUARIO u
+        join ROL_PRIVILEGIO rp on rp.ROPR_ID_ROL = u.USUA_ID_ROL and rp.ROPR_ACTIVO
+        join PRIVILEGIO p on p.PRIV_ID_PRIVILEGIO = rp.ROPR_ID_PRIVILEGIO
+        where u.USUA_ID_USUARIO = p_actor
+          and u.USUA_ACTIVO
+          and p.PRIV_NOMBRE = 'eliminar_definitivo'
+    ) into v_permiso;
+
+    if not v_permiso then
+        raise exception 'La cuenta no tiene permiso para el borrado definitivo.';
+    end if;
+
+    -- 2. La persona debe existir
+    if not exists (select 1 from PERSONA where PERS_ID_PERSONA = p_persona) then
+        raise exception 'La persona no existe.';
+    end if;
+
+    -- 3. Nadie borra su propia persona
+    select USUA_ID_USUARIO into v_cuenta
+    from USUARIO where USUA_ID_PERSONA = p_persona;
+
+    if v_cuenta = p_actor then
+        raise exception 'No puedes borrar tu propia persona. Pídelo a otro superadmin.';
+    end if;
+
+    -- 4. Permiso para borrar designaciones, solo en esta transacción
+    perform set_config('sideanfeca.borrado_definitivo', 'on', true);
+
+    -- 5. Datos y historial
+    delete from CONTACTO where CONT_ID_PERSONA = p_persona;
+    delete from PERSONA_NIVEL_ACADEMICO where PENA_ID_PERSONA = p_persona;
+    delete from DESIGNACION where DESI_ID_PERSONA = p_persona;
+
+    if v_cuenta is null then
+        -- 6a. Sin cuenta: se borra la fila completa
+        delete from PERSONA where PERS_ID_PERSONA = p_persona;
+
+        insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
+        values (p_actor, 'Eliminacion', 'PERSONA', p_persona, 'Borrado definitivo');
+
+        return 'Persona eliminada por completo.';
+    end if;
+
+    -- 6b. Con cuenta: se conserva el nombre y se desactiva la cuenta
+    update PERSONA
+       set PERS_CURP = null,
+           PERS_SEGUNDO_APELLIDO = null,
+           PERS_ID_INSTITUCION_EDUCATIVA = null,
+           PERS_ID_ORGANIZACION = null
+     where PERS_ID_PERSONA = p_persona;
+
+    update USUARIO set USUA_ACTIVO = false where USUA_ID_USUARIO = v_cuenta;
+
+    insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
+    values (p_actor, 'Desactivacion', 'USUARIO', v_cuenta, 'Desactivada por borrado definitivo');
+
+    insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
+    values (p_actor, 'Eliminacion', 'PERSONA', p_persona, 'Datos eliminados; se conserva el nombre');
+
+    return 'Datos eliminados. Se conservó el nombre y la cuenta quedó desactivada.';
+end;
+$$ language plpgsql;
 
 
 /*==============================================================*/
