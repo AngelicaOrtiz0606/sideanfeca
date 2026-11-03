@@ -97,7 +97,6 @@ create table COLONIA (
    COLO_CODIGO_POSTAL    CHAR(5) not null,
    COLO_ID_ASENTA_CPCONS CHAR(4) not null,
    COLO_NOMBRE           VARCHAR(100) not null,
-   COLO_TIPO             VARCHAR(30) not null,
    constraint PK_COLONIA primary key (COLO_ID_COLONIA),
    constraint COLO_CP_ASENTA_UQ unique (COLO_CODIGO_POSTAL, COLO_ID_ASENTA_CPCONS),
    constraint CKC_COLO_CP check (COLO_CODIGO_POSTAL ~ '^[0-9]{5}$'),
