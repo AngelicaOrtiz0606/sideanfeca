@@ -1,19 +1,19 @@
 /*==============================================================*/
 /* PROYECTO:  SIDEANFECA                                        */
 /* DBMS:      PostgreSQL 18                                     */
-/* Versión:   script_17                                      */
+/* Versión:   script_19                                         */
 /*                                                              */
-/* - Usuarios, roles, privilegios y bitácora: tablas propias    */
-/*   (sección 8). Laravel autentica con USUARIO y autoriza con  */
-/*   ROL / ROL_PRIVILEGIO / PRIVILEGIO.                         */
+/* - Usuarios, roles, privilegios, bitácora e inicios de sesión:*/
+/*   tablas propias (sección 7). Laravel autentica con USUARIO  */
+/*   y autoriza con ROL / ROL_PRIVILEGIO / PRIVILEGIO.          */
 /* - Catálogos de domicilio (entidad, municipio, colonia): se   */
 /*   cargan desde el CSV oficial de Correos de México.          */
-/* - Orden de los puestos en cada directorio: manual, en        */
-/*   PUESTO_DIRECTORIO. No hay reglas de orden automáticas.     */
-/* - Historial de participación: solo informativo y para el     */
-/*   filtro de año. No genera directorios.                      */
+/* - Orden de puestos y coordinaciones: manual. Se reordena con */
+/*   las funciones reordenar_* (una transacción, en bitácora).  */
+/* - Fechas de designación: se guarda el ÚLTIMO día con cargo    */
+/*   (rango cerrado). El formulario captura el primer día sin   */
+/*   cargo y Laravel guarda ese día menos uno.                  */
 /* - Reglas que dependen de Laravel (no de la BD):              */
-/*     · Persona con al menos una designación                   */
 /*     · Coordinador y secretario técnico regional con          */
 /*       coordinación                                           */
 /*     · Teléfono con lada/extensión según TIPO_CONTACTO        */
@@ -23,21 +23,27 @@ create extension if not exists btree_gist;
 
 
 /*==============================================================*/
-/* REGLAS DE BORRADO (script 16)
-   Por defecto NO se borra nada que tenga relación.
-   DELETE normal:
-     - Contactos y grados de la persona: CASCADE.
-     - Membresía del puesto en directorios: CASCADE.
-     - Persona con designaciones o con cuenta: RESTRICT.
-   Borrado definitivo de datos (función eliminar_persona_definitiva):
-     - Solo con el privilegio eliminar_definitivo, y no sobre uno mismo.
-     - Persona sin cuenta: se borra completa, con sus designaciones.
-     - Persona con cuenta: se borran contactos, grados, designaciones,
-       CURP y pertenencias; se conserva el nombre; la cuenta se desactiva.
-   Designaciones: solo se borran dentro de esa función (trigger).
-   Cuentas (USUARIO): nunca se borran. La bitácora y las recuperaciones
-   de contraseña dependen de ellas. Una cuenta se desactiva.
-   Bitácora: no se edita ni se borra, y no guarda nombres, solo IDs. */
+/* REGLAS DE BORRADO Y BITÁCORA (script 19)
+   - Nada se borra en cascada desde la interfaz. Las funciones de
+     borrado son la única vía, y dejan registro en bitácora.
+   - Persona SIN cuenta: borrado completo (eliminar_persona_definitiva).
+   - Persona CON cuenta:
+       · Administrador: "borrar" = OCULTAR (PERS_OCULTA_ADMIN). No se
+         borra nada. El superadmin la sigue viendo.
+       · Superadmin (decisión de la organización): se borran contactos,
+         grados, designaciones y pertenencia; se conservan nombre y
+         CURP; la cuenta se desactiva.
+       · Cancelación ARCO (cancelar_arco): se borra todo lo personal,
+         incluido nombre y CURP. La cuenta queda anonimizada.
+   - Toda persona tiene al menos una designación o una cuenta
+     (trigger diferido: validar_persona_con_razon).
+   - Designaciones: solo se borran desde eliminar_designacion_erronea
+     o eliminar_persona_definitiva (trigger bloquear_borrado_designacion).
+   - Cuentas (USUARIO): nunca se borran. Se desactivan o se anonimizan.
+   - Bitácora: solo inserción. Guarda referencias (números), no nombres
+     ni correos en texto. Los nombres se muestran desde la ficha.
+   - Inicios de sesión (LOG_ACCESO): solo inserción, sin correos.
+   - Recuperación de contraseña: tabla temporal con hash del código. */
 
 /*==============================================================*/
 /* 1. GEOGRAFÍA                                                 */
@@ -159,12 +165,13 @@ create table NIVEL_ACADEMICO (
    constraint NIAC_NOMBRE_UQ unique (NIAC_NOMBRE)
 );
 
-/* Coordinaciones nacionales temáticas */
+/* Coordinaciones nacionales temáticas. Se pueden desactivar. */
 create table COORDINACION_NACIONAL (
    CONA_ID_COORDINACION_NACIONAL SERIAL not null,
    CONA_NOMBRE           VARCHAR(70) not null,
    CONA_DESCRIPCION      VARCHAR(100) null,
    CONA_ORDEN            INT4 not null,
+   CONA_ACTIVO           BOOL not null default true,
    constraint PK_COORDINACION_NACIONAL primary key (CONA_ID_COORDINACION_NACIONAL),
    constraint CONA_NOMBRE_UQ unique (CONA_NOMBRE),
    /* Orden de visualización: se puede reordenar en una sola transacción */
@@ -386,8 +393,8 @@ create index INPA_TIPO_ANIO_IDX on INSTITUCION_PARTICIPACION (INPA_TIPO, INPA_FE
 
 /* Persona: información personal. Pertenencia opcional (institución u
    organización). La designación sí la exige (ver validar_designacion).
-   Una persona con cuenta conserva su nombre al borrarse sus datos
-   (ver eliminar_persona_definitiva). */
+   PERS_OCULTA_ADMIN = true: el administrador no la ve; el superadmin
+   sí. No borra nada (ver borrar_persona). */
 create table PERSONA (
    PERS_ID_PERSONA       SERIAL not null,
    PERS_NOMBRE           VARCHAR(60) not null,
@@ -397,7 +404,10 @@ create table PERSONA (
    PERS_GENERO           VARCHAR(1) not null,
    PERS_ID_INSTITUCION_EDUCATIVA INT4 null,
    PERS_ID_ORGANIZACION  INT4 null,
-   PERS_ACTIVO           BOOL not null default true,
+   /* Oculta = no aparece en pantallas de administración ni en el sitio
+      público ni en directorios generados (lo filtra Laravel). Su puesto
+      se muestra como "Vacante" en esos lugares. El superadmin la ve. */
+   PERS_OCULTA_ADMIN     BOOL not null default false,
    constraint PK_PERSONA primary key (PERS_ID_PERSONA),
    constraint CKC_PERS_GENERO check (PERS_GENERO in ('F','M')),
    /* CURP opcional. Si se captura: 18 caracteres, en mayúsculas, y única. */
@@ -463,6 +473,7 @@ create table PUESTO (
    PUES_ID_COORDINACION_NACIONAL INT4 null,
    PUES_ID_INSTITUCION_EDUCATIVA INT4 null,
    PUES_TITULARIDAD      BOOL not null default false,
+   PUES_ACTIVO           BOOL not null default true,
    constraint PK_PUESTO primary key (PUES_ID_PUESTO),
    constraint PUES_PUESTO_UQ unique nulls not distinct (
        PUES_ID_CARGO,
@@ -527,10 +538,12 @@ for each row execute function validar_puesto();
 
 
 /* Asignación de una persona a un puesto.
-   EXCLUDE: un mismo puesto no puede tener dos periodos que se
-   traslapen. Para asignarlo a otra persona, primero se cierra la
-   designación anterior (DESI_FECHA_FIN). Un suplente empieza el
-   día siguiente al fin de la anterior. */
+   DESI_FECHA_INICIO y DESI_FECHA_FIN son el PRIMER y el ÚLTIMO día
+   con cargo (rango cerrado). El formulario captura el primer día
+   sin cargo ("deja el cargo el"); Laravel llama a
+   desactivar_designacion, que guarda ese día menos uno.
+   EXCLUDE: un mismo puesto no puede tener dos periodos traslapados,
+   sin importar si son pasados, actuales o futuros. */
 create table DESIGNACION (
    DESI_ID_DESIGNACION   SERIAL not null,
    DESI_ID_PUESTO        INT4 not null,
@@ -570,6 +583,11 @@ begin
       into v_inst_persona, v_org_persona
     from PERSONA where PERS_ID_PERSONA = new.DESI_ID_PERSONA;
 
+    -- Un puesto inactivo no recibe designaciones nuevas
+    if not (select PUES_ACTIVO from PUESTO where PUES_ID_PUESTO = new.DESI_ID_PUESTO) then
+        raise exception 'El puesto está inactivo.';
+    end if;
+
     -- Toda designación exige pertenencia a una institución u organización
     if v_inst_persona is null and v_org_persona is null then
         raise exception 'Para tener designación, la persona debe pertenecer a una institución u organización.';
@@ -603,7 +621,7 @@ for each row execute function validar_designacion();
      distintos en cada uno.
    - Los puestos institucionales no van en directorios.
    - El orden es único por tipo de directorio y diferible, para que
-     Laravel pueda reescribir toda la lista en una sola transacción.
+     reordenar_puestos_directorio pueda reescribir la lista completa.
    Los filtros (zona, coordinación, año) se aplican al consultar,
    sin cambiar el orden. */
 create table PUESTO_DIRECTORIO (
@@ -645,9 +663,8 @@ for each row execute function validar_puesto_directorio();
 
 
 /*==============================================================*/
-/* 7. SEGURIDAD: privilegios, roles, usuarios y bitácora        */
-/*   Laravel autentica con USUARIO y autoriza con                */
-/*   ROL -> ROL_PRIVILEGIO -> PRIVILEGIO.                        */
+/* 7. SEGURIDAD: privilegios, roles, usuarios, bitácora e       */
+/*    inicios de sesión                                         */
 /*==============================================================*/
 
 /* Privilegios del sistema (crear institución, editar persona,
@@ -660,7 +677,7 @@ create table PRIVILEGIO (
    constraint PRIV_NOMBRE_UQ unique (PRIV_NOMBRE)
 );
 
-/* Roles (Administrador, Capturista, Consulta...). */
+/* Roles (Superadministrador, Administrador). */
 create table ROL (
    ROL_ID_ROL            SERIAL not null,
    ROL_NOMBRE            VARCHAR(80) not null,
@@ -684,7 +701,8 @@ create table ROL_PRIVILEGIO (
 create index ROPR_PRIVILEGIO_FK on ROL_PRIVILEGIO (ROPR_ID_PRIVILEGIO);
 
 /* Cuentas de acceso al sistema. Entra con correo.
-   La cuenta no se borra si tiene bitácora: se desactiva. */
+   La cuenta nunca se borra: la bitácora y los inicios de sesión
+   dependen de ella. Se desactiva, o se anonimiza en ARCO. */
 create table USUARIO (
    USUA_ID_USUARIO       SERIAL not null,
    USUA_ID_PERSONA       INT4 null,
@@ -696,8 +714,8 @@ create table USUARIO (
    constraint PK_USUARIO primary key (USUA_ID_USUARIO),
    constraint USUA_PERSONA_UQ unique (USUA_ID_PERSONA),
    constraint CKC_USUA_CORREO check (USUA_CORREO ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
-   /* Cuenta activa siempre tiene persona. Una cuenta desactivada puede
-      quedar sin persona si la persona se borró definitivamente. */
+   /* Cuenta activa siempre tiene persona. Una cuenta anonimizada
+      (ARCO) no tiene persona y queda desactivada. */
    constraint CKC_USUA_ACTIVA_PERSONA check (USUA_ACTIVO = false or USUA_ID_PERSONA is not null),
    constraint FK_USUA_PERSONA foreign key (USUA_ID_PERSONA)
       references PERSONA (PERS_ID_PERSONA),
@@ -709,8 +727,10 @@ create index USUA_ROL_FK on USUARIO (USUA_ID_ROL);
 /* Un correo no se repite, sin importar mayúsculas. */
 create unique index USUA_CORREO_UQ on USUARIO (lower(USUA_CORREO));
 
-/* Recuperación de contraseña. Se guarda solo el HASH del token
-   (nunca el token en texto plano), con fecha de expiración y de uso. */
+/* Recuperación de contraseña. TEMPORAL: cada fila dura minutos.
+   Se guarda solo el HASH SHA-256 del código (nunca el código),
+   con expiración corta, un solo uso y límite de intentos.
+   Se borra al usarse, al vencer (limpiar_recuperaciones) y en ARCO. */
 create table RECUPERACION_CONTRASENIA (
    RECO_ID_RECUPERACION  SERIAL not null,
    RECO_ID_USUARIO       INT4 not null,
@@ -718,39 +738,90 @@ create table RECUPERACION_CONTRASENIA (
    RECO_FECHA_CREACION   TIMESTAMP not null default now(),
    RECO_FECHA_EXPIRA     TIMESTAMP not null,
    RECO_FECHA_USO        TIMESTAMP null,
+   RECO_INTENTOS         INT4 not null default 0,
    constraint PK_RECUPERACION_CONTRASENIA primary key (RECO_ID_RECUPERACION),
    constraint RECO_TOKEN_HASH_UQ unique (RECO_TOKEN_HASH),
    constraint CKC_RECO_FECHAS check (RECO_FECHA_EXPIRA > RECO_FECHA_CREACION),
+   constraint CKC_RECO_INTENTOS check (RECO_INTENTOS between 0 and 5),
    constraint FK_RECO_USUARIO foreign key (RECO_ID_USUARIO)
       references USUARIO (USUA_ID_USUARIO)
 );
 create index RECO_USUARIO_FK on RECUPERACION_CONTRASENIA (RECO_ID_USUARIO);
 
 
-/* Bitácora: registro de cada alta, modificación, activación o
-   desactivación. Quién lo hizo = USUARIO (puede no tener persona). */
+/* BITÁCORA: quién hizo qué, sobre qué registro, cuándo y por qué.
+   - BITA_ID_USUARIO: quién actuó (cuenta). Su nombre se muestra desde
+     la ficha del usuario.
+   - BITA_TABLA y BITA_REFERENCIA: sobre qué registro (número). El
+     nombre de la persona NO se guarda aquí: se muestra desde su ficha.
+     Si la ficha se borra (ARCO), el front dice "persona eliminada #n".
+   - BITA_MOTIVO: de una lista cerrada. */
 create table BITACORA (
    BITA_ID_BITACORA      SERIAL not null,
    BITA_FECHA_HORA       TIMESTAMP not null default now(),
    BITA_ID_USUARIO       INT4 not null,
-   BITA_ACCION           VARCHAR(40) not null,
-   BITA_ENTIDAD          VARCHAR(50) not null,
-   BITA_ID_REGISTRO      INT4 null,
-   BITA_DESCRIPCION      VARCHAR(100) null,
+   BITA_ACCION           VARCHAR(30) not null,
+   BITA_TABLA            VARCHAR(40) not null,
+   BITA_REFERENCIA       INT4 null,
+   BITA_MOTIVO           VARCHAR(60) null,
    constraint PK_BITACORA primary key (BITA_ID_BITACORA),
-   constraint CKC_BITA_ACCION check (BITA_ACCION in
-      ('Registro','Modificacion','Activacion','Desactivacion','Eliminacion')),
+   constraint CKC_BITA_ACCION check (BITA_ACCION in (
+      'Registro','Modificacion','Reordenamiento','Activacion','Desactivacion',
+      'Ocultacion','Restauracion','Eliminacion','Anonimizacion')),
+   constraint CKC_BITA_MOTIVO check (BITA_MOTIVO is null or BITA_MOTIVO in (
+      'Error de captura','Decisión de la organización','Cancelación ARCO','Duplicado')),
    constraint FK_BITA_USUARIO foreign key (BITA_ID_USUARIO)
       references USUARIO (USUA_ID_USUARIO)
 );
 create index BITA_USUARIO_FK on BITACORA (BITA_ID_USUARIO);
+create index BITA_FECHA_IDX on BITACORA (BITA_FECHA_HORA);
+create index BITA_TABLA_REF_IDX on BITACORA (BITA_TABLA, BITA_REFERENCIA);
 
-/* La bitácora solo se inserta: no se edita ni se borra.
+/* DETALLE de la bitácora: qué campo cambió, con valores anterior y nuevo.
+   Regla: los campos personales (nombre, CURP, correo, contactos,
+   grados...) NO guardan valores, solo el nombre del campo. Los
+   campos organizacionales (orden, fechas de cargo, puesto...) sí.
+   BIDE_REFERENCIA: a qué registro se refiere esta fila, si es
+   distinto del principal (ej. cada puesto que cambió de lugar). */
+create table BITACORA_DETALLE (
+   BIDE_ID_DETALLE       SERIAL not null,
+   BIDE_ID_BITACORA      INT4 not null,
+   BIDE_REFERENCIA       INT4 null,
+   BIDE_CAMPO            VARCHAR(60) not null,
+   BIDE_ANTERIOR         VARCHAR(255) null,
+   BIDE_NUEVO            VARCHAR(255) null,
+   constraint PK_BITACORA_DETALLE primary key (BIDE_ID_DETALLE),
+   constraint FK_BIDE_BITACORA foreign key (BIDE_ID_BITACORA)
+      references BITACORA (BITA_ID_BITACORA)
+);
+create index BIDE_BITACORA_FK on BITACORA_DETALLE (BIDE_ID_BITACORA);
+
+/* INICIOS DE SESIÓN: éxito, fallo, cuenta inactiva y cierre.
+   Sin correos: si el correo no existe, solo queda la IP y la hora.
+   Los inicios de sesión son para seguridad, no para la bitácora. */
+create table LOG_ACCESO (
+   LOGA_ID_LOG           SERIAL not null,
+   LOGA_FECHA_HORA       TIMESTAMP not null default now(),
+   LOGA_ID_USUARIO       INT4 null,
+   LOGA_RESULTADO        VARCHAR(20) not null,
+   LOGA_IP               VARCHAR(45) not null,
+   constraint PK_LOG_ACCESO primary key (LOGA_ID_LOG),
+   constraint CKC_LOGA_RESULTADO check (LOGA_RESULTADO in
+      ('Exitoso','Fallido','Cuenta inactiva','Cierre de sesión')),
+   /* Solo un intento fallido puede no tener cuenta */
+   constraint CKC_LOGA_USUARIO check (LOGA_RESULTADO = 'Fallido' or LOGA_ID_USUARIO is not null),
+   constraint FK_LOGA_USUARIO foreign key (LOGA_ID_USUARIO)
+      references USUARIO (USUA_ID_USUARIO)
+);
+create index LOGA_USUARIO_FK on LOG_ACCESO (LOGA_ID_USUARIO);
+create index LOGA_FECHA_IDX on LOG_ACCESO (LOGA_FECHA_HORA);
+
+/* Solo inserción: bitácora, detalle e inicios de sesión.
    (TRUNCATE no lo cubre; la cuenta de la aplicación no debe tenerlo.) */
 create or replace function bitacora_solo_insercion()
 returns trigger as $$
 begin
-    raise exception 'La bitácora es de solo inserción.';
+    raise exception 'La bitácora y los inicios de sesión son de solo inserción.';
 end;
 $$ language plpgsql;
 
@@ -758,13 +829,21 @@ create trigger trg_bitacora_solo_insercion
 before update or delete on BITACORA
 for each row execute function bitacora_solo_insercion();
 
+create trigger trg_bitacora_detalle_solo_insercion
+before update or delete on BITACORA_DETALLE
+for each row execute function bitacora_solo_insercion();
 
-/* Una cuenta nunca se borra: la bitácora y las recuperaciones de
-   contraseña dependen de ella. Se desactiva con USUA_ACTIVO = false. */
+create trigger trg_log_acceso_solo_insercion
+before update or delete on LOG_ACCESO
+for each row execute function bitacora_solo_insercion();
+
+/* Una cuenta nunca se borra: la bitácora y los inicios de sesión
+   dependen de ella. Se desactiva con cambiar_activo_usuario, o se
+   anonimiza en cancelar_arco. */
 create or replace function bloquear_borrado_usuario()
 returns trigger as $$
 begin
-    raise exception 'Las cuentas no se borran. Desactívala con USUA_ACTIVO = false.';
+    raise exception 'Las cuentas no se borran. Desactívala o usa cancelar_arco.';
 end;
 $$ language plpgsql;
 
@@ -773,19 +852,84 @@ before delete on USUARIO
 for each row execute function bloquear_borrado_usuario();
 
 
+/* Helpers de bitácora. Laravel los llama dentro de la misma
+   transacción que el cambio, para que nunca quede un cambio sin
+   registro (ni al revés). */
+create or replace function bitacora_registrar(p_actor INT4, p_accion VARCHAR, p_tabla VARCHAR,
+                                              p_referencia INT4, p_motivo VARCHAR)
+returns INT4 as $$
+declare
+    v_id INT4;
+begin
+    if p_accion in ('Eliminacion','Ocultacion','Anonimizacion')
+       and nullif(btrim(p_motivo), '') is null then
+        raise exception 'Esta acción requiere motivo.';
+    end if;
+
+    insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_TABLA, BITA_REFERENCIA, BITA_MOTIVO)
+    values (p_actor, p_accion, p_tabla, p_referencia, nullif(btrim(p_motivo), ''))
+    returning BITA_ID_BITACORA into v_id;
+
+    return v_id;
+end;
+$$ language plpgsql;
+
+create or replace function bitacora_detalle_registrar(p_bitacora INT4, p_referencia INT4, p_campo VARCHAR,
+                                                      p_anterior VARCHAR, p_nuevo VARCHAR)
+returns void as $$
+begin
+    if p_campo in ('Nombre','Primer apellido','Segundo apellido','CURP','Género',
+                   'Correo','Contacto','Grado académico','Pertenencia')
+       and (p_anterior is not null or p_nuevo is not null) then
+        raise exception 'Los campos personales no guardan valores en la bitácora (campo: %).', p_campo;
+    end if;
+
+    insert into BITACORA_DETALLE (BIDE_ID_BITACORA, BIDE_REFERENCIA, BIDE_CAMPO, BIDE_ANTERIOR, BIDE_NUEVO)
+    values (p_bitacora, p_referencia, p_campo, p_anterior, p_nuevo);
+end;
+$$ language plpgsql;
+
+/* Laravel llama esta función en cada intento de inicio de sesión,
+   cierre de sesión o cuenta inactiva. p_usuario = null solo si el
+   correo no existe. */
+create or replace function registrar_acceso(p_usuario INT4, p_resultado VARCHAR, p_ip VARCHAR)
+returns INT4 as $$
+declare
+    v_id INT4;
+begin
+    insert into LOG_ACCESO (LOGA_ID_USUARIO, LOGA_RESULTADO, LOGA_IP)
+    values (p_usuario, p_resultado, p_ip)
+    returning LOGA_ID_LOG into v_id;
+    return v_id;
+end;
+$$ language plpgsql;
+
+/* Limpieza de recuperaciones: vencidas o ya usadas. Laravel la programa. */
+create or replace function limpiar_recuperaciones()
+returns INT4 as $$
+declare
+    v_borradas INT4;
+begin
+    delete from RECUPERACION_CONTRASENIA
+     where RECO_FECHA_EXPIRA < now() or RECO_FECHA_USO is not null;
+    get diagnostics v_borradas = row_count;
+    return v_borradas;
+end;
+$$ language plpgsql;
+
+
 /*==============================================================*/
-/* 7b. BORRADO DEFINITIVO DE DATOS                              */
-/*   Solo el superadmin (privilegio eliminar_definitivo) y solo  */
-/*   desde eliminar_persona_definitiva. Nunca en cascada.       */
+/* 7b. ACCIONES SOBRE DATOS                                     */
+/*   Todas dejan registro en bitácora, en la misma transacción. */
 /*==============================================================*/
 
-/* Bloquea el borrado directo de designaciones. Solo la función de
-   borrado definitivo activa el permiso, y solo dentro de su transacción. */
+/* Bloquea el borrado directo de designaciones. Solo las funciones de
+   borrado activan el permiso, y solo dentro de su transacción. */
 create or replace function bloquear_borrado_designacion()
 returns trigger as $$
 begin
     if coalesce(current_setting('sideanfeca.borrado_definitivo', true), '') <> 'on' then
-        raise exception 'Las designaciones no se borran directamente. Usa eliminar_persona_definitiva.';
+        raise exception 'Las designaciones no se borran directamente. Usa eliminar_designacion_erronea o eliminar_persona_definitiva.';
     end if;
     return old;
 end;
@@ -795,19 +939,9 @@ create trigger trg_bloquear_borrado_designacion
 before delete on DESIGNACION
 for each row execute function bloquear_borrado_designacion();
 
-/* p_actor: cuenta que ejecuta. p_persona: persona a borrar.
-   - Sin cuenta: se borra la fila completa.
-   - Con cuenta: se borran contactos, grados, designaciones, CURP,
-     segundo apellido y pertenencias; se conserva el nombre; la cuenta
-     se desactiva y sus recuperaciones de contraseña se conservan.
-   La bitácora guarda solo IDs, sin nombres. */
-create or replace function eliminar_persona_definitiva(p_actor INT4, p_persona INT4)
-returns text as $$
-declare
-    v_permiso boolean;
-    v_cuenta  INT4;
-begin
-    -- 1. Quien ejecuta: cuenta activa con el privilegio
+/* Helper: ¿la cuenta activa tiene este privilegio? */
+create or replace function cuenta_tiene_privilegio(p_actor INT4, p_privilegio text)
+returns boolean as $$
     select exists (
         select 1
         from USUARIO u
@@ -815,67 +949,465 @@ begin
         join PRIVILEGIO p on p.PRIV_ID_PRIVILEGIO = rp.ROPR_ID_PRIVILEGIO
         where u.USUA_ID_USUARIO = p_actor
           and u.USUA_ACTIVO
-          and p.PRIV_NOMBRE = 'eliminar_definitivo'
-    ) into v_permiso;
+          and p.PRIV_NOMBRE = p_privilegio
+    );
+$$ language sql stable;
 
-    if not v_permiso then
+/* REGLA DIFERIDA: toda persona tiene al menos una designación o una
+   cuenta. Se revisa al confirmar la transacción, así que Laravel puede
+   crear la persona y su designación en el mismo paso. */
+create or replace function validar_persona_con_razon()
+returns trigger as $$
+declare
+    v_persona INT4;
+begin
+    if lower(tg_table_name) = 'persona' then
+        v_persona := new.PERS_ID_PERSONA;
+    elsif lower(tg_table_name) = 'designacion' then
+        v_persona := old.DESI_ID_PERSONA;
+    else
+        v_persona := coalesce(new.USUA_ID_PERSONA, old.USUA_ID_PERSONA);
+    end if;
+
+    -- Si la persona ya no existe (se borró completa), no hay nada que revisar
+    if v_persona is null
+       or not exists (select 1 from PERSONA where PERS_ID_PERSONA = v_persona) then
+        return null;
+    end if;
+
+    if not exists (select 1 from DESIGNACION where DESI_ID_PERSONA = v_persona)
+       and not exists (select 1 from USUARIO where USUA_ID_PERSONA = v_persona) then
+        raise exception 'La persona quedaría sin designación y sin cuenta. Si debe desaparecer, bórrala completa.';
+    end if;
+
+    return null;
+end;
+$$ language plpgsql;
+
+create constraint trigger trg_persona_con_razon
+after insert or update on PERSONA
+deferrable initially deferred
+for each row execute function validar_persona_con_razon();
+
+create constraint trigger trg_designacion_con_razon
+after delete on DESIGNACION
+deferrable initially deferred
+for each row execute function validar_persona_con_razon();
+
+create constraint trigger trg_usuario_con_razon
+after update of USUA_ID_PERSONA on USUARIO
+deferrable initially deferred
+for each row execute function validar_persona_con_razon();
+
+
+/* Activar o desactivar una cuenta. Solo gestionar_usuarios.
+   No se puede activar una cuenta anonimizada (no tiene persona). */
+create or replace function cambiar_activo_usuario(p_actor INT4, p_usuario INT4, p_activo BOOL)
+returns text as $$
+declare
+    v_persona INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_usuarios') then
+        raise exception 'La cuenta no tiene permiso para gestionar usuarios.';
+    end if;
+
+    select USUA_ID_PERSONA into v_persona from USUARIO where USUA_ID_USUARIO = p_usuario;
+    if not found then
+        raise exception 'La cuenta no existe.';
+    end if;
+
+    if not p_activo and p_actor = p_usuario then
+        raise exception 'No puedes desactivar tu propia cuenta.';
+    end if;
+
+    if p_activo and v_persona is null then
+        raise exception 'Esta cuenta no tiene persona vinculada y no puede activarse.';
+    end if;
+
+    update USUARIO set USUA_ACTIVO = p_activo where USUA_ID_USUARIO = p_usuario;
+
+    if p_activo then
+        perform bitacora_registrar(p_actor, 'Activacion', 'USUARIO', p_usuario, null);
+        return 'Cuenta activada. Su registro en directorios no cambia.';
+    end if;
+
+    perform bitacora_registrar(p_actor, 'Desactivacion', 'USUARIO', p_usuario, null);
+    return 'Cuenta desactivada.';
+end;
+$$ language plpgsql;
+
+
+/* DESACTIVAR (dejar el cargo) una designación.
+   p_fecha_deja_cargo = primer día SIN cargo (lo que captura el usuario,
+   o hoy si pulsa "desactivar hoy"). Se guarda el día anterior como
+   último día con cargo. Así no hay traslape con el sustituto que
+   empieza ese mismo día. */
+create or replace function desactivar_designacion(p_actor INT4, p_designacion INT4, p_fecha_deja_cargo DATE)
+returns text as $$
+declare
+    v_inicio  DATE;
+    v_fin     DATE;
+    v_nuevo_fin DATE;
+    v_bita    INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_designaciones') then
+        raise exception 'La cuenta no tiene permiso para gestionar designaciones.';
+    end if;
+
+    select DESI_FECHA_INICIO, DESI_FECHA_FIN into v_inicio, v_fin
+    from DESIGNACION where DESI_ID_DESIGNACION = p_designacion;
+
+    if not found then
+        raise exception 'La designación no existe.';
+    end if;
+
+    v_nuevo_fin := p_fecha_deja_cargo - 1;
+
+    if v_nuevo_fin < v_inicio then
+        raise exception 'La designación quedaría sin días de cargo. Si fue un error de captura, bórrala.';
+    end if;
+
+    update DESIGNACION set DESI_FECHA_FIN = v_nuevo_fin where DESI_ID_DESIGNACION = p_designacion;
+
+    v_bita := bitacora_registrar(p_actor, 'Modificacion', 'DESIGNACION', p_designacion, null);
+    perform bitacora_detalle_registrar(v_bita, p_designacion, 'Fecha en que deja el cargo',
+                                       case when v_fin is null then null else (v_fin + 1)::text end,
+                                       p_fecha_deja_cargo::text);
+
+    return 'Fecha de baja registrada.';
+end;
+$$ language plpgsql;
+
+/* Designación capturada por error (nunca ocurrió): se borra. No deja
+   huecos en la historia. Solo se permite con motivo de error o duplicado. */
+create or replace function eliminar_designacion_erronea(p_actor INT4, p_designacion INT4, p_motivo VARCHAR)
+returns text as $$
+declare
+    v_persona INT4;
+    v_puesto  INT4;
+    v_bita    INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_designaciones') then
+        raise exception 'La cuenta no tiene permiso para gestionar designaciones.';
+    end if;
+
+    if p_motivo not in ('Error de captura', 'Duplicado') then
+        raise exception 'Motivo no válido para borrar una designación.';
+    end if;
+
+    select DESI_ID_PERSONA, DESI_ID_PUESTO into v_persona, v_puesto
+    from DESIGNACION where DESI_ID_DESIGNACION = p_designacion;
+
+    if not found then
+        raise exception 'La designación no existe.';
+    end if;
+
+    perform set_config('sideanfeca.borrado_definitivo', 'on', true);
+    delete from DESIGNACION where DESI_ID_DESIGNACION = p_designacion;
+
+    v_bita := bitacora_registrar(p_actor, 'Eliminacion', 'DESIGNACION', p_designacion, p_motivo);
+    perform bitacora_detalle_registrar(v_bita, v_persona, 'Persona', null, null);
+    perform bitacora_detalle_registrar(v_bita, v_puesto, 'Puesto', null, null);
+
+    return 'Designación eliminada.';
+end;
+$$ language plpgsql;
+
+/* BORRADO DEFINITIVO de una persona (superadmin o administrador,
+   según el caso). Motivos: error de captura, duplicado o decisión de
+   la organización. Nunca sobre uno mismo.
+   - Sin cuenta: se borra todo (contactos, grados, designaciones y ficha).
+   - Con cuenta: requiere gestionar_usuarios. Se borran contactos,
+     grados, designaciones y pertenencia; se CONSERVAN nombre,
+     segundo apellido y CURP (para recuperarla si regresa); la cuenta
+     se desactiva.
+   Si el borrado es por ARCO, usar cancelar_arco. */
+create or replace function eliminar_persona_definitiva(p_actor INT4, p_persona INT4, p_motivo VARCHAR)
+returns text as $$
+declare
+    v_cuenta        INT4;
+    v_designaciones INT4;
+    v_bita          INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'eliminar_definitivo') then
         raise exception 'La cuenta no tiene permiso para el borrado definitivo.';
     end if;
 
-    -- 2. La persona debe existir
+    if p_motivo not in ('Error de captura', 'Duplicado', 'Decisión de la organización') then
+        raise exception 'Motivo no válido para el borrado definitivo.';
+    end if;
+
     if not exists (select 1 from PERSONA where PERS_ID_PERSONA = p_persona) then
         raise exception 'La persona no existe.';
     end if;
 
-    -- 3. Nadie borra su propia persona
-    select USUA_ID_USUARIO into v_cuenta
-    from USUARIO where USUA_ID_PERSONA = p_persona;
+    select USUA_ID_USUARIO into v_cuenta from USUARIO where USUA_ID_PERSONA = p_persona;
 
-    if v_cuenta = p_actor then
-        raise exception 'No puedes borrar tu propia persona. Pídelo a otro superadmin.';
+    if v_cuenta is not null then
+        if not cuenta_tiene_privilegio(p_actor, 'gestionar_usuarios') then
+            raise exception 'Solo quien gestiona usuarios puede borrar a una persona con cuenta.';
+        end if;
+        if v_cuenta = p_actor then
+            raise exception 'No puedes borrar tu propia persona. Pídelo a otro superadmin.';
+        end if;
     end if;
 
-    -- 4. Permiso para borrar designaciones, solo en esta transacción
+    select count(*) into v_designaciones from DESIGNACION where DESI_ID_PERSONA = p_persona;
+
     perform set_config('sideanfeca.borrado_definitivo', 'on', true);
 
-    -- 5. Datos y historial
     delete from CONTACTO where CONT_ID_PERSONA = p_persona;
     delete from PERSONA_NIVEL_ACADEMICO where PENA_ID_PERSONA = p_persona;
     delete from DESIGNACION where DESI_ID_PERSONA = p_persona;
 
     if v_cuenta is null then
-        -- 6a. Sin cuenta: se borra la fila completa
         delete from PERSONA where PERS_ID_PERSONA = p_persona;
 
-        insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
-        values (p_actor, 'Eliminacion', 'PERSONA', p_persona, 'Borrado definitivo');
-
+        v_bita := bitacora_registrar(p_actor, 'Eliminacion', 'PERSONA', p_persona, p_motivo);
+        perform bitacora_detalle_registrar(v_bita, null, 'Designaciones eliminadas', null, v_designaciones::text);
         return 'Persona eliminada por completo.';
     end if;
 
-    -- 6b. Con cuenta: se conserva el nombre y se desactiva la cuenta
     update PERSONA
-       set PERS_CURP = null,
-           PERS_SEGUNDO_APELLIDO = null,
-           PERS_ID_INSTITUCION_EDUCATIVA = null,
+       set PERS_ID_INSTITUCION_EDUCATIVA = null,
            PERS_ID_ORGANIZACION = null
      where PERS_ID_PERSONA = p_persona;
 
     update USUARIO set USUA_ACTIVO = false where USUA_ID_USUARIO = v_cuenta;
 
-    insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
-    values (p_actor, 'Desactivacion', 'USUARIO', v_cuenta, 'Desactivada por borrado definitivo');
+    perform bitacora_registrar(p_actor, 'Desactivacion', 'USUARIO', v_cuenta, p_motivo);
 
-    insert into BITACORA (BITA_ID_USUARIO, BITA_ACCION, BITA_ENTIDAD, BITA_ID_REGISTRO, BITA_DESCRIPCION)
-    values (p_actor, 'Eliminacion', 'PERSONA', p_persona, 'Datos eliminados; se conserva el nombre');
+    v_bita := bitacora_registrar(p_actor, 'Eliminacion', 'PERSONA', p_persona, p_motivo);
+    perform bitacora_detalle_registrar(v_bita, null, 'Designaciones eliminadas', null, v_designaciones::text);
+    perform bitacora_detalle_registrar(v_bita, null, 'Pertenencia', null, null);
+    perform bitacora_detalle_registrar(v_bita, null, 'Contacto', null, null);
+    perform bitacora_detalle_registrar(v_bita, null, 'Grado académico', null, null);
 
-    return 'Datos eliminados. Se conservó el nombre y la cuenta quedó desactivada.';
+    return 'Datos eliminados. Se conservaron el nombre y la CURP; la cuenta quedó desactivada.';
+end;
+$$ language plpgsql;
+
+/* BORRAR desde la pantalla del administrador.
+   - Persona CON cuenta: se OCULTA (no se borra nada). El superadmin
+     la sigue viendo con toda su información.
+   - Persona SIN cuenta: se borra por completo (eliminar_persona_definitiva). */
+create or replace function borrar_persona(p_actor INT4, p_persona INT4, p_motivo VARCHAR)
+returns text as $$
+declare
+    v_bita INT4;
+begin
+    if exists (select 1 from USUARIO where USUA_ID_PERSONA = p_persona) then
+        if not cuenta_tiene_privilegio(p_actor, 'gestionar_personas') then
+            raise exception 'La cuenta no tiene permiso para gestionar personas.';
+        end if;
+        if p_motivo not in ('Error de captura', 'Duplicado', 'Decisión de la organización') then
+            raise exception 'Motivo no válido para ocultar a una persona.';
+        end if;
+
+        update PERSONA set PERS_OCULTA_ADMIN = true where PERS_ID_PERSONA = p_persona;
+        perform bitacora_registrar(p_actor, 'Ocultacion', 'PERSONA', p_persona, p_motivo);
+        return 'Persona oculta para administradores. El superadmin la sigue viendo.';
+    end if;
+
+    return eliminar_persona_definitiva(p_actor, p_persona, p_motivo);
+end;
+$$ language plpgsql;
+
+/* Mostrar de nuevo una persona oculta (por ejemplo, al volver a
+   capturarla con su CURP). */
+create or replace function mostrar_persona(p_actor INT4, p_persona INT4)
+returns text as $$
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_personas') then
+        raise exception 'La cuenta no tiene permiso para gestionar personas.';
+    end if;
+
+    update PERSONA set PERS_OCULTA_ADMIN = false where PERS_ID_PERSONA = p_persona;
+    if not found then
+        raise exception 'La persona no existe.';
+    end if;
+
+    perform bitacora_registrar(p_actor, 'Restauracion', 'PERSONA', p_persona, null);
+    return 'Persona visible de nuevo.';
+end;
+$$ language plpgsql;
+
+/* CANCELACIÓN ARCO. Solo quien gestiona usuarios y puede borrar
+   definitivamente. Se borra TODO lo personal, incluido nombre y CURP.
+   - Contactos, grados, designaciones y ficha: se borran.
+   - Cuenta (si existe): se desactiva, se quita el vínculo con la
+     persona, el correo se anonimiza, la contraseña queda inutilizable
+     y sus recuperaciones pendientes se borran. La fila de la cuenta se
+     conserva porque la bitácora la referencia.
+   - Puestos: quedan vacantes si ya no tienen titular.
+   - Bitácora: solo el número de persona, sin nombre. */
+create or replace function cancelar_arco(p_actor INT4, p_persona INT4)
+returns text as $$
+declare
+    v_cuenta INT4;
+    v_bita   INT4;
+begin
+    if not (cuenta_tiene_privilegio(p_actor, 'gestionar_usuarios')
+            and cuenta_tiene_privilegio(p_actor, 'eliminar_definitivo')) then
+        raise exception 'La cuenta no tiene permiso para atender una cancelación ARCO.';
+    end if;
+
+    if not exists (select 1 from PERSONA where PERS_ID_PERSONA = p_persona) then
+        raise exception 'La persona no existe.';
+    end if;
+
+    select USUA_ID_USUARIO into v_cuenta from USUARIO where USUA_ID_PERSONA = p_persona;
+
+    if v_cuenta = p_actor then
+        raise exception 'No puedes atender una cancelación ARCO sobre tu propia cuenta.';
+    end if;
+
+    perform set_config('sideanfeca.borrado_definitivo', 'on', true);
+
+    v_bita := bitacora_registrar(p_actor, 'Eliminacion', 'PERSONA', p_persona, 'Cancelación ARCO');
+    perform bitacora_detalle_registrar(v_bita, null, 'Datos personales', null, null);
+
+    if v_cuenta is not null then
+        delete from RECUPERACION_CONTRASENIA where RECO_ID_USUARIO = v_cuenta;
+
+        update USUARIO
+           set USUA_ACTIVO = false,
+               USUA_ID_PERSONA = null,
+               USUA_CORREO = 'anonimo-' || v_cuenta || '@invalido.invalid',
+               USUA_CONTRASENIA = '!ANONIMIZADA'
+         where USUA_ID_USUARIO = v_cuenta;
+
+        perform bitacora_registrar(p_actor, 'Anonimizacion', 'USUARIO', v_cuenta, 'Cancelación ARCO');
+    end if;
+
+    delete from CONTACTO where CONT_ID_PERSONA = p_persona;
+    delete from PERSONA_NIVEL_ACADEMICO where PENA_ID_PERSONA = p_persona;
+    delete from DESIGNACION where DESI_ID_PERSONA = p_persona;
+    delete from PERSONA where PERS_ID_PERSONA = p_persona;
+
+    return 'Cancelación ARCO aplicada.';
 end;
 $$ language plpgsql;
 
 
 /*==============================================================*/
-/* 8. CATÁLOGOS INICIALES (ejemplo)                             */
+/* 7c. ORDEN DE DIRECTORIOS (una transacción, con bitácora)     */
+/*==============================================================*/
+
+/* Reordenar los puestos de un directorio. p_puestos = lista completa
+   de puestos del directorio, en el nuevo orden. p_puesto_movido =
+   el que el usuario arrastró (para la referencia de la bitácora). */
+create or replace function reordenar_puestos_directorio(p_actor INT4, p_tipo_directorio INT4,
+                                                        p_puesto_movido INT4, p_puestos INT4[])
+returns text as $$
+declare
+    v_total  INT4;
+    v_i      INT4;
+    v_puesto INT4;
+    v_old    INT4;
+    v_nombre VARCHAR(50);
+    v_bita   INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_directorios') then
+        raise exception 'La cuenta no tiene permiso para gestionar directorios.';
+    end if;
+
+    select count(*) into v_total from PUESTO_DIRECTORIO where PUDI_ID_TIPO_DIRECTORIO = p_tipo_directorio;
+    if v_total = 0 then
+        return 'El directorio no tiene puestos.';
+    end if;
+
+    if p_puestos is null
+       or cardinality(p_puestos) <> v_total
+       or (select count(distinct x) from unnest(p_puestos) x) <> v_total
+       or (select count(*) from PUESTO_DIRECTORIO
+            where PUDI_ID_TIPO_DIRECTORIO = p_tipo_directorio
+              and PUDI_ID_PUESTO = any(p_puestos)) <> v_total then
+        raise exception 'La lista debe contener todos los puestos del directorio, una sola vez.';
+    end if;
+
+    if not (p_puesto_movido = any(p_puestos)) then
+        raise exception 'El puesto movido no está en la lista.';
+    end if;
+
+    select TIDI_NOMBRE into v_nombre from TIPO_DIRECTORIO where TIDI_ID_TIPO_DIRECTORIO = p_tipo_directorio;
+
+    v_bita := bitacora_registrar(p_actor, 'Reordenamiento', 'PUESTO_DIRECTORIO', p_puesto_movido, null);
+    perform bitacora_detalle_registrar(v_bita, null, 'Directorio', null, v_nombre);
+
+    for v_i in 1..v_total loop
+        v_puesto := p_puestos[v_i];
+
+        select PUDI_ORDEN into v_old from PUESTO_DIRECTORIO
+         where PUDI_ID_TIPO_DIRECTORIO = p_tipo_directorio and PUDI_ID_PUESTO = v_puesto;
+
+        if v_old is distinct from v_i then
+            update PUESTO_DIRECTORIO set PUDI_ORDEN = v_i
+             where PUDI_ID_TIPO_DIRECTORIO = p_tipo_directorio and PUDI_ID_PUESTO = v_puesto;
+
+            perform bitacora_detalle_registrar(v_bita, v_puesto, 'Orden en el directorio',
+                                               v_old::text, v_i::text);
+        end if;
+    end loop;
+
+    return 'Orden actualizado.';
+end;
+$$ language plpgsql;
+
+/* Reordenar coordinaciones nacionales. Misma regla. */
+create or replace function reordenar_coordinaciones(p_actor INT4, p_coordinacion_movida INT4, p_coordinaciones INT4[])
+returns text as $$
+declare
+    v_total  INT4;
+    v_i      INT4;
+    v_cona   INT4;
+    v_old    INT4;
+    v_bita   INT4;
+begin
+    if not cuenta_tiene_privilegio(p_actor, 'gestionar_coordinaciones') then
+        raise exception 'La cuenta no tiene permiso para gestionar coordinaciones.';
+    end if;
+
+    select count(*) into v_total from COORDINACION_NACIONAL;
+    if v_total = 0 then
+        return 'No hay coordinaciones.';
+    end if;
+
+    if p_coordinaciones is null
+       or cardinality(p_coordinaciones) <> v_total
+       or (select count(distinct x) from unnest(p_coordinaciones) x) <> v_total
+       or (select count(*) from COORDINACION_NACIONAL
+            where CONA_ID_COORDINACION_NACIONAL = any(p_coordinaciones)) <> v_total then
+        raise exception 'La lista debe contener todas las coordinaciones, una sola vez.';
+    end if;
+
+    if not (p_coordinacion_movida = any(p_coordinaciones)) then
+        raise exception 'La coordinación movida no está en la lista.';
+    end if;
+
+    v_bita := bitacora_registrar(p_actor, 'Reordenamiento', 'COORDINACION_NACIONAL', p_coordinacion_movida, null);
+
+    for v_i in 1..v_total loop
+        v_cona := p_coordinaciones[v_i];
+
+        select CONA_ORDEN into v_old from COORDINACION_NACIONAL
+         where CONA_ID_COORDINACION_NACIONAL = v_cona;
+
+        if v_old is distinct from v_i then
+            update COORDINACION_NACIONAL set CONA_ORDEN = v_i
+             where CONA_ID_COORDINACION_NACIONAL = v_cona;
+
+            perform bitacora_detalle_registrar(v_bita, v_cona, 'Orden', v_old::text, v_i::text);
+        end if;
+    end loop;
+
+    return 'Orden actualizado.';
+end;
+$$ language plpgsql;
+
+
+/*==============================================================*/
+/* 8. CATÁLOGOS INICIALES                                       */
 /*   Zonas, entidades, coordinaciones, cargos y personas los    */
 /*   carga el usuario o un seeder de Laravel.                   */
 /*==============================================================*/
