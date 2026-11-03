@@ -23,7 +23,7 @@ class SeguridadSeeder extends Seeder
             'gestionar_grados'         => 'Grados académicos',
             'ver_bitacora'             => 'Consultar la bitácora',
             'gestionar_usuarios'       => 'Crear usuarios, asignar rol y desactivarlos',
-            'eliminar_definitivo'      => 'Borrado definitivo de datos de una persona (solo superadministrador)',
+            'eliminar_definitivo'      => 'Borrado definitivo de personas y designaciones erróneas',
         ];
 
         foreach ($privilegios as $nombre => $descripcion) {
@@ -34,10 +34,10 @@ class SeguridadSeeder extends Seeder
         }
 
         // Solo dos roles. El superadministrador tiene todo.
-        // El administrador tiene todo menos bitácora, usuarios y borrado definitivo.
+        // El administrador tiene todo menos bitácora y usuarios.
         $sinAdmin = array_values(array_diff(
             array_keys($privilegios),
-            ['ver_bitacora', 'gestionar_usuarios', 'eliminar_definitivo']
+            ['ver_bitacora', 'gestionar_usuarios']
         ));
 
         $roles = [
