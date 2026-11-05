@@ -118,11 +118,13 @@ class CatalogosInicialesSeeder extends Seeder
             'Historia',
             'Vinculación Nacional e Internacional',
             'Universidad-Empresa',
-            'Formación Profesional Académica',
+            'Formación Profesional y Académica',
             'Responsabilidad Social Universitaria',
             'Igualdad de Género',
             'Desarrollo Académico Estudiantil',
         ];
+
+        $this->corregirNombresAnteriores();
 
         foreach ($coordinaciones as $indice => $nombre) {
             DB::table('coordinacion_nacional')->updateOrInsert(
@@ -132,6 +134,36 @@ class CatalogosInicialesSeeder extends Seeder
                     'cona_activo' => true,
                 ]
             );
+        }
+    }
+
+    /*
+     * Renombra coordinaciones que se cargaron con un nombre incorrecto en
+     * una versión anterior de este seeder. Sin esto, el seeder buscaría el
+     * nombre nuevo, no lo encontraría e intentaría insertar otra
+     * coordinación con un orden ya ocupado.
+     *
+     * Solo renombra si el nombre anterior existe y el nuevo todavía no.
+     * Es una corrección de datos de instalación, previa a que existan
+     * usuarios; no lleva bitácora porque no hay un actor.
+     */
+    private function corregirNombresAnteriores(): void
+    {
+        // nombre anterior => nombre correcto
+        $correcciones = [
+            'Formación Profesional Académica' => 'Formación Profesional y Académica',
+        ];
+
+        foreach ($correcciones as $anterior => $correcto) {
+            $yaExisteCorrecto = DB::table('coordinacion_nacional')
+                ->where('cona_nombre', $correcto)
+                ->exists();
+
+            if (! $yaExisteCorrecto) {
+                DB::table('coordinacion_nacional')
+                    ->where('cona_nombre', $anterior)
+                    ->update(['cona_nombre' => $correcto]);
+            }
         }
     }
 }
