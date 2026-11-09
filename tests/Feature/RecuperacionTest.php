@@ -99,6 +99,20 @@ class RecuperacionTest extends TestCase
         });
     }
 
+    public function test_el_enlace_usa_app_url_aunque_el_navegador_diga_otra_direccion(): void
+    {
+        config(['app.url' => 'https://sideanfeca.test']);
+        $this->crearCuenta(Rol::ADMINISTRADOR, ['usua_correo' => self::CORREO]);
+
+        // Un atacante manda la solicitud diciendo que el sistema está en otro sitio
+        $this->post('http://sitio-falso.test/recuperar-contrasenia', ['correo' => self::CORREO]);
+
+        Mail::assertSent(EnlaceRecuperacion::class, function (EnlaceRecuperacion $correo): bool {
+            return str_starts_with($correo->url, 'https://sideanfeca.test/recuperar-contrasenia/')
+                && ! str_contains($correo->url, 'sitio-falso');
+        });
+    }
+
     public function test_un_correo_no_registrado_ve_el_mismo_mensaje_y_no_recibe_nada(): void
     {
         $this->followRedirects($this->post(route('contrasenia.enviar'), ['correo' => 'nadie@prueba.test']))

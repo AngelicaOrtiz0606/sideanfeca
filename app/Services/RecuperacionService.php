@@ -59,9 +59,21 @@ class RecuperacionService
         });
 
         Mail::to($cuenta->usua_correo)->send(new EnlaceRecuperacion(
-            route('contrasenia.restablecer', ['solicitud' => $idSolicitud, 'token' => $token]),
+            $this->enlace($idSolicitud, $token),
             self::MINUTOS_VIGENCIA,
         ));
+    }
+
+    /**
+     * Arma el enlace del correo SIEMPRE con APP_URL, nunca con la dirección que
+     * dice el navegador. Así nadie puede pedir un enlace para otra persona
+     * haciendo que apunte a un sitio falso (envenenamiento del enlace).
+     */
+    private function enlace(int $idSolicitud, string $token): string
+    {
+        $ruta = route('contrasenia.restablecer', ['solicitud' => $idSolicitud, 'token' => $token], absolute: false);
+
+        return rtrim((string) config('app.url'), '/').$ruta;
     }
 
     /**

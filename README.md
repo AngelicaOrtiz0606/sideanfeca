@@ -32,7 +32,7 @@ Todos los comandos se corren en la carpeta del proyecto.
 
    En `.env` escribe los datos de PostgreSQL: `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD`. El usuario de la base debe ser dueño de la base (lo necesita para crear la extensión `btree_gist`).
 
-   Escribe también `APP_URL` con la dirección con la que se entra al sistema (por ejemplo `http://192.168.181.128` o la dirección del servidor oficial). Los enlaces de recuperación de contraseña que se envían por correo se arman con ella.
+   Escribe también `APP_URL` con la dirección con la que se entra al sistema (en el servidor oficial, su dirección definitiva; en una máquina de práctica puede quedarse en `http://localhost`). Los enlaces de recuperación de contraseña que se envían por correo se arman siempre con ella, nunca con la dirección que diga el navegador, para que nadie pueda desviarlos a un sitio falso.
 
 3. **Esquema de la base de datos.** La migración carga `database/sql/esquema_sideanfeca.sql` completo (tablas, funciones y triggers).
 
