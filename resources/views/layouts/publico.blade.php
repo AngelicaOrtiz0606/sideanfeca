@@ -13,7 +13,7 @@
     <link rel="icon" type="image/png" href="{{ asset('img/logo_anfeca.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="cuerpo">
+<body class="@yield('clase_cuerpo', 'cuerpo')">
     <a href="#contenido" class="saltar">Saltar al contenido</a>
 
     {{-- Una página puede omitir el encabezado con @section('sin_encabezado', true) --}}
@@ -25,6 +25,6 @@
         @yield('contenido')
     </main>
 
-    <x-footer class="pie--centrado" />
+    <x-footer :class="trim('pie--centrado '.View::yieldContent('clase_pie'))" />
 </body>
 </html>

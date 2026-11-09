@@ -5,33 +5,11 @@
 {{-- El panel rojo ya presenta el sistema: esta página no repite el encabezado --}}
 @section('sin_encabezado', true)
 @section('clase_contenido', 'acceso')
+@section('clase_cuerpo', 'cuerpo cuerpo--acceso')
+@section('clase_pie', 'pie--compacto')
 
 @section('contenido')
-    <section class="acceso__marca" aria-labelledby="acceso-sistema">
-        <div class="acceso__marca-contenido">
-            <div class="acceso__identidad">
-                <span class="acceso__logo">
-                    <img src="{{ asset('img/logo_anfeca.png') }}" alt="" width="52" height="68">
-                </span>
-                <div>
-                    <p class="acceso__sistema" id="acceso-sistema">SIDEANFECA</p>
-                    <p class="acceso__lema">Sistema de Directorios de ANFECA</p>
-                </div>
-            </div>
-
-            <div class="acceso__descripcion">
-                <p class="acceso__asociacion">
-                    Asociación Nacional de Facultades y Escuelas de Contaduría y Administración
-                </p>
-                <ul class="acceso__directorios" aria-label="Directorios que administra el sistema">
-                    <li>Consejo Nacional Directivo</li>
-                    <li>Consejos Regionales</li>
-                    <li>Coordinaciones Nacionales</li>
-                    <li>Instituciones</li>
-                </ul>
-            </div>
-        </div>
-    </section>
+    <x-acceso-marca />
 
     <section class="acceso__panel" aria-labelledby="acceso-titulo">
         <div class="acceso__formulario">
@@ -69,10 +47,7 @@
                 <div class="campo">
                     <div class="campo__encabezado">
                         <label for="contrasenia" class="campo__etiqueta">Contraseña</label>
-                        {{-- El enlace aparece en cuanto exista la ruta de recuperación --}}
-                        @if (Route::has('contrasenia.solicitar'))
-                            <a href="{{ route('contrasenia.solicitar') }}" class="campo__enlace">¿Olvidaste tu contraseña?</a>
-                        @endif
+                        <a href="{{ route('contrasenia.solicitar') }}" class="campo__enlace">¿Olvidaste tu contraseña?</a>
                     </div>
                     <div class="campo__con-boton">
                         <input

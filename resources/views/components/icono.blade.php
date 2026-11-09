@@ -69,6 +69,9 @@
         @case('entrar')
             <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
             @break
+        @case('regresar')
+            <path d="m12 19-7-7 7-7" /><path d="M19 12H5" />
+            @break
         @case('alerta')
             <circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" />
             @break

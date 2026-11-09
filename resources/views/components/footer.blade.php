@@ -37,23 +37,25 @@
                 previo por escrito de la institución.
             </p>
 
-            <ul class="pie__legales">
-                @foreach ($enlacesLegales as $enlace)
-                    <li>
-                        @if (filled($enlace['url']))
-                            <a href="{{ $enlace['url'] }}" target="_blank" rel="noopener">
-                                {{ $enlace['texto'] }}<span class="solo-lectores"> (PDF, se abre en otra pestaña)</span>
-                            </a>
-                        @else
-                            <span>{{ $enlace['texto'] }}</span>
-                        @endif
-                    </li>
-                @endforeach
-            </ul>
+            <div class="pie__cierre">
+                <ul class="pie__legales">
+                    @foreach ($enlacesLegales as $enlace)
+                        <li>
+                            @if (filled($enlace['url']))
+                                <a href="{{ $enlace['url'] }}" target="_blank" rel="noopener">
+                                    {{ $enlace['texto'] }}<span class="solo-lectores"> (PDF, se abre en otra pestaña)</span>
+                                </a>
+                            @else
+                                <span>{{ $enlace['texto'] }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
 
-            <p class="pie__administra">
-                Sitio web administrado por el Centro de Informática de la Facultad de Contaduría y Administración (CIFCA).
-            </p>
+                <p class="pie__administra">
+                    Sitio web administrado por el Centro de Informática de la Facultad de Contaduría y Administración (CIFCA).
+                </p>
+            </div>
         </div>
     </div>
 </footer>

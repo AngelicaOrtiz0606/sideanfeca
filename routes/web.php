@@ -9,6 +9,9 @@ Route::redirect('/', '/login');
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'mostrar'])->name('login');
     Route::post('/login', [LoginController::class, 'iniciar'])->name('login.iniciar');
+
+    // Página temporal: el flujo de recuperación por correo se programa en su propio lote de M1
+    Route::view('/recuperar-contrasenia', 'auth.recuperar')->name('contrasenia.solicitar');
 });
 
 Route::middleware(['auth', 'cuenta.activa'])->group(function () {

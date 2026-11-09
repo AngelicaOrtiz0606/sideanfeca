@@ -27,8 +27,18 @@ class LayoutTest extends TestCase
             ->assertSee('id="contenido"', false)
             ->assertSee('SIDEANFECA')
             ->assertSee('data-mostrar-contrasenia', false)
+            ->assertSee('¿Olvidaste tu contraseña?')
+            ->assertSee('href="'.route('contrasenia.solicitar').'"', false)
             ->assertSee('aria-live="polite"', false)
             ->assertDontSee('id="menu-lateral"', false);
+    }
+
+    public function test_la_pagina_de_recuperacion_existe_y_regresa_al_login(): void
+    {
+        $this->get(route('contrasenia.solicitar'))
+            ->assertOk()
+            ->assertSee('Recuperar contraseña')
+            ->assertSee('href="'.route('login').'"', false);
     }
 
     public function test_el_footer_conserva_la_leyenda_oficial(): void
