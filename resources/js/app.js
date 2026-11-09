@@ -87,7 +87,7 @@ document.querySelectorAll('[data-mostrar-contrasenia]').forEach((boton) => {
 });
 
 document.querySelectorAll('[data-contrasenia]').forEach((campo) => {
-    const aviso = document.querySelector('[data-aviso-mayusculas]');
+    const aviso = document.getElementById(campo.dataset.aviso);
 
     if (!aviso) {
         return;
@@ -104,3 +104,82 @@ document.querySelectorAll('[data-contrasenia]').forEach((campo) => {
         aviso.textContent = '';
     });
 });
+
+/*
+ * Formularios con data-validar: el botón de enviar queda inactivo hasta que los
+ * campos estén bien llenos. Es una ayuda para la persona; el servidor vuelve a
+ * validar todo (FormRequest) y la base solo recibe consultas con parámetros.
+ *
+ * - Campos obligatorios, correos con formato válido (type="email") y largos máximos.
+ * - data-regla="nueva": al menos 8 caracteres, con letras y números.
+ * - data-igual-a="id": debe coincidir con otro campo (confirmación).
+ */
+const REGLA_CONTRASENIA = (valor) => valor.length >= 8 && valor.length <= 72 && /\p{L}/u.test(valor) && /\d/.test(valor);
+
+function campoValido(campo) {
+    // Los navegadores no siempre avisan cuando autocompletan; un campo autocompletado cuenta como lleno
+    let autocompletado = false;
+    try {
+        autocompletado = campo.matches(':autofill');
+    } catch {
+        autocompletado = false;
+    }
+
+    if (campo.value === '' && autocompletado) {
+        return true;
+    }
+
+    if (campo.value.trim() === '' && campo.required) {
+        return false;
+    }
+
+    if (campo.dataset.regla === 'nueva' && !REGLA_CONTRASENIA(campo.value)) {
+        return false;
+    }
+
+    if (campo.dataset.igualA) {
+        const otro = document.getElementById(campo.dataset.igualA);
+        if (!otro || otro.value !== campo.value) {
+            return false;
+        }
+    }
+
+    return campo.checkValidity();
+}
+
+document.querySelectorAll('form[data-validar]').forEach((formulario) => {
+    const boton = formulario.querySelector('[type="submit"]');
+    const pista = formulario.querySelector('[data-pista]');
+    const campos = [...formulario.querySelectorAll('input:not([type="hidden"])')];
+
+    const actualizar = () => {
+        const listo = campos.every(campoValido);
+        boton.disabled = !listo;
+        if (pista) {
+            pista.hidden = listo;
+        }
+    };
+
+    formulario.addEventListener('input', actualizar);
+    formulario.addEventListener('change', actualizar);
+    // Revisa otra vez cuando el navegador termina de autocompletar
+    window.addEventListener('load', () => setTimeout(actualizar, 300));
+    actualizar();
+});
+
+/*
+ * Botón redondo para subir: aparece solo cuando la página ya bajó.
+ */
+const botonSubir = document.querySelector('[data-boton-subir]');
+
+if (botonSubir) {
+    // Aparece al bajar 320 px o, en páginas cortas, al bajar más de la mitad de lo que se puede bajar
+    const revisarDesplazamiento = () => {
+        const maximo = document.documentElement.scrollHeight - window.innerHeight;
+        const umbral = Math.max(80, Math.min(320, maximo * 0.5));
+        botonSubir.hidden = maximo <= 0 || window.scrollY < umbral;
+    };
+
+    window.addEventListener('scroll', revisarDesplazamiento, { passive: true });
+    revisarDesplazamiento();
+}

@@ -31,5 +31,7 @@
             <x-footer />
         </div>
     </div>
+
+    <x-boton-subir />
 </body>
 </html>

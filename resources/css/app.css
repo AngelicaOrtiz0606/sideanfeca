@@ -172,6 +172,19 @@
     background: var(--color-marca-tinte);
 }
 
+.boton:disabled {
+    border-color: var(--color-borde);
+    background: #e4e4e4;
+    color: #5f5f5f;
+    cursor: not-allowed;
+}
+
+.formulario__pista {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
 .boton--ancho {
     width: 100%;
 }
@@ -585,9 +598,10 @@ a.menu-lateral__enlace:hover .icono {
 }
 
 /* ---------- Pie de página (leyenda oficial) ---------- */
-/* Misma información y orden del prototipo, acomodada en pocos renglones */
+/* Una sola franja con degradado: datos a la izquierda, leyenda y enlaces a la derecha */
 .pie {
-    color: #fff;
+    background: linear-gradient(100deg, var(--color-marca) 0%, #750000 55%, var(--color-marca-oscuro) 100%);
+    color: rgb(255 255 255 / 0.9);
     font-size: 0.8125rem;
     line-height: 1.5;
 }
@@ -596,22 +610,24 @@ a.menu-lateral__enlace:hover .icono {
     outline-color: #fff;
 }
 
-.pie__franja {
-    background: var(--color-marca);
-}
-
-.pie__franja--inferior {
-    background: #6f0000;
-}
-
 .pie__contenido {
+    display: grid;
+    gap: 0.75rem;
     max-width: 80rem;
-    padding: 0.75rem 1rem;
+    padding: 1rem;
 }
 
 @media (width >= 40rem) {
     .pie__contenido {
-        padding-inline: 2rem;
+        padding: 1rem 2rem;
+    }
+}
+
+@media (width >= 56rem) {
+    .pie__contenido {
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 2rem;
     }
 }
 
@@ -619,123 +635,91 @@ a.menu-lateral__enlace:hover .icono {
     margin-inline: auto;
 }
 
-.pie__superior {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem 1.5rem;
-}
-
-/* Nombre, "Hecho en México" y "D.R." en un renglón (en teléfono, uno debajo del otro) */
 .pie__datos {
-    display: flex;
-    flex-direction: column;
-    color: rgb(255 255 255 / 0.9);
-}
-
-.pie__titulo {
-    color: #fff;
-    font-size: 0.875rem;
-    font-weight: 700;
-}
-
-@media (width >= 48rem) {
-    .pie__datos {
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: baseline;
-    }
-
-    .pie__datos p + p::before {
-        content: '·';
-        margin: 0 0.625rem;
-        color: rgb(255 255 255 / 0.55);
-    }
-}
-
-.pie__subir {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    flex-shrink: 0;
-    min-height: 2.25rem;
-    padding: 0 0.875rem;
-    border: 1px solid rgb(255 255 255 / 0.45);
-    border-radius: 999px;
     color: #fff;
     font-weight: 600;
-    text-decoration: none;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
 }
 
-.pie__subir:hover {
-    border-color: #fff;
-    background: rgb(255 255 255 / 0.12);
+@media (width >= 56rem) {
+    .pie__datos {
+        padding-right: 2rem;
+        border-right: 1px solid rgb(255 255 255 / 0.3);
+    }
 }
 
-.pie__subir .icono {
-    width: 1rem;
-    height: 1rem;
-}
-
-.pie__inferior {
+.pie__texto {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding-block: 0.875rem;
-    color: rgb(255 255 255 / 0.88);
+    gap: 0.25rem;
 }
 
 .pie__leyenda {
-    max-width: 120ch;
+    max-width: 130ch;
 }
 
-/* Enlaces legales y CIFCA comparten renglón en pantallas anchas */
-.pie__cierre {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.375rem 2rem;
+.pie a {
+    color: #fff;
+    font-weight: 600;
+    text-decoration-color: rgb(255 255 255 / 0.5);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color 0.15s ease;
+}
+
+.pie a:hover {
+    text-decoration-color: #fff;
 }
 
 .pie__legales {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem 0;
+    gap: 0.125rem 0;
     list-style: none;
-    font-weight: 600;
 }
 
-@media (width < 40rem) {
-    .pie__legales {
-        flex-direction: column;
-        gap: 0.375rem;
-    }
+.pie__legales li:not(:last-child)::after {
+    content: '|';
+    margin: 0 0.625rem;
+    color: rgb(255 255 255 / 0.5);
+}
+
+/* Botón flotante para subir: solo aparece cuando la página ya bajó */
+.boton-subir {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border: 1px solid rgb(255 255 255 / 0.6);
+    border-radius: 999px;
+    background: var(--color-marca);
+    color: #fff;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+    transition: background-color 0.15s ease, opacity 0.2s ease, transform 0.2s var(--curva-salida);
+}
+
+.boton-subir:hover {
+    background: var(--color-marca-hover);
+}
+
+.boton-subir[hidden] {
+    display: none;
+}
+
+.boton-subir:focus-visible {
+    outline: 3px solid var(--color-tinta);
+    outline-offset: 2px;
 }
 
 @media (width >= 40rem) {
-    .pie__legales li:not(:last-child)::after {
-        content: '|';
-        margin: 0 0.625rem;
-        color: rgb(255 255 255 / 0.45);
-        font-weight: 400;
+    .boton-subir {
+        right: 1.5rem;
+        bottom: 1.5rem;
     }
-}
-
-.pie__legales a {
-    color: #fff;
-    text-decoration-color: rgb(255 255 255 / 0.5);
-    text-decoration-thickness: 1px;
-    transition: text-decoration-color 0.15s ease;
-}
-
-.pie__legales a:hover {
-    text-decoration-color: #fff;
-}
-
-.pie__administra {
-    color: rgb(255 255 255 / 0.8);
 }
 
 /* ---------- Formularios ---------- */
@@ -883,8 +867,12 @@ a.menu-lateral__enlace:hover .icono {
     font-size: 1rem;
 }
 
-/* ---------- Inicio de sesión ---------- */
-/* En el login, el panel ocupa el alto que deja el footer: así se ven los dos sin desplazarse */
+/* ---------- Inicio de sesión y recuperación de contraseña ---------- */
+/*
+ * Pantalla dividida, sin encabezado: a la izquierda la identidad del sistema
+ * sobre un fondo claro; a la derecha el formulario. El footer va abajo y se ve
+ * sin desplazarse en las pantallas de computadora más comunes.
+ */
 .cuerpo--acceso {
     display: flex;
     flex-direction: column;
@@ -896,20 +884,22 @@ a.menu-lateral__enlace:hover .icono {
     background: var(--color-superficie);
 }
 
-@media (width >= 64rem) {
+@media (width >= 56rem) {
     .acceso {
-        grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 }
 
-/* Panel de marca: rojo institucional con el patrón del prototipo como textura */
+/* Panel de identidad: fondo claro con el patrón del prototipo muy tenue y la cintilla abajo */
 .acceso__marca {
     position: relative;
     isolation: isolate;
     overflow: hidden;
     display: flex;
-    background: linear-gradient(160deg, var(--color-marca) 0%, #7a0000 55%, var(--color-marca-oscuro) 100%);
-    color: #fff;
+    align-items: center;
+    padding: 1.25rem 1.25rem;
+    border-bottom: 1px solid var(--color-borde);
+    background: #f6f4f4;
 }
 
 .acceso__marca::before {
@@ -917,53 +907,32 @@ a.menu-lateral__enlace:hover .icono {
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: url('/img/fondo.jpg') center / 22rem;
-    opacity: 0.09;
-    mix-blend-mode: luminosity;
+    background: url('/img/fondo.jpg') center / 20rem;
+    opacity: 0.06;
 }
 
-.acceso__marca :focus-visible {
-    outline-color: #fff;
-}
-
-.acceso__marca-contenido {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 2.5rem;
-    width: 100%;
-    padding: 1.5rem 1.25rem;
-}
-
-@media (width >= 64rem) {
-    .acceso__marca-contenido {
-        padding: 2.5rem 3rem;
+@media (width >= 56rem) {
+    .acceso__marca {
+        justify-content: center;
+        padding: 3rem;
+        border-right: 1px solid var(--color-borde);
+        border-bottom: none;
     }
 }
 
 .acceso__identidad {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.875rem;
 }
 
 .acceso__logo {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 3.5rem;
-    height: 3.5rem;
-    border-radius: 0.875rem;
-    background: #fff;
-    box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
-}
-
-.acceso__logo img {
-    width: 2.125rem;
-    height: auto;
+    width: auto;
+    height: 2.75rem;
 }
 
 .acceso__sistema {
+    color: var(--color-marca);
     font-size: 1.25rem;
     font-weight: 800;
     line-height: 1.1;
@@ -972,74 +941,43 @@ a.menu-lateral__enlace:hover .icono {
 
 .acceso__lema {
     margin-top: 0.125rem;
-    color: rgb(255 255 255 / 0.92);
-    font-size: 0.9375rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
     font-weight: 500;
 }
 
-.acceso__descripcion {
+.acceso__linea {
     display: none;
 }
 
-@media (width >= 64rem) {
-    .acceso__logo {
-        width: 4.25rem;
-        height: 4.25rem;
-        border-radius: 1.25rem;
+@media (width >= 56rem) {
+    .acceso__identidad {
+        flex-direction: column;
+        gap: 1.25rem;
+        text-align: center;
     }
 
-    .acceso__logo img {
-        width: 2.5rem;
+    .acceso__logo {
+        height: 6.5rem;
     }
 
     .acceso__sistema {
-        font-size: 1.75rem;
+        font-size: 2rem;
     }
 
     .acceso__lema {
-        font-size: 1rem;
+        margin-top: 0.375rem;
+        font-size: 1.0625rem;
     }
 
-    .acceso__descripcion {
+    .acceso__linea {
         display: block;
-        max-width: 30rem;
+        width: 3rem;
+        height: 3px;
+        margin: 1.25rem auto 0;
+        border-radius: 2px;
+        background: var(--color-marca);
     }
-}
-
-.acceso__asociacion {
-    color: #fff;
-    font-size: 1.0625rem;
-    font-weight: 600;
-    line-height: 1.35;
-    text-wrap: balance;
-}
-
-.acceso__directorios {
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgb(255 255 255 / 0.25);
-    list-style: none;
-    color: rgb(255 255 255 / 0.94);
-    font-size: 0.9375rem;
-}
-
-/* Viñeta en rombo, como las figuras del logo */
-.acceso__directorios li {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.acceso__directorios li::before {
-    content: '';
-    flex-shrink: 0;
-    width: 0.5rem;
-    height: 0.5rem;
-    background: #fff;
-    transform: rotate(45deg);
 }
 
 /* Panel del formulario */
@@ -1047,10 +985,10 @@ a.menu-lateral__enlace:hover .icono {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2.5rem 1.25rem 3rem;
+    padding: 2rem 1.25rem 2.5rem;
 }
 
-@media (width >= 64rem) {
+@media (width >= 56rem) {
     .acceso__panel {
         padding: 2.5rem 3rem;
     }
@@ -1058,71 +996,83 @@ a.menu-lateral__enlace:hover .icono {
 
 .acceso__formulario {
     width: 100%;
-    max-width: 28rem;
+    max-width: 26rem;
 }
 
 .acceso__titulo {
     color: var(--color-tinta);
-    font-size: 1.375rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.25;
     letter-spacing: -0.01em;
 }
 
-@media (width >= 64rem) {
-    .acceso__titulo {
-        font-size: 1.5rem;
-    }
-}
-
 .acceso__instruccion {
-    margin: 0.5rem 0 1.5rem;
-    color: var(--color-texto);
-    font-size: 1rem;
+    margin: 0.375rem 0 1.5rem;
+    color: var(--color-texto-suave);
     line-height: 1.5;
 }
 
-.acceso .boton--primario {
-    margin-top: 0.5rem;
-}
-
-.acceso__ayuda {
+.acceso__pie {
     margin-top: 1.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--color-borde);
     color: var(--color-texto-suave);
     font-size: 0.9375rem;
-    line-height: 1.55;
+    line-height: 1.5;
 }
 
-/* En el login, una línea fina separa el footer del panel rojo */
-.pie--compacto {
-    border-top: 1px solid rgb(255 255 255 / 0.22);
+.acceso__pie a {
+    font-weight: 600;
 }
 
-/* Pantallas bajas (laptops de 720 px de alto): se compacta el login para que el footer quepa */
-@media (width >= 64rem) and (height < 48rem) {
-    .acceso__marca-contenido,
-    .acceso__panel {
-        padding-block: 1.5rem;
-    }
-
-    .acceso__directorios {
-        gap: 0.375rem;
-        margin-top: 1rem;
-        padding-top: 1rem;
-    }
-
-    .acceso__instruccion {
-        margin-bottom: 1.25rem;
-    }
-
-    .formulario--amplio {
-        gap: 1.125rem;
-    }
-
-    .acceso__ayuda {
-        margin-top: 1.25rem;
-        padding-top: 1rem;
-    }
+/* Mensajes de estado (por ejemplo, "te enviamos un enlace") */
+.aviso {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    margin-bottom: 1.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid;
+    border-radius: var(--radio);
+    font-size: 0.9375rem;
+    line-height: 1.5;
 }
+
+.aviso .icono {
+    margin-top: 0.1rem;
+}
+
+.aviso--exito {
+    border-color: #b9dcc3;
+    background: var(--color-exito-fondo);
+    color: var(--color-exito);
+}
+
+.aviso--error {
+    border-color: #efc3c0;
+    background: var(--color-error-fondo);
+    color: var(--color-error);
+}
+
+.campo__ayuda {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.enlace-regresar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.enlace-regresar:hover {
+    text-decoration: underline;
+}
+
+.enlace-regresar .icono {
+    width: 1rem;
+    height: 1rem;
+}
+

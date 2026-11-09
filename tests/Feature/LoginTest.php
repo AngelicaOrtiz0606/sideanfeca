@@ -179,6 +179,31 @@ class LoginTest extends TestCase
         $this->assertSame($antes + LoginRequest::INTENTOS_POR_MINUTO, DB::table('log_acceso')->count());
     }
 
+    public function test_un_intento_de_inyeccion_sql_no_entra_ni_altera_la_base(): void
+    {
+        $this->crearCuenta(Rol::ADMINISTRADOR, ['usua_correo' => 'ana@prueba.test']);
+        $cuentasAntes = DB::table('usuario')->count();
+
+        foreach ([
+            ['correo' => "ana@prueba.test' OR '1'='1", 'contrasenia' => "' OR '1'='1"],
+            ['correo' => 'ana@prueba.test', 'contrasenia' => "x'; DROP TABLE usuario; --"],
+        ] as $intento) {
+            $this->post('/login', $intento)->assertSessionHasErrors('correo');
+        }
+
+        $this->assertGuest();
+        $this->assertSame($cuentasAntes, DB::table('usuario')->count());
+    }
+
+    public function test_el_texto_escrito_se_muestra_escapado_y_no_se_ejecuta(): void
+    {
+        $malicioso = '"><script>alert(1)</script>';
+
+        $this->followRedirects($this->from('/login')->post('/login', ['correo' => $malicioso, 'contrasenia' => 'x']))
+            ->assertDontSee('<script>alert(1)</script>', false)
+            ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false);
+    }
+
     public function test_cerrar_sesion_sale_y_registra_el_cierre(): void
     {
         $cuenta = $this->crearCuenta();

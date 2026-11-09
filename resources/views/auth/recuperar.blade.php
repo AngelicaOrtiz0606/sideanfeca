@@ -1,32 +1,55 @@
 @extends('layouts.publico')
 
 @section('titulo', 'Recuperar contraseña')
-
-@section('sin_encabezado', true)
-@section('clase_contenido', 'acceso')
-@section('clase_cuerpo', 'cuerpo cuerpo--acceso')
-@section('clase_pie', 'pie--compacto')
+@section('acceso', true)
 
 @section('contenido')
-    <x-acceso-marca />
+    <h1 class="acceso__titulo">Recuperar contraseña</h1>
+    <p class="acceso__instruccion">
+        Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.
+    </p>
 
-    <section class="acceso__panel" aria-labelledby="recuperar-titulo">
-        <div class="acceso__formulario">
-            <h1 id="recuperar-titulo" class="acceso__titulo">Recuperar contraseña</h1>
+    <x-aviso-estado />
 
-            {{-- Página temporal. El flujo por correo (código de 15 minutos) se
-                 programa en su propio lote de M1 y reemplaza este contenido. --}}
-            <p class="acceso__instruccion">
-                Muy pronto podrás recibir aquí un código en tu correo para crear una contraseña nueva.
-            </p>
-            <p class="acceso__instruccion">
-                Mientras tanto, comunícate con la persona responsable del sistema en tu institución.
-            </p>
+    <form method="POST" action="{{ route('contrasenia.enviar') }}" class="formulario formulario--amplio" novalidate data-validar>
+        @csrf
 
-            <a href="{{ route('login') }}" class="boton boton--secundario boton--ancho">
-                <x-icono nombre="regresar" />
-                <span>Volver a iniciar sesión</span>
-            </a>
+        <div class="campo">
+            <label for="correo" class="campo__etiqueta">Correo electrónico</label>
+            <input
+                id="correo"
+                name="correo"
+                type="email"
+                value="{{ old('correo') }}"
+                class="campo__entrada"
+                autocomplete="email"
+                inputmode="email"
+                autocapitalize="none"
+                spellcheck="false"
+                maxlength="254"
+                required
+                autofocus
+                @error('correo') aria-invalid="true" aria-describedby="correo-error" @enderror
+            >
+            @error('correo')
+                <p id="correo-error" class="campo__error" role="alert">
+                    <x-icono nombre="alerta" />
+                    <span>{{ $message }}</span>
+                </p>
+            @enderror
         </div>
-    </section>
+
+        <button type="submit" class="boton boton--primario boton--grande boton--ancho" aria-describedby="pista-recuperar">
+            <x-icono nombre="correo" />
+            <span>Enviar enlace</span>
+        </button>
+        <p id="pista-recuperar" class="formulario__pista" data-pista hidden>Escribe un correo válido para continuar.</p>
+    </form>
+
+    <p class="acceso__pie">
+        <a href="{{ route('login') }}" class="enlace-regresar">
+            <x-icono nombre="regresar" />
+            <span>Volver a iniciar sesión</span>
+        </a>
+    </p>
 @endsection

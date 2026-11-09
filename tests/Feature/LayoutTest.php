@@ -41,19 +41,38 @@ class LayoutTest extends TestCase
             ->assertSee('href="'.route('login').'"', false);
     }
 
-    public function test_el_footer_conserva_la_leyenda_oficial(): void
+    public function test_el_footer_conserva_la_leyenda_oficial_en_el_orden_pedido(): void
     {
         $this->get('/login')
-            ->assertSee('Sistema Integral de Directorios ANFECA')
-            ->assertSee('Hecho en México')
-            ->assertSee('D.R. © '.now()->year)
-            ->assertSee(self::LEYENDA)
-            ->assertSee('AVISO DE PRIVACIDAD')
-            ->assertSee('Documento de seguridad')
-            ->assertSee('Instrumento jurídico')
-            ->assertSee('Aviso de privacidad simplificado')
-            ->assertSee('Sitio web administrado por el Centro de Informática de la Facultad de Contaduría y Administración (CIFCA).')
+            ->assertSeeInOrder([
+                'Hecho en México',
+                'D.R. © '.now()->year,
+                self::LEYENDA,
+                'previo por escrito de la institución.',
+                'AVISO DE PRIVACIDAD',
+                'Sitio web administrado por el Centro de Informática de la Facultad de Contaduría y Administración (CIFCA).',
+                'Documento de seguridad',
+                'Instrumento jurídico',
+                'Aviso de privacidad simplificado',
+            ])
             ->assertDontSee('href="#"', false);
+    }
+
+    public function test_el_boton_para_subir_es_flotante_y_empieza_oculto(): void
+    {
+        $this->get('/login')
+            ->assertSee('class="boton-subir" data-boton-subir hidden', false)
+            ->assertSee('Subir al inicio de la página');
+    }
+
+    public function test_los_formularios_de_acceso_se_validan_antes_de_enviarse(): void
+    {
+        $this->get('/login')
+            ->assertSee('data-validar', false)
+            ->assertSee('type="email"', false)
+            ->assertSee('required', false);
+
+        $this->get(route('contrasenia.solicitar'))->assertSee('data-validar', false);
     }
 
     public function test_los_enlaces_legales_apuntan_a_los_documentos_de_la_fca(): void
