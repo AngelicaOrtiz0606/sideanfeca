@@ -1,28 +1,38 @@
 {{--
-    Campo de contraseña con botón "Mostrar / Ocultar" y aviso de mayúsculas activadas.
+    Campo de contraseña con botón "Mostrar / Ocultar", aviso de mayúsculas
+    activadas y retroalimentación mientras se escribe.
 
     Uso:
         <x-campo-contrasenia id="contrasenia" name="contrasenia" etiqueta="Contraseña"
                              autocomplete="current-password">
             <x-slot:enlace><a href="...">¿Olvidaste tu contraseña?</a></x-slot:enlace>
         </x-campo-contrasenia>
+
+    regla="nueva" muestra la lista de requisitos (8 caracteres, mayúscula, número
+    y carácter especial) y la va marcando. igual-a="otro_id" avisa si coincide
+    con otro campo.
 --}}
 @props([
     'id',
     'name',
     'etiqueta',
     'autocomplete' => 'current-password',
-    'ayuda' => null,
     'enlace' => null,
-    // 'nueva': exige la regla del sistema (8 caracteres, letras y números) en el navegador
     'regla' => null,
-    // id del campo que debe coincidir (confirmación de contraseña)
     'igualA' => null,
 ])
 
 @php
+    $requisitos = [
+        'largo' => '8 caracteres o más',
+        'mayuscula' => 'Una mayúscula',
+        'numero' => 'Un número',
+        'especial' => 'Un carácter especial',
+    ];
+
     $describe = collect([
-        $ayuda ? "{$id}-ayuda" : null,
+        $regla === 'nueva' ? "{$id}-requisitos" : null,
+        $igualA ? "{$id}-retro" : null,
         "{$id}-mayusculas",
         $errors->has($name) ? "{$id}-error" : null,
     ])->filter()->implode(' ');
@@ -57,10 +67,25 @@
         </button>
     </div>
 
-    @if ($ayuda)
-        <p id="{{ $id }}-ayuda" class="campo__ayuda">{{ $ayuda }}</p>
+    @if ($regla === 'nueva')
+        <div class="requisitos" id="{{ $id }}-requisitos">
+            <p class="requisitos__titulo">Tu contraseña debe tener:</p>
+            <ul class="requisitos__lista" data-requisitos="{{ $id }}">
+            @foreach ($requisitos as $clave => $texto)
+                <li class="requisitos__item" data-requisito="{{ $clave }}" data-cumple="false">
+                    <x-icono nombre="circulo" data-icono-pendiente />
+                    <x-icono nombre="correcto" data-icono-cumple />
+                    <span>{{ $texto }}</span>
+                    <span class="solo-lectores" data-estado-requisito>: pendiente</span>
+                </li>
+            @endforeach
+            </ul>
+        </div>
     @endif
 
+    @if ($igualA)
+        <p id="{{ $id }}-retro" class="campo__retro" aria-live="polite"></p>
+    @endif
     <p id="{{ $id }}-mayusculas" class="campo__aviso" aria-live="polite"></p>
 
     @error($name)

@@ -22,7 +22,7 @@ class CrearSuperadminTest extends TestCase
 
     private const CORREO = 'responsable@anfeca.test';
 
-    private const CONTRASENIA = 'clave2026';
+    private const CONTRASENIA = 'Clave2026!';
 
     public function test_crea_la_persona_la_cuenta_y_su_bitacora(): void
     {
@@ -117,7 +117,7 @@ class CrearSuperadminTest extends TestCase
     {
         $this->seed(SeguridadSeeder::class);
 
-        $this->ejecutar(['confirmacion' => 'otra2026'], confirmar: false)
+        $this->ejecutar(['confirmacion' => 'Otra2026!'], confirmar: false)
             ->expectsOutputToContain('no coincide')
             ->assertExitCode(1);
 
@@ -139,11 +139,29 @@ class CrearSuperadminTest extends TestCase
     {
         $this->seed(SeguridadSeeder::class);
 
-        $this->ejecutar(['contrasenia' => 'ab12', 'confirmacion' => 'ab12'], confirmar: false)
+        $this->ejecutar(['contrasenia' => 'Ab1!', 'confirmacion' => 'Ab1!'], confirmar: false)
             ->expectsOutputToContain('al menos 8 caracteres')
             ->assertExitCode(1);
 
         $this->assertFalse(Usuario::query()->exists());
+    }
+
+    public function test_se_niega_con_una_contrasenia_sin_mayuscula(): void
+    {
+        $this->seed(SeguridadSeeder::class);
+
+        $this->ejecutar(['contrasenia' => 'clave2026!', 'confirmacion' => 'clave2026!'], confirmar: false)
+            ->expectsOutputToContain('al menos una letra mayúscula')
+            ->assertExitCode(1);
+    }
+
+    public function test_se_niega_con_una_contrasenia_sin_caracter_especial(): void
+    {
+        $this->seed(SeguridadSeeder::class);
+
+        $this->ejecutar(['contrasenia' => 'Clave2026', 'confirmacion' => 'Clave2026'], confirmar: false)
+            ->expectsOutputToContain('al menos un carácter especial')
+            ->assertExitCode(1);
     }
 
     public function test_si_responde_que_no_no_guarda_nada(): void
@@ -181,7 +199,7 @@ class CrearSuperadminTest extends TestCase
             ->expectsQuestion('Segundo apellido (opcional, Enter para omitir)', $r['segundo_apellido'])
             ->expectsChoice('Género', $r['genero'], ['F', 'M'])
             ->expectsQuestion('Correo electrónico', $r['correo'])
-            ->expectsQuestion('Contraseña (al menos 8 caracteres, con letras y números)', $r['contrasenia'])
+            ->expectsQuestion('Contraseña (al menos 8 caracteres, una mayúscula, un número y un carácter especial)', $r['contrasenia'])
             ->expectsQuestion('Escribe la contraseña otra vez', $r['confirmacion']);
 
         if ($confirmar) {

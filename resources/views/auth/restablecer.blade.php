@@ -4,8 +4,13 @@
 @section('acceso', true)
 
 @section('contenido')
+    <a href="{{ route('login') }}" class="enlace-regresar acceso__regresar">
+        <x-icono nombre="regresar" />
+        <span>Volver a iniciar sesión</span>
+    </a>
+
     <h1 class="acceso__titulo">Crear contraseña nueva</h1>
-    <p class="acceso__instruccion">Escribe tu contraseña nueva dos veces para confirmarla.</p>
+    <p class="acceso__instruccion">Escríbela dos veces para confirmarla.</p>
 
     <form
         method="POST"
@@ -21,7 +26,6 @@
             name="contrasenia"
             etiqueta="Contraseña nueva"
             autocomplete="new-password"
-            ayuda="Al menos 8 caracteres, con letras y números."
             regla="nueva"
         />
 
@@ -33,16 +37,9 @@
             igual-a="contrasenia"
         />
 
-        <button type="submit" class="boton boton--primario boton--grande boton--ancho" aria-describedby="pista-restablecer">
+        <button type="submit" class="boton boton--primario boton--grande boton--ancho">
             <span>Guardar contraseña</span>
         </button>
-        <p id="pista-restablecer" class="formulario__pista" data-pista hidden>Escribe la contraseña nueva dos veces, con al menos 8 caracteres, letras y números.</p>
     </form>
 
-    <p class="acceso__pie">
-        <a href="{{ route('login') }}" class="enlace-regresar">
-            <x-icono nombre="regresar" />
-            <span>Volver a iniciar sesión</span>
-        </a>
-    </p>
 @endsection

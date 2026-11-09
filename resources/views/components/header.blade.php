@@ -16,7 +16,7 @@
             @endif
 
             <a href="{{ auth()->check() ? route('inicio') : route('login') }}" class="encabezado__inicio">
-                <img src="{{ asset('img/logo_anfeca.png') }}" alt="" class="encabezado__logo" width="34" height="44">
+                <img src="{{ imagen('logo') }}" alt="" class="encabezado__logo" width="34" height="44">
                 <span class="encabezado__divisor" aria-hidden="true"></span>
                 <span class="encabezado__textos">
                     <span class="encabezado__titulo">SIDEANFECA</span>

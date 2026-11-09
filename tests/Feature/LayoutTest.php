@@ -75,6 +75,20 @@ class LayoutTest extends TestCase
         $this->get(route('contrasenia.solicitar'))->assertSee('data-validar', false);
     }
 
+    public function test_la_validacion_del_login_es_discreta_sin_mensajes_repetidos(): void
+    {
+        $this->get('/login')
+            ->assertDontSee('id="correo-retro"', false)
+            ->assertDontSee('id="contrasenia-retro"', false)
+            ->assertDontSee('para continuar.');
+    }
+
+    public function test_volver_a_iniciar_sesion_esta_arriba_del_formulario(): void
+    {
+        $this->get(route('contrasenia.solicitar'))
+            ->assertSeeInOrder(['Volver a iniciar sesión', 'Recuperar contraseña', 'Enviar enlace']);
+    }
+
     public function test_los_enlaces_legales_apuntan_a_los_documentos_de_la_fca(): void
     {
         $this->get('/login')

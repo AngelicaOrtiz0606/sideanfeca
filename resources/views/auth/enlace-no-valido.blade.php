@@ -4,6 +4,11 @@
 @section('acceso', true)
 
 @section('contenido')
+    <a href="{{ route('login') }}" class="enlace-regresar acceso__regresar">
+        <x-icono nombre="regresar" />
+        <span>Volver a iniciar sesión</span>
+    </a>
+
     <h1 class="acceso__titulo">El enlace ya no sirve</h1>
 
     <div class="aviso aviso--error" role="alert">
@@ -16,10 +21,4 @@
         <span>Pedir un enlace nuevo</span>
     </a>
 
-    <p class="acceso__pie">
-        <a href="{{ route('login') }}" class="enlace-regresar">
-            <x-icono nombre="regresar" />
-            <span>Volver a iniciar sesión</span>
-        </a>
-    </p>
 @endsection

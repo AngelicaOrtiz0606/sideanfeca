@@ -72,6 +72,9 @@
         @case('regresar')
             <path d="m12 19-7-7 7-7" /><path d="M19 12H5" />
             @break
+        @case('circulo')
+            <circle cx="12" cy="12" r="9" />
+            @break
         @case('correcto')
             <circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" />
             @break

@@ -16,7 +16,7 @@
     {{-- Los enlaces de recuperación llevan un token: no se comparte la dirección con otros sitios --}}
     <meta name="referrer" content="no-referrer">
     <title>@yield('titulo', 'SIDEANFECA') · SIDEANFECA</title>
-    <link rel="icon" type="image/png" href="{{ asset('img/logo_anfeca.png') }}">
+    <link rel="icon" type="image/png" href="{{ imagen('logo') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="cuerpo {{ $esAcceso ? 'cuerpo--acceso' : '' }}">

@@ -47,7 +47,7 @@ class CrearSuperadmin extends Command
             'segundo_apellido' => trim((string) $this->ask('Segundo apellido (opcional, Enter para omitir)', '')),
             'genero' => $this->choice('Género', ['F', 'M']),
             'correo' => trim((string) $this->ask('Correo electrónico')),
-            'contrasenia' => (string) $this->secret('Contraseña (al menos 8 caracteres, con letras y números)'),
+            'contrasenia' => (string) $this->secret('Contraseña (al menos 8 caracteres, una mayúscula, un número y un carácter especial)'),
             'contrasenia_confirmation' => (string) $this->secret('Escribe la contraseña otra vez'),
         ];
 

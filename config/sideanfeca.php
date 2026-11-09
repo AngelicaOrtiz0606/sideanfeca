@@ -6,6 +6,17 @@
 return [
 
     /*
+     * Imágenes del sistema, con un nombre corto. En las vistas se usan con
+     * imagen('logo'); si un archivo cambia de lugar, solo se corrige aquí.
+     * Las rutas son relativas a la carpeta public/.
+     */
+    'imagenes' => [
+        'logo' => 'img/logo_anfeca.png',
+        'cintilla' => 'img/cintilla.jpg',
+        'fondo' => 'img/fondo.jpg',
+    ],
+
+    /*
      * Enlaces legales del footer. El texto de cada enlace es la leyenda
      * oficial y no cambia; aquí solo se configura su dirección.
      * Las direcciones oficiales de la FCA vienen por defecto; se pueden

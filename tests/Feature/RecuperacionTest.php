@@ -29,7 +29,7 @@ class RecuperacionTest extends TestCase
 
     private const CORREO = 'ana@prueba.test';
 
-    private const NUEVA = 'nueva2026';
+    private const NUEVA = 'Nueva2026!';
 
     private const NO_VALIDO = 'Este enlace venció o ya se usó.';
 
@@ -129,7 +129,9 @@ class RecuperacionTest extends TestCase
             ->assertSee('Crear contraseña nueva')
             ->assertSee('name="contrasenia"', false)
             ->assertSee('name="contrasenia_confirmation"', false)
-            ->assertSee('autocomplete="new-password"', false);
+            ->assertSee('autocomplete="new-password"', false)
+            ->assertSeeInOrder(['8 caracteres o más', 'Una mayúscula', 'Un número', 'Un carácter especial'])
+            ->assertSee('data-igual-a="contrasenia"', false);
     }
 
     public function test_con_el_enlace_correcto_cambia_la_contrasenia(): void
@@ -162,7 +164,7 @@ class RecuperacionTest extends TestCase
         $this->guardar($id, $token)->assertRedirect(route('login'));
 
         $this->get(route('contrasenia.restablecer', ['solicitud' => $id, 'token' => $token]))->assertSee(self::NO_VALIDO);
-        $this->guardar($id, $token, 'otra2026')->assertSee(self::NO_VALIDO);
+        $this->guardar($id, $token, 'Otra2026!')->assertSee(self::NO_VALIDO);
     }
 
     public function test_un_enlace_vencido_no_sirve(): void
@@ -241,8 +243,9 @@ class RecuperacionTest extends TestCase
         $this->post(route('contrasenia.enviar'), ['correo' => self::CORREO]);
         [$id, $token] = $this->enlaceEnviado();
 
-        $this->guardar($id, $token, 'solotexto')->assertSessionHasErrors('contrasenia');
-        $this->guardar($id, $token, 'ab12')->assertSessionHasErrors('contrasenia');
+        foreach (['solotexto', 'Ab1!', 'sinmayuscula1!', 'SinEspecial1', 'SinNumero!'] as $debil) {
+            $this->guardar($id, $token, $debil)->assertSessionHasErrors('contrasenia');
+        }
 
         $this->assertSame(0, DB::table('recuperacion_contrasenia')->value('reco_intentos'));
         $this->assertNull(DB::table('recuperacion_contrasenia')->value('reco_fecha_uso'));
@@ -256,7 +259,7 @@ class RecuperacionTest extends TestCase
 
         $this->post(route('contrasenia.actualizar', ['solicitud' => $id, 'token' => $token]), [
             'contrasenia' => self::NUEVA,
-            'contrasenia_confirmation' => 'distinta2026',
+            'contrasenia_confirmation' => 'Distinta2026!',
         ])->assertSessionHasErrors(['contrasenia' => 'Las dos contraseñas no coinciden. Escríbelas de nuevo.']);
     }
 

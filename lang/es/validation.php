@@ -20,7 +20,7 @@ return [
         'letters' => ':Attribute debe tener al menos una letra.',
         'mixed' => ':Attribute debe tener al menos una mayúscula y una minúscula.',
         'numbers' => ':Attribute debe tener al menos un número.',
-        'symbols' => ':Attribute debe tener al menos un símbolo.',
+        'symbols' => ':Attribute debe tener al menos un carácter especial (por ejemplo ! # $ % & * ?).',
         'uncompromised' => ':Attribute aparece en una filtración de datos. Elige otra.',
     ],
     'required' => ':Attribute es obligatorio.',

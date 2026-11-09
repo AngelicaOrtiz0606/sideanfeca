@@ -32,6 +32,8 @@ Todos los comandos se corren en la carpeta del proyecto.
 
    En `.env` escribe los datos de PostgreSQL: `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD`. El usuario de la base debe ser dueño de la base (lo necesita para crear la extensión `btree_gist`).
 
+   Escribe también `APP_URL` con la dirección con la que se entra al sistema (por ejemplo `http://192.168.181.128` o la dirección del servidor oficial). Los enlaces de recuperación de contraseña que se envían por correo se arman con ella.
+
 3. **Esquema de la base de datos.** La migración carga `database/sql/esquema_sideanfeca.sql` completo (tablas, funciones y triggers).
 
    ```bash
@@ -59,7 +61,7 @@ Todos los comandos se corren en la carpeta del proyecto.
    php artisan sideanfeca:crear-superadmin
    ```
 
-   Las contraseñas de todas las cuentas deben tener al menos 8 caracteres, con letras y números.
+   Las contraseñas de todas las cuentas deben tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.
 
 ## Pruebas
 
