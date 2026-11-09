@@ -19,6 +19,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  */
 class Usuario extends Authenticatable
 {
+    /**
+     * Nombres de los privilegios activos, leídos una sola vez por petición.
+     *
+     * @var array<int, string>|null
+     */
+    private ?array $privilegiosActivos = null;
+
     // Nombre real de la tabla y de sus columnas (en minúsculas, como las crea PostgreSQL)
     protected $table = 'usuario';
 
@@ -65,6 +72,36 @@ class Usuario extends Authenticatable
     public function estaActiva(): bool
     {
         return $this->usua_activo === true;
+    }
+
+    /**
+     * ¿La cuenta tiene este privilegio? Mismo criterio que la función SQL
+     * cuenta_tiene_privilegio: cuenta activa y privilegio activo en su rol.
+     * En M2 esta revisión se expone como Gates de Laravel.
+     */
+    public function tienePrivilegio(string $privilegio): bool
+    {
+        return in_array($privilegio, $this->nombresDePrivilegios(), true);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function nombresDePrivilegios(): array
+    {
+        if (! $this->estaActiva()) {
+            return [];
+        }
+
+        return $this->privilegiosActivos ??= $this->rol()->first()?->privilegios()->pluck('priv_nombre')->all() ?? [];
+    }
+
+    /**
+     * Perfil que se muestra en pantalla: "Superadmin" o "Admin".
+     */
+    public function etiquetaPerfil(): string
+    {
+        return $this->rol?->rol_nombre === Rol::SUPERADMINISTRADOR ? 'Superadmin' : 'Admin';
     }
 
     // Laravel debe usar nuestra columna de contraseña

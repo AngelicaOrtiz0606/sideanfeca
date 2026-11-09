@@ -1,21 +1,13 @@
-{{-- Página temporal para probar el inicio de sesión. La pantalla de inicio de la
-     sección 10 (saludo, contadores y bitácora) la reemplaza en otro lote de M1. --}}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Inicio · SIDEANFECA</title>
-</head>
-<body>
-<main>
-    <h1>Sesión iniciada</h1>
-    <p>Esta página es temporal.</p>
+@extends('layouts.admin')
 
-    <form method="POST" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit">Cerrar sesión</button>
-    </form>
-</main>
-</body>
-</html>
+@section('titulo', 'Inicio')
+
+@section('contenido')
+    {{-- Página temporal. La pantalla de inicio de la sección 10 (saludo,
+         contadores y bitácora) la reemplaza en el siguiente lote de M1. --}}
+    <h1 class="pagina__titulo">Inicio</h1>
+    <p class="pagina__texto">
+        Sesión iniciada. Aquí aparecerán el saludo, los contadores de instituciones y
+        coordinaciones y, para el superadmin, la bitácora reciente.
+    </p>
+@endsection

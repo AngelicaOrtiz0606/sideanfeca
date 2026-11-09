@@ -12,6 +12,14 @@ abstract class TestCase extends BaseTestCase
      */
     private const SUFIJO_BASE_PRUEBAS = '_testing';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Las pruebas no necesitan los estilos compilados (npm run build)
+        $this->withoutVite();
+    }
+
     /**
      * Antes de cualquier prueba (y antes de que RefreshDatabase o
      * DatabaseTransactions toquen la base), confirma que la conexión
