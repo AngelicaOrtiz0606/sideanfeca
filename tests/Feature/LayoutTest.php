@@ -200,4 +200,18 @@ class LayoutTest extends TestCase
         $this->assertFalse($admin->tienePrivilegio('ver_bitacora'));
         $this->assertFalse($inactiva->tienePrivilegio('ver_bitacora'));
     }
+
+    public function test_todas_las_pantallas_mandan_los_encabezados_de_seguridad(): void
+    {
+        $this->get('/login')
+            ->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('Content-Security-Policy', "frame-ancestors 'none'")
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Referrer-Policy', 'same-origin');
+
+        $this->actingAs($this->crearCuenta())
+            ->get('/inicio')
+            ->assertOk()
+            ->assertHeader('X-Frame-Options', 'DENY');
+    }
 }

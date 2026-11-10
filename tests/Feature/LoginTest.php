@@ -223,6 +223,25 @@ class LoginTest extends TestCase
             ->assertMethodNotAllowed();
     }
 
+    public function test_si_cambia_la_contrasenia_las_sesiones_abiertas_se_cierran(): void
+    {
+        $cuenta = $this->crearCuenta(Rol::ADMINISTRADOR, ['usua_correo' => 'ana@prueba.test']);
+
+        $this->post('/login', ['correo' => 'ana@prueba.test', 'contrasenia' => $this->contraseniaDePrueba]);
+        $this->get('/inicio')->assertOk();
+
+        // La contraseña cambia en otro lado (por ejemplo, con el enlace de recuperación)
+        DB::table('usuario')
+            ->where('usua_id_usuario', $cuenta->usua_id_usuario)
+            ->update(['usua_contrasenia' => bcrypt('OtraClave2026!')]);
+
+        // La siguiente petición de esa sesión ya no entra
+        $this->app['auth']->forgetGuards();
+
+        $this->get('/inicio')->assertRedirect(route('login'));
+        $this->assertGuest();
+    }
+
     public function test_cuenta_desactivada_con_la_sesion_abierta_sale_en_la_siguiente_peticion(): void
     {
         $cuenta = $this->crearCuenta();

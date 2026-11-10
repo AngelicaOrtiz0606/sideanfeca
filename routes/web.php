@@ -26,7 +26,9 @@ Route::middleware('guest')->group(function () {
         });
 });
 
-Route::middleware(['auth', 'cuenta.activa'])->group(function () {
+// auth.session: si la contraseña cambia (por ejemplo, con el enlace de
+// recuperación), las sesiones abiertas en otras computadoras se cierran
+Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () {
     // Pantalla de inicio (sección 10)
     Route::get('/inicio', InicioController::class)->name('inicio');
 

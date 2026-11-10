@@ -95,6 +95,25 @@ Antes de cada entrega, revisa también las dependencias:
 composer audit
 ```
 
+## Antes de pasar al servidor oficial
+
+En el `.env` del servidor oficial cambia estos valores (en la máquina de práctica se quedan como están):
+
+| Variable | Valor | Por qué |
+|---|---|---|
+| `APP_ENV` | `production` | Indica que es el sistema real. |
+| `APP_DEBUG` | `false` | Si algo falla, la persona ve un mensaje general y no el código ni los datos internos. |
+| `APP_URL` | la dirección definitiva, con `https://` | Con ella se arman los enlaces de recuperación. |
+| `LOG_LEVEL` | `warning` | El registro solo guarda avisos y errores. |
+| `SESSION_SECURE_COOKIE` | `true` | La sesión solo viaja por HTTPS. Ponlo únicamente cuando el sitio ya tenga HTTPS, o no se podrá iniciar sesión. |
+
+Después de cambiarlos:
+
+```bash
+php artisan optimize:clear
+php artisan config:cache
+```
+
 ## Dónde está cada cosa
 
 | Qué | Dónde |
