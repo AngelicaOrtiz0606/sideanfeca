@@ -95,6 +95,29 @@ Antes de cada entrega, revisa también las dependencias:
 composer audit
 ```
 
+## Dónde está cada cosa
+
+| Qué | Dónde |
+|---|---|
+| Direcciones de las pantallas, cada una con su alias (`route('login')`) | `routes/web.php` |
+| Tareas programadas | `routes/console.php` |
+| Controladores: reciben la petición y eligen la vista | `app/Http/Controllers/` |
+| Validación de formularios | `app/Http/Requests/` |
+| Lógica de cada proceso (llamadas a las funciones SQL, bitácora, contadores) | `app/Services/` |
+| Modelos de las tablas | `app/Models/` |
+| Reglas de validación propias | `app/Rules/` |
+| Funciones de ayuda, como `imagen('logo')` | `app/helpers.php` |
+| Configuración propia (imágenes, enlaces legales) | `config/sideanfeca.php` |
+| Layouts (`admin` y `publico`) | `resources/views/layouts/` |
+| Piezas reutilizables (header, menú, footer, campos, íconos) | `resources/views/components/` |
+| Pantallas | `resources/views/auth/`, `resources/views/inicio.blade.php` |
+| Colores y estilos que se usan en todas las pantallas (títulos, subtítulos, enlaces) | `resources/css/style.css` |
+| Estilos de cada pieza y de cada pantalla | `resources/css/componentes/`, `resources/css/layouts/`, `resources/css/paginas/` |
+| JavaScript, dividido por función | `resources/js/modulos/` |
+| Pruebas | `tests/Feature/`, con ayudas en `tests/Support/` |
+
+Regla de diseño: nunca usar líneas de acento arriba ni a los lados de las tarjetas.
+
 ## Reglas para programar
 
 - La lógica de negocio vive en la base de datos. Laravel llama a las funciones SQL y les pasa la cuenta que actúa.

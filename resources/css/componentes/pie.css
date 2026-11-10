@@ -1,0 +1,99 @@
+/*
+ * Pie de página con la leyenda oficial (resources/views/components/footer.blade.php).
+ */
+
+/* ---------- Pie de página (leyenda oficial) ---------- */
+/* Una sola franja con degradado: datos a la izquierda, leyenda y enlaces a la derecha */
+.pie {
+    /* Rojo institucional que se oscurece de arriba hacia abajo */
+    background: linear-gradient(180deg, #a3121a 0%, var(--color-marca) 40%, #5a0006 80%, #3a0004 100%);
+    border-top: 3px solid #c8102e;
+    color: rgb(255 255 255 / 0.9);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+/* Texto seleccionado: en blanco, porque el rojo general no se vería sobre el pie */
+.pie::selection,
+.pie ::selection {
+    background: #fff;
+    color: var(--color-marca-oscuro);
+}
+
+.pie :focus-visible {
+    outline-color: #fff;
+}
+
+.pie__contenido {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 80rem;
+    padding: 1rem;
+}
+
+@media (width >= 40rem) {
+    .pie__contenido {
+        padding: 1rem 2rem;
+    }
+}
+
+@media (width >= 56rem) {
+    .pie__contenido {
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 2rem;
+    }
+}
+
+.pie--centrado .pie__contenido {
+    margin-inline: auto;
+}
+
+.pie__datos {
+    color: #fff;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media (width >= 56rem) {
+    .pie__datos {
+        padding-right: 2rem;
+        border-right: 1px solid rgb(255 255 255 / 0.3);
+    }
+}
+
+.pie__texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.pie__leyenda {
+    max-width: 130ch;
+}
+
+.pie a {
+    color: #fff;
+    font-weight: 600;
+    text-decoration-color: rgb(255 255 255 / 0.5);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color 0.15s ease;
+}
+
+.pie a:hover {
+    text-decoration-color: #fff;
+}
+
+.pie__legales {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0;
+    list-style: none;
+}
+
+.pie__legales li:not(:last-child)::after {
+    content: '|';
+    margin: 0 0.625rem;
+    color: rgb(255 255 255 / 0.5);
+}

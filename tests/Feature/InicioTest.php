@@ -108,6 +108,23 @@ class InicioTest extends TestCase
             ->assertDontSee('la zona regional #2')
             ->assertSee('Marta Ruiz')
             ->assertSee('registró');
+
+        $this->actingAs($cuenta)->get('/inicio')
+            ->assertViewHas('hayMasMovimientos', true)
+            ->assertSee('Se muestran los 5 movimientos más recientes.');
+    }
+
+    public function test_con_cinco_movimientos_o_menos_no_ofrece_ver_mas(): void
+    {
+        $cuenta = $this->crearCuenta(Rol::SUPERADMINISTRADOR);
+
+        foreach (range(1, 5) as $numero) {
+            DB::select('select bitacora_registrar(?, ?, ?, ?, ?)', [$cuenta->usua_id_usuario, 'Registro', 'ZONA_REGIONAL', $numero, null]);
+        }
+
+        $this->actingAs($cuenta)->get('/inicio')
+            ->assertViewHas('hayMasMovimientos', false)
+            ->assertDontSee('Se muestran los 5 movimientos más recientes.');
     }
 
     public function test_un_registro_de_persona_borrada_dice_persona_eliminada(): void

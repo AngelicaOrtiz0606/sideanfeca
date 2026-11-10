@@ -1,0 +1,314 @@
+/*
+ * Pantalla de inicio (resources/views/inicio.blade.php).
+ */
+
+/* ---------- Pantalla de inicio (sección 10), con el estilo del prototipo ---------- */
+/*
+ * Regla de diseño del proyecto: nunca usar líneas de acento arriba ni a los
+ * lados de las tarjetas.
+ */
+
+/* Franja de bienvenida: rojo institucional con degradado, como en el prototipo */
+.bienvenida {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 1.75rem;
+    padding: 1.375rem 1.75rem;
+    border-radius: 0.875rem;
+    background: linear-gradient(135deg, var(--color-marca) 0%, var(--color-marca-oscuro) 100%);
+    box-shadow: 0 6px 20px rgb(92 0 0 / 0.18);
+    color: #fff;
+}
+
+/* Texto seleccionado: en blanco, porque el rojo general no se vería sobre la franja */
+.bienvenida::selection,
+.bienvenida ::selection {
+    background: #fff;
+    color: var(--color-marca-oscuro);
+}
+
+/* Círculo de luz tenue a la derecha */
+.bienvenida::before {
+    content: '';
+    position: absolute;
+    top: -55%;
+    right: -6%;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.06);
+    pointer-events: none;
+}
+
+.bienvenida :focus-visible {
+    outline-color: #fff;
+}
+
+.bienvenida__texto {
+    position: relative;
+}
+
+.bienvenida__texto h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    text-wrap: balance;
+}
+
+.bienvenida__texto p {
+    margin-top: 0.25rem;
+    color: rgb(255 255 255 / 0.88);
+    font-size: 0.9375rem;
+}
+
+.bienvenida__fecha {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.125rem;
+    border: 1px solid rgb(255 255 255 / 0.16);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.12);
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.bienvenida__fecha .icono {
+    width: 1rem;
+    height: 1rem;
+}
+
+.inicio__seccion + .inicio__seccion {
+    margin-top: 1.75rem;
+}
+
+/* Tarjetas de contadores: ícono de color a la izquierda, número y etiqueta a la derecha */
+.contadores {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (width >= 48rem) {
+    .contadores {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.contador {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid transparent;
+    border-radius: 0.875rem;
+    background: var(--color-superficie);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+    transition: transform 0.2s var(--curva-salida), box-shadow 0.2s var(--curva-salida), border-color 0.2s ease;
+}
+
+.contador:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-borde);
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.12);
+}
+
+.contador__icono {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2.875rem;
+    height: 2.875rem;
+    border-radius: 0.75rem;
+    background: var(--color-marca);
+    color: #fff;
+}
+
+.contador__icono[data-tono='vino'] {
+    background: #6f1d2b;
+}
+
+.contador__icono[data-tono='gris'] {
+    background: #4a4a4a;
+}
+
+.contador__datos {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* El número va primero a la vista, la etiqueta debajo (como en el prototipo) */
+.contador__etiqueta {
+    order: 2;
+    color: var(--color-texto);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.contador__valor {
+    order: 1;
+    color: var(--color-tinta);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+}
+
+.contador__detalle {
+    order: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.125rem;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}
+
+/* Tarjeta que contiene la actividad reciente */
+.tarjeta-seccion {
+    padding: 1.125rem 1.25rem 1.25rem;
+    border-radius: 0.875rem;
+    background: var(--color-superficie);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+}
+
+.tarjeta-seccion__encabezado {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.875rem;
+}
+
+.enlace-flecha {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.vacio {
+    padding: 1rem 1.125rem;
+    border-radius: var(--radio);
+    background: var(--color-fondo);
+    color: var(--color-texto-suave);
+}
+
+/* Actividad reciente: una fila por movimiento */
+.actividad {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    list-style: none;
+}
+
+.actividad__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radio);
+    background: #f7f7f7;
+    transition: background-color 0.15s ease;
+}
+
+.actividad__item:hover {
+    background: var(--color-fondo);
+}
+
+.actividad__cuerpo {
+    flex: 1;
+    min-width: 0;
+}
+
+.actividad__frase {
+    color: var(--color-texto);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.actividad__frase strong {
+    color: var(--color-tinta);
+    font-weight: 600;
+}
+
+/* El verbo lleva el color de la acción */
+.actividad__verbo {
+    font-weight: 600;
+}
+
+.actividad__verbo[data-tono='exito'] {
+    color: var(--color-exito);
+}
+
+.actividad__verbo[data-tono='info'] {
+    color: var(--color-info);
+}
+
+.actividad__verbo[data-tono='aviso'] {
+    color: var(--color-aviso);
+}
+
+.actividad__verbo[data-tono='error'] {
+    color: var(--color-error);
+}
+
+.actividad__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.875rem;
+    margin-top: 0.125rem;
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+}
+
+/* Los cambios se abren solo si la persona quiere verlos */
+.actividad__cambios {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.actividad__cambios summary {
+    width: fit-content;
+    color: var(--color-enlace);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.actividad__cambios ul {
+    margin: 0.375rem 0 0 1.125rem;
+    color: var(--color-texto);
+    line-height: 1.6;
+}
+
+@media (width < 40rem) {
+    .bienvenida {
+        padding: 1.25rem;
+    }
+
+    .bienvenida__fecha {
+        white-space: normal;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .contador,
+    .contador:hover,
+    .actividad__item {
+        transition: none;
+        transform: none;
+    }
+}
+
+/* Aviso al pie de la actividad cuando hay más movimientos que los 5 visibles */
+.actividad__mas {
+    margin-top: 0.75rem;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}

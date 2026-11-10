@@ -18,6 +18,7 @@ class InicioController extends Controller
         /** @var Usuario $cuenta */
         $cuenta = $request->user();
         $verBitacora = $cuenta->tienePrivilegio('ver_bitacora');
+        $bitacora = $verBitacora ? $inicio->bitacoraReciente() : ['movimientos' => collect(), 'hayMas' => false];
 
         return view('inicio', [
             'nombre' => $cuenta->persona?->nombre_completo,
@@ -26,7 +27,8 @@ class InicioController extends Controller
             'inicioAnterior' => $inicio->inicioDeSesionAnterior($cuenta),
             'contadores' => $inicio->contadores(),
             'verBitacora' => $verBitacora,
-            'movimientos' => $verBitacora ? $inicio->bitacoraReciente() : collect(),
+            'movimientos' => $bitacora['movimientos'],
+            'hayMasMovimientos' => $bitacora['hayMas'],
         ]);
     }
 }

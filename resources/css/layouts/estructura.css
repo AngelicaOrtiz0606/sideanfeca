@@ -1,0 +1,55 @@
+/*
+ * Estructura de las pantallas internas: columna del menú y contenido
+ * (resources/views/layouts/admin.blade.php).
+ */
+
+/* ---------- Estructura de pantallas internas ---------- */
+.estructura {
+    display: grid;
+    min-height: calc(100dvh - var(--alto-encabezado));
+}
+
+@media (width >= 64rem) {
+    .estructura {
+        grid-template-columns: var(--ancho-menu) minmax(0, 1fr);
+        /* La columna del menú es blanca hasta abajo, aunque la página sea más alta que la pantalla */
+        background: linear-gradient(
+            90deg,
+            var(--color-superficie) calc(var(--ancho-menu) - 1px),
+            var(--color-borde) calc(var(--ancho-menu) - 1px),
+            var(--color-borde) var(--ancho-menu),
+            transparent var(--ancho-menu)
+        );
+    }
+}
+
+.estructura__principal {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.contenido {
+    flex: 1;
+    width: 100%;
+    max-width: 80rem;
+    padding: 2rem 1rem 3rem;
+}
+
+.contenido:focus {
+    outline: none;
+}
+
+@media (width >= 40rem) {
+    .contenido {
+        padding: 2.5rem 2rem 3.5rem;
+    }
+}
+
+.contenido--publico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100dvh - var(--alto-encabezado) - 4rem);
+    max-width: none;
+}
