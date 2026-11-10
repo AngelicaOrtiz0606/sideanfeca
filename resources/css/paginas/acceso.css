@@ -1,0 +1,219 @@
+/*
+ * Pantallas de acceso: inicio de sesión y recuperación de contraseña
+ * (resources/views/auth/).
+ */
+
+/* ---------- Inicio de sesión y recuperación de contraseña ---------- */
+/*
+ * Pantalla dividida, sin encabezado: a la izquierda la identidad del sistema
+ * sobre un fondo claro; a la derecha el formulario. El footer va abajo y se ve
+ * sin desplazarse en las pantallas de computadora más comunes.
+ */
+.cuerpo--acceso {
+    display: flex;
+    flex-direction: column;
+}
+
+.acceso {
+    display: grid;
+    flex: 1;
+    background: var(--color-superficie);
+}
+
+@media (width >= 56rem) {
+    .acceso {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+/* Panel de identidad: fondo claro con el patrón del prototipo muy tenue y la cintilla abajo */
+.acceso__marca {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    padding: 1.25rem 1.25rem;
+    border-bottom: 1px solid var(--color-borde);
+    background: #f6f4f4;
+}
+
+.acceso__marca::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--imagen-fondo) center / 20rem;
+    opacity: 0.06;
+}
+
+@media (width >= 56rem) {
+    .acceso__marca {
+        justify-content: center;
+        padding: 3rem;
+        border-right: 1px solid var(--color-borde);
+        border-bottom: none;
+    }
+}
+
+.acceso__identidad {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+}
+
+.acceso__logo {
+    width: auto;
+    height: 2.75rem;
+}
+
+.acceso__sistema {
+    color: var(--color-marca);
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+}
+
+.acceso__lema {
+    margin-top: 0.125rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.acceso__linea {
+    display: none;
+}
+
+@media (width >= 56rem) {
+    .acceso__identidad {
+        flex-direction: column;
+        gap: 1.25rem;
+        text-align: center;
+    }
+
+    .acceso__logo {
+        height: 6.5rem;
+    }
+
+    .acceso__sistema {
+        font-size: 2rem;
+    }
+
+    .acceso__lema {
+        margin-top: 0.375rem;
+        font-size: 1.0625rem;
+    }
+
+    .acceso__linea {
+        display: block;
+        width: 3rem;
+        height: 3px;
+        margin: 1.25rem auto 0;
+        border-radius: 2px;
+        background: var(--color-marca);
+    }
+}
+
+/* Panel del formulario */
+.acceso__panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem 2.5rem;
+}
+
+@media (width >= 56rem) {
+    .acceso__panel {
+        padding: 2.5rem 3rem;
+    }
+}
+
+.acceso__formulario {
+    width: 100%;
+    max-width: 26rem;
+}
+
+.acceso__titulo {
+    color: var(--color-secundario);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+.acceso__instruccion {
+    margin: 0.375rem 0 1.5rem;
+    color: var(--color-texto-suave);
+    line-height: 1.5;
+}
+
+.acceso__pie {
+    margin-top: 1.5rem;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.acceso__pie a {
+    font-weight: 600;
+}
+
+/* Mensajes de estado (por ejemplo, "te enviamos un enlace") */
+.aviso {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    margin-bottom: 1.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid;
+    border-radius: var(--radio);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.aviso .icono {
+    margin-top: 0.1rem;
+}
+
+.aviso--exito {
+    border-color: #b9dcc3;
+    background: var(--color-exito-fondo);
+    color: var(--color-exito);
+}
+
+.aviso--error {
+    border-color: #efc3c0;
+    background: var(--color-error-fondo);
+    color: var(--color-error);
+}
+
+.campo__ayuda {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.enlace-regresar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.enlace-regresar:hover {
+    text-decoration: underline;
+}
+
+.enlace-regresar .icono {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* "Volver a iniciar sesión" va arriba del título */
+.acceso__regresar {
+    margin-bottom: 1.25rem;
+    font-size: 0.9375rem;
+}
