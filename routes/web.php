@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
+use App\Http\Controllers\InicioController;
 use Illuminate\Support\Facades\Route;
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -26,8 +27,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'cuenta.activa'])->group(function () {
-    // Página temporal: la pantalla de inicio de la sección 10 llega en otro lote de M1
-    Route::view('/inicio', 'inicio')->name('inicio');
+    // Pantalla de inicio (sección 10)
+    Route::get('/inicio', InicioController::class)->name('inicio');
 
     Route::post('/logout', [LoginController::class, 'cerrar'])->name('logout');
 });

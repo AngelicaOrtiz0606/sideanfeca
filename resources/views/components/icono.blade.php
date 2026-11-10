@@ -81,6 +81,27 @@
         @case('correo')
             <rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
             @break
+        @case('calendario')
+            <rect width="18" height="18" x="3" y="4" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" />
+            @break
+        @case('mas')
+            <path d="M5 12h14" /><path d="M12 5v14" />
+            @break
+        @case('lapiz')
+            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" />
+            @break
+        @case('pausa')
+            <circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" />
+            @break
+        @case('restaurar')
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
+            @break
+        @case('papelera')
+            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            @break
+        @case('reloj')
+            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+            @break
         @case('alerta')
             <circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" />
             @break

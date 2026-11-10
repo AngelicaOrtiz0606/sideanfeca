@@ -97,6 +97,9 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Las columnas TIMESTAMP del esquema guardan la hora local de la sesión:
+            // así now() en PostgreSQL coincide con la hora de México que muestra Laravel.
+            'timezone' => env('DB_TIMEZONE', env('APP_TIMEZONE', 'America/Mexico_City')),
         ],
 
         'sqlsrv' => [
