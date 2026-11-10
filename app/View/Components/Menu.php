@@ -2,16 +2,18 @@
 
 namespace App\View\Components;
 
-use App\Models\Usuario;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Component;
 
 /**
  * Menú lateral de las pantallas internas.
  *
- * - Un enlace solo aparece si la cuenta tiene su privilegio (sección 7).
+ * - Un enlace solo aparece si la cuenta tiene su privilegio (sección 7). Se
+ *   revisa con el mismo Gate que protege la ruta, así nunca se muestra un
+ *   enlace que responda 403.
  * - Mientras su módulo no exista (la ruta todavía no está definida), el
  *   enlace se muestra como "Próximamente" y no se puede abrir. Al crear la
  *   ruta en su módulo, se activa solo.
@@ -88,8 +90,7 @@ class Menu extends Component
             $enlaces = [];
 
             foreach ($seccion['enlaces'] as $enlace) {
-                if ($enlace['privilegio'] !== null
-                    && ! ($cuenta instanceof Usuario && $cuenta->tienePrivilegio($enlace['privilegio']))) {
+                if ($enlace['privilegio'] !== null && ! Gate::forUser($cuenta)->allows($enlace['privilegio'])) {
                     continue;
                 }
 

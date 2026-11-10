@@ -66,7 +66,7 @@
         <section aria-labelledby="bitacora-titulo" class="inicio__seccion tarjeta-seccion">
             <div class="tarjeta-seccion__encabezado">
                 <h2 id="bitacora-titulo" class="seccion__titulo">Actividad reciente</h2>
-                @if ($hayMasMovimientos && Route::has('bitacora.index'))
+                @if ($hayMasMovimientos && $consultaCompleta)
                     <a href="{{ route('bitacora.index') }}" class="enlace-flecha">Ver más</a>
                 @endif
             </div>
@@ -112,7 +112,7 @@
                 </ol>
 
                 {{-- Mientras no exista la consulta completa (M9), se avisa que hay más movimientos --}}
-                @if ($hayMasMovimientos && ! Route::has('bitacora.index'))
+                @if ($hayMasMovimientos && ! $consultaCompleta)
                     <p class="actividad__mas">Se muestran los 5 movimientos más recientes. La consulta completa de la bitácora estará disponible próximamente.</p>
                 @endif
             @endif

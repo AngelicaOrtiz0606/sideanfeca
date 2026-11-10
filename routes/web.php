@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\Privilegio;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
 use App\Http\Controllers\InicioController;
+use App\Http\Controllers\PantallaPendienteController;
 use Illuminate\Support\Facades\Route;
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -33,4 +35,16 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     Route::get('/inicio', InicioController::class)->name('inicio');
 
     Route::post('/logout', [LoginController::class, 'cerrar'])->name('logout');
+
+    // Pantallas con privilegio: quien no lo tiene recibe 403.
+    // Mientras su módulo no exista, muestran la pantalla provisional.
+    Route::get('/bitacora', PantallaPendienteController::class)
+        ->defaults('titulo', 'Bitácora')
+        ->middleware(Privilegio::VerBitacora->middleware())
+        ->name('bitacora.index');
+
+    Route::get('/usuarios', PantallaPendienteController::class)
+        ->defaults('titulo', 'Usuarios')
+        ->middleware(Privilegio::GestionarUsuarios->middleware())
+        ->name('usuarios.index');
 });
