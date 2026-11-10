@@ -249,6 +249,8 @@ class BitacoraService
                 ->whereIn('cona_id_coordinacion_nacional', $ids)->pluck('cona_nombre', 'cona_id_coordinacion_nacional'),
             'ZONA_REGIONAL' => fn (Collection $ids) => DB::table('zona_regional')
                 ->whereIn('zore_id_zona_regional', $ids)->pluck('zore_nombre', 'zore_id_zona_regional'),
+            'ENTIDAD_FEDERATIVA' => fn (Collection $ids) => DB::table('entidad_federativa')
+                ->whereIn('enfe_id_entidad_federativa', $ids)->pluck('enfe_nombre', 'enfe_id_entidad_federativa'),
             'CARGO' => fn (Collection $ids) => DB::table('cargo')
                 ->whereIn('carg_id_cargo', $ids)->pluck('carg_nombre_m', 'carg_id_cargo'),
             'ORGANIZACION' => fn (Collection $ids) => DB::table('organizacion')

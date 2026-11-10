@@ -3,9 +3,13 @@
 use App\Enums\Privilegio;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
+use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\PantallaPendienteController;
 use Illuminate\Support\Facades\Route;
+
+// Los identificadores en las direcciones son siempre números
+Route::pattern('zona', '[0-9]+');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
 Route::redirect('/', '/login');
@@ -42,6 +46,11 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         ->defaults('titulo', 'Bitácora')
         ->middleware(Privilegio::VerBitacora->middleware())
         ->name('bitacora.index');
+
+    // Catálogos (M3)
+    Route::resource('zonas', ZonaController::class)
+        ->parameters(['zonas' => 'zona'])
+        ->middleware(Privilegio::GestionarZonas->middleware());
 
     Route::get('/usuarios', PantallaPendienteController::class)
         ->defaults('titulo', 'Usuarios')

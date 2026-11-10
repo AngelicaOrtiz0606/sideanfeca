@@ -73,7 +73,7 @@ function campoEsValido(campo) {
 
 document.querySelectorAll('form[data-validar]').forEach((formulario) => {
     const boton = formulario.querySelector('[type="submit"]');
-    const campos = [...formulario.querySelectorAll('input:not([type="hidden"])')];
+    const campos = [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
     const escritos = new Set();
 
     const actualizar = () => {

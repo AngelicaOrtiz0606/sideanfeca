@@ -1,0 +1,52 @@
+/*
+ * Ventana de confirmación (<dialog>): se abre encima de la pantalla y se
+ * cierra con Cancelar o con la tecla Esc.
+ */
+
+.dialogo {
+    width: min(28rem, calc(100% - 2rem));
+    margin: auto;
+    padding: 1.5rem;
+    border: 0;
+    border-radius: 0.875rem;
+    background: var(--color-superficie);
+    box-shadow: 0 20px 50px rgb(0 0 0 / 0.25);
+    color: var(--color-tinta);
+}
+
+.dialogo::backdrop {
+    background: rgb(20 20 20 / 0.45);
+}
+
+.dialogo__titulo {
+    color: var(--color-secundario);
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.dialogo__texto {
+    margin-top: -0.75rem;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+}
+
+.dialogo__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .dialogo[open] {
+        animation: dialogo-aparece 0.2s var(--curva-salida);
+    }
+}
+
+@keyframes dialogo-aparece {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem) scale(0.98);
+    }
+}

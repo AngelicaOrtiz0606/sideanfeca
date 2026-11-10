@@ -1,0 +1,47 @@
+/*
+ * Mensajes de estado dentro de una pantalla (componentes aviso-estado y
+ * errores-formulario): éxito, atención y error.
+ */
+
+.aviso {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    margin-bottom: 1.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid;
+    border-radius: var(--radio);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.aviso .icono {
+    margin-top: 0.1rem;
+}
+
+.aviso--exito {
+    border-color: #b9dcc3;
+    background: var(--color-exito-fondo);
+    color: var(--color-exito);
+}
+
+.aviso--atencion {
+    border-color: #ecd59a;
+    background: var(--color-aviso-fondo);
+    color: var(--color-aviso);
+}
+
+.aviso--error {
+    border-color: #efc3c0;
+    background: var(--color-error-fondo);
+    color: var(--color-error);
+}
+
+/* Lista de errores del servidor, arriba del formulario */
+.aviso__lista {
+    display: grid;
+    gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
