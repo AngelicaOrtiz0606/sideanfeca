@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Privilegio;
+use App\Services\PermisosService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -19,13 +21,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  */
 class Usuario extends Authenticatable
 {
-    /**
-     * Nombres de los privilegios activos, leídos una sola vez por petición.
-     *
-     * @var array<int, string>|null
-     */
-    private ?array $privilegiosActivos = null;
-
     // Nombre real de la tabla y de sus columnas (en minúsculas, como las crea PostgreSQL)
     protected $table = 'usuario';
 
@@ -75,25 +70,12 @@ class Usuario extends Authenticatable
     }
 
     /**
-     * ¿La cuenta tiene este privilegio? Mismo criterio que la función SQL
-     * cuenta_tiene_privilegio: cuenta activa y privilegio activo en su rol.
-     * En M2 esta revisión se expone como Gates de Laravel.
+     * ¿La cuenta tiene este privilegio? Lo responde la función SQL
+     * cuenta_tiene_privilegio (ver PermisosService), igual que los Gates.
      */
-    public function tienePrivilegio(string $privilegio): bool
+    public function tienePrivilegio(Privilegio|string $privilegio): bool
     {
-        return in_array($privilegio, $this->nombresDePrivilegios(), true);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    public function nombresDePrivilegios(): array
-    {
-        if (! $this->estaActiva()) {
-            return [];
-        }
-
-        return $this->privilegiosActivos ??= $this->rol()->first()?->privilegios()->pluck('priv_nombre')->all() ?? [];
+        return app(PermisosService::class)->tiene($this, $privilegio);
     }
 
     /**

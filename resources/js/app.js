@@ -10,9 +10,11 @@
  *   validacion-formularios.js   validación discreta y botón inactivo
  *   boton-subir.js              botón flotante para subir
  *   contadores.js               números que se cuentan en la pantalla de inicio
+ *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
  */
 import './modulos/menu-movil.js';
 import './modulos/campo-contrasenia.js';
 import './modulos/validacion-formularios.js';
 import './modulos/boton-subir.js';
 import './modulos/contadores.js';
+import './modulos/regreso-seguro.js';

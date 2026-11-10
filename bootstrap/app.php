@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AsegurarCuentaActiva;
 use App\Http\Middleware\EncabezadosSeguridad;
+use App\Http\Middleware\SinCacheConSesion;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,8 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'cuenta.activa' => AsegurarCuentaActiva::class,
         ]);
 
-        // Encabezados de seguridad del navegador en todas las pantallas
-        $middleware->web(append: [EncabezadosSeguridad::class]);
+        // Encabezados de seguridad del navegador en todas las pantallas, y sin
+        // copias guardadas (la flecha de regreso no muestra pantallas viejas)
+        $middleware->web(append: [EncabezadosSeguridad::class, SinCacheConSesion::class]);
 
         // Quien no ha iniciado sesión va al login; quien ya la inició, al inicio
         $middleware->redirectGuestsTo(fn () => route('login'));

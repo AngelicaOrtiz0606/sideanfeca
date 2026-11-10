@@ -15,7 +15,7 @@
     <link rel="icon" type="image/png" href="{{ imagen('logo') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="cuerpo">
+<body class="cuerpo" data-con-sesion>
     <a href="#contenido" class="saltar">Saltar al contenido</a>
 
     <x-header />
