@@ -1,6 +1,6 @@
 {{--
     Catálogo de coordinaciones nacionales, en su orden. Todo se hace desde aquí:
-    "Nueva coordinación" y "Editar" abren una ventana; "Desactivar" pide
+    "Nueva coordinación", "Editar" y "Cambiar el orden" abren una ventana; "Desactivar" pide
     confirmación y "Activar" es un clic; "Borrar" pide el motivo o explica por
     qué no se puede. El nombre lleva a la consulta (sus puestos).
 --}}
@@ -20,10 +20,10 @@
         </div>
 
         <div class="pagina__acciones">
-            <a href="{{ route('coordinaciones.orden') }}" class="boton boton--discreto">
+            <button type="button" class="boton boton--discreto" data-abrir-dialogo="dialogo-orden">
                 <x-icono nombre="ordenar" />
                 Cambiar el orden
-            </a>
+            </button>
             <button type="button" class="boton boton--primario"
                     data-abrir-dialogo="dialogo-coordinacion"
                     data-accion="{{ route('coordinaciones.store') }}" data-metodo="POST"
@@ -36,6 +36,11 @@
     </header>
 
     <x-aviso-estado />
+
+    {{-- Errores al guardar el orden (lista alterada) --}}
+    @if ($errors->has('orden') || $errors->has('orden.*'))
+        <x-errores-formulario />
+    @endif
 
     <section class="tarjeta tarjeta--tabla" aria-label="Lista de coordinaciones nacionales">
         @if ($coordinaciones->isEmpty())
@@ -118,6 +123,7 @@
     </section>
 
     @include('catalogos.coordinaciones._dialogo-coordinacion')
+    @include('catalogos.coordinaciones._dialogo-orden')
 
     @include('catalogos._dialogo-borrar', [
         'motivos' => $motivos,

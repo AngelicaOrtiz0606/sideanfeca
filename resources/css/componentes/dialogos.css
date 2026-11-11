@@ -70,3 +70,37 @@
 .dialogo__texto--separado {
     margin: 0.5rem 0 1.25rem;
 }
+
+/*
+ * Ventana para cambiar un orden: el título y los botones siempre quedan a la
+ * vista; solo la lista se desplaza (también en teléfono).
+ */
+.dialogo--orden {
+    width: min(38rem, calc(100% - 2rem));
+}
+
+.dialogo--orden[open] {
+    display: flex;
+    max-height: calc(100dvh - 2rem);
+    /* clip (y no hidden): la ventana nunca se desplaza sola al mover el foco */
+    overflow: clip;
+}
+
+.dialogo--orden > form {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.dialogo__desplazable {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-inline: -0.25rem;
+    padding: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dialogo--orden .dialogo__acciones {
+    flex-wrap: nowrap;
+}

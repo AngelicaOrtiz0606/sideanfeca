@@ -56,7 +56,6 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         ->middleware(Privilegio::GestionarZonas->middleware());
 
     Route::middleware(Privilegio::GestionarCoordinaciones->middleware())->group(function () {
-        Route::get('/coordinaciones/orden', [CoordinacionController::class, 'orden'])->name('coordinaciones.orden');
         Route::put('/coordinaciones/orden', [CoordinacionController::class, 'guardarOrden'])->name('coordinaciones.guardar-orden');
         Route::patch('/coordinaciones/{coordinacion}/estado', [CoordinacionController::class, 'cambiarEstado'])->name('coordinaciones.estado');
         Route::resource('coordinaciones', CoordinacionController::class)

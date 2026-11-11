@@ -52,7 +52,6 @@ class CoordinacionesTest extends TestCase
             ->update(['ropr_activo' => false]);
 
         $this->actingAs($this->admin)->get('/coordinaciones')->assertForbidden();
-        $this->actingAs($this->admin)->get('/coordinaciones/orden')->assertForbidden();
         $this->actingAs($this->admin)->put('/coordinaciones/orden', ['orden' => $this->ordenActual()])->assertForbidden();
         $this->actingAs($this->admin)->patch("/coordinaciones/{$id}/estado", ['activa' => '0'])->assertForbidden();
         $this->actingAs($this->admin)->delete("/coordinaciones/{$id}", ['motivo' => 'Duplicado'])->assertForbidden();
@@ -240,7 +239,7 @@ class CoordinacionesTest extends TestCase
         $incompleto = array_slice($antes, 0, -1);
 
         $this->actingAs($this->admin)->put('/coordinaciones/orden', ['orden' => $incompleto])
-            ->assertRedirect('/coordinaciones/orden')
+            ->assertRedirect('/coordinaciones')
             ->assertSessionHas('aviso');
 
         $this->assertSame($antes, $this->ordenActual());
@@ -290,8 +289,10 @@ class CoordinacionesTest extends TestCase
 
     public function test_la_pantalla_de_orden_tiene_flechas_accesibles(): void
     {
-        $this->actingAs($this->admin)->get('/coordinaciones/orden')
+        // La ventana de orden está en la misma lista
+        $this->actingAs($this->admin)->get('/coordinaciones')
             ->assertOk()
+            ->assertSee('id="dialogo-orden"', false)
             ->assertSee('data-ordenar-subir', false)
             ->assertSeeText('Subir Academia ANFECA')
             ->assertSeeText('Bajar Academia ANFECA')

@@ -75,13 +75,6 @@ class CoordinacionController extends Controller
             ->with('estado', "Se borró la coordinación {$nombre}. Las que seguían subieron un lugar.");
     }
 
-    public function orden(): View
-    {
-        return view('catalogos.coordinaciones.orden', [
-            'coordinaciones' => $this->coordinaciones->listado(),
-        ]);
-    }
-
     public function guardarOrden(OrdenCoordinacionesRequest $request): RedirectResponse
     {
         try {
@@ -90,7 +83,7 @@ class CoordinacionController extends Controller
             // reordenar_coordinaciones rechazó la lista (le falta o le sobra alguna)
             report($error);
 
-            return redirect()->route('coordinaciones.orden')
+            return redirect()->route('coordinaciones.index')
                 ->with('aviso', 'La lista de coordinaciones cambió mientras ordenabas. Revisa el orden y guarda otra vez.');
         }
 

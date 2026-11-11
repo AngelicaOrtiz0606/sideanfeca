@@ -6,6 +6,7 @@
  * El orden se guarda en los campos ocultos orden[] de cada elemento, en el
  * orden en que quedan en la página. "Guardar orden" se activa solo si el
  * orden cambió. Cada movimiento se anuncia a los lectores de pantalla.
+ * Si la lista está en una ventana y se cancela, regresa al orden original.
  */
 document.querySelectorAll('form[data-ordenar]').forEach((formulario) => {
     const lista = formulario.querySelector('[data-ordenar-lista]');
@@ -83,6 +84,20 @@ document.querySelectorAll('form[data-ordenar]').forEach((formulario) => {
         arrastrado?.removeAttribute('data-arrastrando');
         actualizar(arrastrado);
         arrastrado = null;
+    });
+
+    // Dentro de una ventana: si se cierra sin guardar, la lista regresa al orden original
+    const original = elementos();
+    let guardando = false;
+    formulario.addEventListener('submit', () => { guardando = true; });
+    formulario.closest('dialog')?.addEventListener('close', () => {
+        if (guardando) {
+            return;
+        }
+
+        original.forEach((item) => lista.append(item));
+        actualizar(null);
+        anuncio.textContent = '';
     });
 
     actualizar(null);
