@@ -52,6 +52,7 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     // Catálogos (M3)
     Route::resource('zonas', ZonaController::class)
         ->parameters(['zonas' => 'zona'])
+        ->except(['create', 'edit'])
         ->middleware(Privilegio::GestionarZonas->middleware());
 
     Route::middleware(Privilegio::GestionarCoordinaciones->middleware())->group(function () {
@@ -59,7 +60,8 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::put('/coordinaciones/orden', [CoordinacionController::class, 'guardarOrden'])->name('coordinaciones.guardar-orden');
         Route::patch('/coordinaciones/{coordinacion}/estado', [CoordinacionController::class, 'cambiarEstado'])->name('coordinaciones.estado');
         Route::resource('coordinaciones', CoordinacionController::class)
-            ->parameters(['coordinaciones' => 'coordinacion']);
+            ->parameters(['coordinaciones' => 'coordinacion'])
+            ->except(['create', 'edit']);
     });
 
     Route::get('/usuarios', PantallaPendienteController::class)

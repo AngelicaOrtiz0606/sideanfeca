@@ -18,10 +18,10 @@
     margin-top: 1.25rem;
 }
 
-/* Tarjeta que solo contiene una tabla: la tabla llega a las orillas */
+/* Tarjeta que solo contiene una tabla: la tabla llega a las orillas.
+   Sin overflow oculto, para que los globos de las acciones no se corten. */
 .tarjeta--tabla {
     padding: 0.25rem 0;
-    overflow: hidden;
 }
 
 .tarjeta__encabezado {

@@ -16,10 +16,15 @@
         </div>
 
         <div class="pagina__acciones">
-            <a href="{{ route('zonas.edit', $zona) }}" class="boton boton--discreto">
+            <button type="button" class="boton boton--discreto"
+                    data-abrir-dialogo="dialogo-zona"
+                    data-accion="{{ route('zonas.update', $zona) }}" data-metodo="PUT"
+                    data-zona="{{ $zona->zore_id_zona_regional }}"
+                    data-titulo="Editar zona" data-boton="Guardar cambios"
+                    data-valores='@json(['numero' => $zona->zore_numero, 'nombre' => $zona->zore_nombre, '_id' => $zona->zore_id_zona_regional])'>
                 <x-icono nombre="lapiz" />
                 Editar zona
-            </a>
+            </button>
         </div>
     </header>
 
@@ -74,43 +79,5 @@
         @endif
     </section>
 
-    @if ($motivoParaNoBorrar !== null)
-        <p class="nota-borrado">{{ $motivoParaNoBorrar }}</p>
-    @else
-        <section class="tarjeta tarjeta--peligro" aria-labelledby="borrar-titulo">
-            <div>
-                <h2 id="borrar-titulo" class="seccion__titulo">Borrar zona</h2>
-                <p class="tarjeta__texto">La zona no tiene entidades, instituciones ni puestos. El borrado queda en la bitácora con su motivo.</p>
-            </div>
-            <button type="button" class="boton boton--peligro" data-abrir-dialogo="dialogo-borrar">
-                <x-icono nombre="papelera" />
-                Borrar zona
-            </button>
-        </section>
-
-        <dialog id="dialogo-borrar" class="dialogo" aria-labelledby="dialogo-borrar-titulo" @if ($errors->has('motivo')) data-abrir-al-cargar @endif>
-            <form method="POST" action="{{ route('zonas.destroy', $zona) }}" class="formulario" novalidate data-validar>
-                @csrf
-                @method('DELETE')
-
-                <h2 id="dialogo-borrar-titulo" class="dialogo__titulo">¿Borrar la {{ $zona->etiqueta() }}?</h2>
-                <p class="dialogo__texto">Esta acción no se puede deshacer.</p>
-
-                <div class="campo">
-                    <label for="motivo" class="campo__etiqueta">Motivo</label>
-                    <select id="motivo" name="motivo" class="campo__entrada" required @error('motivo') aria-invalid="true" @enderror>
-                        <option value="">Elige un motivo</option>
-                        @foreach ($motivos as $motivo)
-                            <option value="{{ $motivo }}" @selected(old('motivo') === $motivo)>{{ $motivo }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="dialogo__acciones">
-                    <button type="button" class="boton boton--secundario" data-cerrar-dialogo>Cancelar</button>
-                    <button type="submit" class="boton boton--peligro">Borrar</button>
-                </div>
-            </form>
-        </dialog>
-    @endif
+    @include('catalogos.zonas._dialogo-zona', ['zonas' => collect([$zona]), 'entidades' => $todasLasEntidades])
 @endsection

@@ -1,37 +1,55 @@
 /*
- * Formulario de zona: al marcar una entidad federativa que ya pertenece a
- * otra zona, se pregunta si se quiere quitar de esa zona y pasar a esta.
- * Si la persona cancela (o cierra con Esc), la entidad se desmarca.
+ * Ventana de zona (#dialogo-zona): las 32 entidades federativas.
  *
- * Usa las casillas con data-entidad y data-zona-actual, y la ventana
- * #dialogo-cambio-zona.
+ * - Al abrirla para una zona (botón con data-zona="id"), las entidades que ya
+ *   están en ella aparecen marcadas y fijas ("En esta zona"); las demás,
+ *   sin marcar y con la zona en la que están hoy. Para una zona nueva, todas
+ *   aparecen sin marcar.
+ * - Al marcar una entidad que pertenece a otra zona, se pregunta si se quiere
+ *   quitar de esa zona y pasar a esta (#dialogo-cambio-zona). Si la persona
+ *   cancela (o cierra con Esc), la entidad se desmarca.
  */
-const dialogo = document.getElementById('dialogo-cambio-zona');
+const ventana = document.getElementById('dialogo-zona');
+const confirmacion = document.getElementById('dialogo-cambio-zona');
 
-if (dialogo) {
-    const texto = dialogo.querySelector('[data-texto-cambio-zona]');
-    let casilla = null;
+if (ventana && confirmacion) {
+    const casillas = [...ventana.querySelectorAll('input[data-zona-id]')];
+    const texto = confirmacion.querySelector('[data-texto-cambio-zona]');
+    let pendiente = null;
 
-    document.querySelectorAll('input[data-zona-actual]').forEach((entrada) => {
-        entrada.addEventListener('change', () => {
-            if (!entrada.checked) {
-                return;
-            }
+    ventana.addEventListener('dialogo:preparado', (evento) => {
+        const zona = evento.detail.boton.dataset.zona ?? '';
 
-            casilla = entrada;
-            texto.textContent = `${entrada.dataset.entidad} ya está asignada a la ${entrada.dataset.zonaActual}. ¿Quieres quitarla de esa zona y pasarla a esta?`;
-            dialogo.returnValue = '';
-            dialogo.showModal();
+        casillas.forEach((casilla) => {
+            const aqui = zona !== '' && casilla.dataset.zonaId === zona;
+            casilla.checked = aqui;
+            casilla.disabled = aqui;
+            casilla.closest('label').classList.toggle('opcion-entidad--fija', aqui);
+            casilla.closest('label').querySelector('[data-zona-leyenda]').textContent = aqui
+                ? 'En esta zona'
+                : `Zona ${casilla.dataset.zonaNumero}`;
         });
     });
 
-    dialogo.addEventListener('close', () => {
-        if (casilla && dialogo.returnValue !== 'si') {
-            casilla.checked = false;
-            casilla.dispatchEvent(new Event('change', { bubbles: true }));
+    casillas.forEach((casilla) => {
+        casilla.addEventListener('change', () => {
+            if (!casilla.checked || casilla.disabled) {
+                return;
+            }
+
+            pendiente = casilla;
+            texto.textContent = `${casilla.dataset.entidad} ya está asignada a la ${casilla.dataset.zonaActual}. ¿Quieres quitarla de esa zona y pasarla a esta?`;
+            confirmacion.returnValue = '';
+            confirmacion.showModal();
+        });
+    });
+
+    confirmacion.addEventListener('close', () => {
+        if (pendiente && confirmacion.returnValue !== 'si') {
+            pendiente.checked = false;
         }
 
-        casilla?.focus();
-        casilla = null;
+        pendiente?.focus();
+        pendiente = null;
     });
 }

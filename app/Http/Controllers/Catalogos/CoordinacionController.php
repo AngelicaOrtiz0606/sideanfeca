@@ -15,8 +15,8 @@ use Illuminate\View\View;
 
 /**
  * Catálogo de coordinaciones nacionales (privilegio gestionar_coordinaciones,
- * revisado en la ruta). Se activan o desactivan; solo se borran si nunca
- * tuvieron puestos.
+ * revisado en la ruta). Todo se hace desde la lista: registrar y editar en
+ * una ventana, activar o desactivar, y borrar solo si no tiene puestos.
  */
 class CoordinacionController extends Controller
 {
@@ -26,6 +26,7 @@ class CoordinacionController extends Controller
     {
         return view('catalogos.coordinaciones.index', [
             'coordinaciones' => $this->coordinaciones->listado(),
+            'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }
 
@@ -34,34 +35,21 @@ class CoordinacionController extends Controller
         return view('catalogos.coordinaciones.show', [
             'coordinacion' => $coordinacion,
             'puestos' => $this->coordinaciones->puestos($coordinacion),
-            'motivoParaNoBorrar' => $this->coordinaciones->motivoParaNoBorrar($coordinacion),
-            'motivos' => EliminarRequest::MOTIVOS,
         ]);
-    }
-
-    public function create(): View
-    {
-        return view('catalogos.coordinaciones.formulario', ['coordinacion' => new CoordinacionNacional]);
     }
 
     public function store(CoordinacionRequest $request): RedirectResponse
     {
         $coordinacion = $this->coordinaciones->registrar($request->user(), $request->nombre(), $request->descripcion());
 
-        return redirect()->route('coordinaciones.show', $coordinacion)
-            ->with('estado', "Se registró la coordinación {$coordinacion->cona_nombre}. Quedó al final del orden.");
-    }
-
-    public function edit(CoordinacionNacional $coordinacion): View
-    {
-        return view('catalogos.coordinaciones.formulario', ['coordinacion' => $coordinacion]);
+        return back()->with('estado', "Se registró la coordinación {$coordinacion->cona_nombre}. Quedó al final del orden.");
     }
 
     public function update(CoordinacionRequest $request, CoordinacionNacional $coordinacion): RedirectResponse
     {
         $this->coordinaciones->actualizar($request->user(), $coordinacion, $request->nombre(), $request->descripcion());
 
-        return redirect()->route('coordinaciones.show', $coordinacion)->with('estado', 'Se guardaron los cambios de la coordinación.');
+        return back()->with('estado', "Se guardaron los cambios de {$coordinacion->refresh()->cona_nombre}.");
     }
 
     public function cambiarEstado(Request $request, CoordinacionNacional $coordinacion): RedirectResponse
@@ -69,9 +57,9 @@ class CoordinacionController extends Controller
         $activa = $request->boolean('activa');
         $this->coordinaciones->cambiarEstado($request->user(), $coordinacion, $activa);
 
-        return redirect()->route('coordinaciones.show', $coordinacion)->with('estado', $activa
-            ? 'Se activó la coordinación.'
-            : 'Se desactivó la coordinación. Sus puestos y su historial se conservan.');
+        return back()->with('estado', $activa
+            ? "Se activó {$coordinacion->cona_nombre}."
+            : "Se desactivó {$coordinacion->cona_nombre}. Sus puestos y su historial se conservan.");
     }
 
     public function destroy(EliminarRequest $request, CoordinacionNacional $coordinacion): RedirectResponse
@@ -79,7 +67,7 @@ class CoordinacionController extends Controller
         $nombre = $coordinacion->cona_nombre;
 
         if (! $this->coordinaciones->eliminar($request->user(), $coordinacion, $request->motivo())) {
-            return redirect()->route('coordinaciones.show', $coordinacion)
+            return redirect()->route('coordinaciones.index')
                 ->with('aviso', $this->coordinaciones->motivoParaNoBorrar($coordinacion) ?? 'No se pudo borrar la coordinación.');
         }
 

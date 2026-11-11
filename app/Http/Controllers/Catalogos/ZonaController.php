@@ -14,6 +14,8 @@ use Illuminate\View\View;
 
 /**
  * Catálogo de zonas regionales (privilegio gestionar_zonas, revisado en la ruta).
+ * Registrar y editar se hacen en una ventana sobre la lista o la consulta,
+ * así que no hay pantallas aparte para eso.
  */
 class ZonaController extends Controller
 {
@@ -23,7 +25,9 @@ class ZonaController extends Controller
     {
         return view('catalogos.zonas.index', [
             'zonas' => $this->zonas->listado(),
-            'hayNumerosLibres' => $this->zonas->numerosLibres() !== [],
+            'numerosLibres' => $this->zonas->numerosLibres(),
+            'entidades' => $this->entidades(),
+            'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }
 
@@ -33,23 +37,7 @@ class ZonaController extends Controller
             'zona' => $zona,
             'entidades' => $zona->entidades,
             'instituciones' => $this->zonas->instituciones($zona),
-            'motivoParaNoBorrar' => $this->zonas->motivoParaNoBorrar($zona),
-            'motivos' => EliminarRequest::MOTIVOS,
-        ]);
-    }
-
-    public function create(): View|RedirectResponse
-    {
-        $libres = $this->zonas->numerosLibres();
-
-        if ($libres === []) {
-            return redirect()->route('zonas.index')
-                ->with('aviso', 'Ya están registradas las 7 zonas. Para agregar otra, primero borra una que no se use.');
-        }
-
-        return view('catalogos.zonas.formulario', [
-            'zona' => (new ZonaRegional)->forceFill(['zore_numero' => $libres[0]]),
-            'entidades' => $this->entidades(),
+            'todasLasEntidades' => $this->entidades(),
         ]);
     }
 
@@ -57,27 +45,19 @@ class ZonaController extends Controller
     {
         $zona = $this->zonas->registrar($request->user(), $request->numero(), $request->nombre(), $request->entidades());
 
-        return redirect()->route('zonas.show', $zona)->with('estado', "Se registró la {$zona->etiqueta()}.");
-    }
-
-    public function edit(ZonaRegional $zona): View
-    {
-        return view('catalogos.zonas.formulario', [
-            'zona' => $zona,
-            'entidades' => $this->entidades(),
-        ]);
+        return back()->with('estado', "Se registró la {$zona->etiqueta()}.");
     }
 
     public function update(ZonaRequest $request, ZonaRegional $zona): RedirectResponse
     {
         $movidas = $this->zonas->actualizar($request->user(), $zona, $request->numero(), $request->nombre(), $request->entidades());
 
-        $mensaje = 'Se guardaron los cambios de la zona.';
+        $mensaje = "Se guardaron los cambios de la {$zona->refresh()->etiqueta()}.";
         if ($movidas !== []) {
             $mensaje .= ' Pasaron a esta zona: '.implode(', ', $movidas).'.';
         }
 
-        return redirect()->route('zonas.show', $zona)->with('estado', $mensaje);
+        return back()->with('estado', $mensaje);
     }
 
     public function destroy(EliminarRequest $request, ZonaRegional $zona): RedirectResponse
@@ -85,7 +65,7 @@ class ZonaController extends Controller
         $etiqueta = $zona->etiqueta();
 
         if (! $this->zonas->eliminar($request->user(), $zona, $request->motivo())) {
-            return redirect()->route('zonas.show', $zona)
+            return redirect()->route('zonas.index')
                 ->with('aviso', $this->zonas->motivoParaNoBorrar($zona) ?? 'No se pudo borrar la zona.');
         }
 
@@ -93,7 +73,7 @@ class ZonaController extends Controller
     }
 
     /**
-     * Las 32 entidades con su zona actual, para elegir cuáles pasan a esta zona.
+     * Las 32 entidades con su zona actual, para elegir cuáles pasan a una zona.
      *
      * @return Collection<int, EntidadFederativa>
      */

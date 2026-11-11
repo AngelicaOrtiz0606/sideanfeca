@@ -34,7 +34,10 @@ class CoordinacionService
             ->select('c.cona_id_coordinacion_nacional', 'c.cona_nombre', 'c.cona_descripcion', 'c.cona_orden', 'c.cona_activo')
             ->selectSub(fn ($q) => $q->from('puesto')->whereColumn('pues_id_coordinacion_nacional', 'c.cona_id_coordinacion_nacional')->selectRaw('count(*)'), 'puestos')
             ->orderBy('c.cona_orden')
-            ->get();
+            ->get()
+            ->each(function (object $coordinacion): void {
+                $coordinacion->motivo_para_no_borrar = $this->explicar((int) $coordinacion->puestos);
+            });
     }
 
     /**
@@ -147,8 +150,11 @@ class CoordinacionService
      */
     public function motivoParaNoBorrar(CoordinacionNacional $coordinacion): ?string
     {
-        $puestos = DB::table('puesto')->where('pues_id_coordinacion_nacional', $coordinacion->cona_id_coordinacion_nacional)->count();
+        return $this->explicar(DB::table('puesto')->where('pues_id_coordinacion_nacional', $coordinacion->cona_id_coordinacion_nacional)->count());
+    }
 
+    private function explicar(int $puestos): ?string
+    {
         return match (true) {
             $puestos === 0 => null,
             $puestos === 1 => 'No se puede borrar porque tiene 1 puesto. Si ya no se usa, desactívala: su historial se conserva.',

@@ -88,8 +88,9 @@ class CoordinacionesTest extends TestCase
     {
         $id = $this->idEnLugar(8); // Historia
 
-        $this->actingAs($this->admin)->put("/coordinaciones/{$id}", ['nombre' => 'Historia de la Contaduría', 'descripcion' => 'Memoria de la profesión'])
-            ->assertRedirect("/coordinaciones/{$id}");
+        $this->actingAs($this->admin)->from('/coordinaciones')->put("/coordinaciones/{$id}", ['nombre' => 'Historia de la Contaduría', 'descripcion' => 'Memoria de la profesión'])
+            ->assertRedirect('/coordinaciones')
+            ->assertSessionHas('estado', 'Se guardaron los cambios de Historia de la Contaduría.');
 
         $bitacora = $this->ultimaBitacora();
         $this->assertSame(['Modificacion', 'COORDINACION_NACIONAL', $id], [$bitacora->bita_accion, $bitacora->bita_tabla, $bitacora->bita_referencia]);
@@ -104,9 +105,9 @@ class CoordinacionesTest extends TestCase
         $id = $this->idEnLugar(1);
         [$puesto, $designacion] = $this->puestoConDesignacion($id);
 
-        $this->actingAs($this->admin)->patch("/coordinaciones/{$id}/estado", ['activa' => '0'])
-            ->assertRedirect("/coordinaciones/{$id}")
-            ->assertSessionHas('estado', 'Se desactivó la coordinación. Sus puestos y su historial se conservan.');
+        $this->actingAs($this->admin)->from('/coordinaciones')->patch("/coordinaciones/{$id}/estado", ['activa' => '0'])
+            ->assertRedirect('/coordinaciones')
+            ->assertSessionHas('estado', 'Se desactivó Certificación Académica. Sus puestos y su historial se conservan.');
 
         $this->assertFalse((bool) DB::table('coordinacion_nacional')->where('cona_id_coordinacion_nacional', $id)->value('cona_activo'));
         $this->assertDatabaseHas('puesto', ['pues_id_puesto' => $puesto, 'pues_id_coordinacion_nacional' => $id]);
@@ -128,7 +129,7 @@ class CoordinacionesTest extends TestCase
         DB::table('coordinacion_nacional')->where('cona_id_coordinacion_nacional', $id)->update(['cona_activo' => false]);
 
         $this->actingAs($this->admin)->patch("/coordinaciones/{$id}/estado", ['activa' => '1'])
-            ->assertSessionHas('estado', 'Se activó la coordinación.');
+            ->assertSessionHas('estado', 'Se activó Academia ANFECA.');
 
         $this->assertTrue((bool) DB::table('coordinacion_nacional')->where('cona_id_coordinacion_nacional', $id)->value('cona_activo'));
         $this->assertSame('Activacion', $this->ultimaBitacora()->bita_accion);
@@ -139,12 +140,13 @@ class CoordinacionesTest extends TestCase
         $id = $this->idEnLugar(1);
         $this->puestoConDesignacion($id);
 
-        $this->actingAs($this->admin)->get("/coordinaciones/{$id}")
-            ->assertSeeText('No se puede borrar porque tiene 1 puesto.')
-            ->assertDontSee('dialogo-borrar', false);
+        // En la lista, el botón Borrar se ve bloqueado y explica por qué
+        $this->actingAs($this->admin)->get('/coordinaciones')
+            ->assertSee('No se puede borrar porque tiene 1 puesto. Si ya no se usa, desactívala: su historial se conserva.')
+            ->assertSee('accion--bloqueada', false);
 
         $this->actingAs($this->admin)->delete("/coordinaciones/{$id}", ['motivo' => 'Error de captura'])
-            ->assertRedirect("/coordinaciones/{$id}")
+            ->assertRedirect('/coordinaciones')
             ->assertSessionHas('aviso');
 
         $this->assertDatabaseHas('coordinacion_nacional', ['cona_id_coordinacion_nacional' => $id]);
@@ -155,8 +157,8 @@ class CoordinacionesTest extends TestCase
         $id = $this->idEnLugar(5); // Investigación
         $antes = $this->ordenActual();
 
-        $this->actingAs($this->admin)->get("/coordinaciones/{$id}")
-            ->assertSeeText('Borrar coordinación')
+        $this->actingAs($this->admin)->get('/coordinaciones')
+            ->assertSee('data-accion="'.route('coordinaciones.destroy', $id).'"', false)
             ->assertSee('Error de captura');
 
         $this->actingAs($this->admin)->delete("/coordinaciones/{$id}", ['motivo' => 'Error de captura'])
@@ -263,6 +265,27 @@ class CoordinacionesTest extends TestCase
             ->assertSessionHas('estado', 'El orden no cambió.');
 
         $this->assertSame($antes, DB::table('bitacora')->count());
+    }
+
+    public function test_cada_fila_tiene_sus_acciones_segun_su_estado(): void
+    {
+        $id = $this->idEnLugar(2);
+        DB::table('coordinacion_nacional')->where('cona_id_coordinacion_nacional', $id)->update(['cona_activo' => false]);
+
+        $this->actingAs($this->admin)->get('/coordinaciones')
+            ->assertSeeText('Editar Certificación Académica')
+            ->assertSeeText('Desactivar Certificación Académica')
+            ->assertSeeText('Activar Academia ANFECA')
+            ->assertDontSeeText('Desactivar Academia ANFECA')
+            ->assertSeeText('Borrar Academia ANFECA');
+    }
+
+    public function test_con_errores_la_ventana_se_vuelve_a_abrir(): void
+    {
+        $this->actingAs($this->admin)->from('/coordinaciones')->followingRedirects()
+            ->post('/coordinaciones', ['nombre' => 'Historia', '_dialogo' => 'coordinacion', '_id' => ''])
+            ->assertSeeText('Ya existe una coordinación con ese nombre.')
+            ->assertSee('id="dialogo-coordinacion" class="dialogo" aria-labelledby="dialogo-coordinacion-titulo"  data-abrir-al-cargar', false);
     }
 
     public function test_la_pantalla_de_orden_tiene_flechas_accesibles(): void

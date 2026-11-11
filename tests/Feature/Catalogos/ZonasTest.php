@@ -60,8 +60,12 @@ class ZonasTest extends TestCase
         $this->actingAs($this->admin)->get("/zonas/{$zona}")
             ->assertOk()
             ->assertSeeText('Noroeste')
-            ->assertSeeText('Sonora')
-            ->assertSeeText('No se puede borrar porque tiene 1 entidad federativa.');
+            ->assertSeeText('Sonora');
+
+        // En la lista, el botón Borrar explica por qué no se puede
+        $this->actingAs($this->admin)->get('/zonas')
+            ->assertSee('No se puede borrar porque tiene 1 entidad federativa. Para borrarla, primero pasa sus entidades a otra zona.')
+            ->assertSee('accion--bloqueada', false);
     }
 
     public function test_una_direccion_que_no_es_numero_no_existe(): void
@@ -74,9 +78,9 @@ class ZonasTest extends TestCase
     {
         $zona = $this->zona(1, 'Noroeste');
 
-        $this->actingAs($this->admin)->put("/zonas/{$zona}", ['numero' => 3, 'nombre' => 'Pacífico Norte'])
-            ->assertRedirect("/zonas/{$zona}")
-            ->assertSessionHas('estado');
+        $this->actingAs($this->admin)->from('/zonas')->put("/zonas/{$zona}", ['numero' => 3, 'nombre' => 'Pacífico Norte'])
+            ->assertRedirect('/zonas')
+            ->assertSessionHas('estado', 'Se guardaron los cambios de la Zona 3 · Pacífico Norte.');
 
         $this->assertDatabaseHas('zona_regional', ['zore_id_zona_regional' => $zona, 'zore_numero' => 3, 'zore_nombre' => 'Pacífico Norte']);
 
@@ -103,9 +107,9 @@ class ZonasTest extends TestCase
         $zona = $this->zona(1, 'Noroeste');
 
         foreach ([0, 8, 'tres'] as $numero) {
-            $this->actingAs($this->admin)->from("/zonas/{$zona}/edit")
+            $this->actingAs($this->admin)->from('/zonas')
                 ->put("/zonas/{$zona}", ['numero' => $numero, 'nombre' => 'Noroeste'])
-                ->assertRedirect("/zonas/{$zona}/edit")
+                ->assertRedirect('/zonas')
                 ->assertSessionHasErrors('numero');
         }
 
@@ -130,14 +134,17 @@ class ZonasTest extends TestCase
             ->assertSessionHasErrors(['nombre' => 'Ya existe una zona con ese nombre.']);
     }
 
-    public function test_el_formulario_con_errores_los_muestra_arriba(): void
+    public function test_con_errores_la_ventana_se_vuelve_a_abrir_con_lo_escrito(): void
     {
         $this->zona(2, 'Norte');
         $zona = $this->zona(1, 'Noroeste');
 
-        $this->actingAs($this->admin)->from("/zonas/{$zona}/edit")->followingRedirects()
-            ->put("/zonas/{$zona}", ['numero' => 2, 'nombre' => 'Noroeste'])
+        $this->actingAs($this->admin)->from('/zonas')->followingRedirects()
+            ->put("/zonas/{$zona}", ['numero' => 2, 'nombre' => 'Pacífico', '_dialogo' => 'zona', '_id' => $zona])
             ->assertSeeText('Ya existe una zona con ese número.')
+            ->assertSee('id="dialogo-zona" class="dialogo dialogo--amplio" aria-labelledby="dialogo-zona-titulo"  data-abrir-al-cargar', false)
+            ->assertSee('action="'.route('zonas.update', $zona).'"', false)
+            ->assertSee('value="Pacífico"', false)
             ->assertSee('aria-invalid="true"', false);
     }
 
@@ -149,7 +156,7 @@ class ZonasTest extends TestCase
 
         $this->actingAs($this->admin)->put("/zonas/{$noroeste}", ['numero' => 1, 'nombre' => 'Noroeste', 'entidades' => [$sonora]])
             ->assertRedirect()
-            ->assertSessionHas('estado', 'Se guardaron los cambios de la zona. Pasaron a esta zona: Sonora (antes en la Zona 2 · Norte).');
+            ->assertSessionHas('estado', 'Se guardaron los cambios de la Zona 1 · Noroeste. Pasaron a esta zona: Sonora (antes en la Zona 2 · Norte).');
 
         $this->assertSame($noroeste, (int) DB::table('entidad_federativa')->where('enfe_id_entidad_federativa', $sonora)->value('enfe_id_zona_regional'));
 
@@ -158,20 +165,19 @@ class ZonasTest extends TestCase
         $this->assertSame([['Zona regional', 'Zona 2 · Norte', 'Zona 1 · Noroeste']], $this->detalles($bitacora->bita_id_bitacora));
     }
 
-    public function test_el_formulario_avisa_en_que_zona_esta_cada_entidad(): void
+    public function test_la_ventana_sabe_en_que_zona_esta_cada_entidad(): void
     {
         $noroeste = $this->zona(1, 'Noroeste');
         $norte = $this->zona(2, 'Norte');
         $this->entidad('26', 'Sonora', $norte);
-        $this->entidad('25', 'Sinaloa', $noroeste);
 
-        $this->actingAs($this->admin)->get("/zonas/{$noroeste}/edit")
+        // Con esto, al abrir la ventana de otra zona se pregunta antes de pasar Sonora
+        $this->actingAs($this->admin)->get('/zonas')
             ->assertOk()
-            // Sonora está en otra zona: al marcarla se pregunta si se quiere pasar
             ->assertSee('data-entidad="Sonora"', false)
+            ->assertSee('data-zona-id="'.$norte.'"', false)
             ->assertSee('data-zona-actual="Zona 2 · Norte"', false)
-            // Sinaloa ya está aquí: fija y sin pregunta
-            ->assertDontSee('data-entidad="Sinaloa"', false)
+            ->assertSee('data-zona="'.$noroeste.'"', false)
             ->assertSee('id="dialogo-cambio-zona"', false);
     }
 
@@ -200,12 +206,12 @@ class ZonasTest extends TestCase
         $norte = $this->zona(2, 'Norte');
         $sonora = $this->entidad('26', 'Sonora', $norte);
 
-        $this->actingAs($this->admin)->get('/zonas/create')
+        $this->actingAs($this->admin)->get('/zonas')
             ->assertOk()
-            ->assertSee('value="1"', false);
+            ->assertSee('data-titulo="Nueva zona"', false);
 
-        $this->actingAs($this->admin)->post('/zonas', ['numero' => 1, 'nombre' => 'Noroeste', 'entidades' => [$sonora]])
-            ->assertRedirect()
+        $this->actingAs($this->admin)->from('/zonas')->post('/zonas', ['numero' => 1, 'nombre' => 'Noroeste', 'entidades' => [$sonora]])
+            ->assertRedirect('/zonas')
             ->assertSessionHas('estado', 'Se registró la Zona 1 · Noroeste.');
 
         $id = (int) DB::table('zona_regional')->where('zore_numero', 1)->value('zore_id_zona_regional');
@@ -220,10 +226,11 @@ class ZonasTest extends TestCase
             $this->zona($numero, "Zona de prueba {$numero}");
         }
 
-        $this->actingAs($this->admin)->get('/zonas')->assertDontSee('Nueva zona');
-        $this->actingAs($this->admin)->get('/zonas/create')
-            ->assertRedirect('/zonas')
-            ->assertSessionHas('aviso');
+        $this->actingAs($this->admin)->get('/zonas')->assertDontSee('data-titulo="Nueva zona"', false);
+
+        // Aunque alguien envíe el formulario, el número 8 no existe y los 1 a 7 ya están ocupados
+        $this->actingAs($this->admin)->post('/zonas', ['numero' => 8, 'nombre' => 'Octava'])->assertSessionHasErrors('numero');
+        $this->actingAs($this->admin)->post('/zonas', ['numero' => 7, 'nombre' => 'Octava'])->assertSessionHasErrors('numero');
     }
 
     public function test_una_zona_con_entidades_no_se_borra(): void
@@ -232,8 +239,8 @@ class ZonasTest extends TestCase
         $this->entidad('26', 'Sonora', $zona);
 
         $this->actingAs($this->admin)->delete("/zonas/{$zona}", ['motivo' => 'Duplicado'])
-            ->assertRedirect("/zonas/{$zona}")
-            ->assertSessionHas('aviso', 'No se puede borrar porque tiene 1 entidad federativa.');
+            ->assertRedirect('/zonas')
+            ->assertSessionHas('aviso', 'No se puede borrar porque tiene 1 entidad federativa. Para borrarla, primero pasa sus entidades a otra zona.');
 
         $this->assertDatabaseHas('zona_regional', ['zore_id_zona_regional' => $zona]);
     }
@@ -242,8 +249,9 @@ class ZonasTest extends TestCase
     {
         $zona = $this->zona(5, 'Centro Sur');
 
-        $this->actingAs($this->admin)->get("/zonas/{$zona}")
-            ->assertSeeText('Borrar zona')
+        $this->actingAs($this->admin)->get('/zonas')
+            ->assertSee('data-accion="'.route('zonas.destroy', $zona).'"', false)
+            ->assertSee('data-bloqueo=""', false)
             ->assertSee('Decisión de la organización');
 
         $this->actingAs($this->admin)->delete("/zonas/{$zona}", ['motivo' => 'Decisión de la organización'])
@@ -262,6 +270,13 @@ class ZonasTest extends TestCase
         $zona = $this->zona(5, 'Centro Sur');
 
         $this->actingAs($this->admin)->delete("/zonas/{$zona}", [])->assertSessionHasErrors('motivo');
+
+        // La ventana de borrar se vuelve a abrir para esa zona
+        $this->actingAs($this->admin)->from('/zonas')->followingRedirects()
+            ->delete("/zonas/{$zona}", ['_id' => $zona])
+            ->assertSee('id="dialogo-borrar" class="dialogo" aria-labelledby="dialogo-borrar-titulo"  data-abrir-al-cargar', false)
+            ->assertSeeText('¿Borrar la Zona 5 · Centro Sur?');
+
         $this->actingAs($this->admin)->delete("/zonas/{$zona}", ['motivo' => 'Porque sí'])->assertSessionHasErrors('motivo');
 
         $this->assertDatabaseHas('zona_regional', ['zore_id_zona_regional' => $zona]);

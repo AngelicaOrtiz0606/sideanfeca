@@ -22,10 +22,14 @@
         </div>
 
         <div class="pagina__acciones">
-            <a href="{{ route('coordinaciones.edit', $coordinacion) }}" class="boton boton--discreto">
+            <button type="button" class="boton boton--discreto"
+                    data-abrir-dialogo="dialogo-coordinacion"
+                    data-accion="{{ route('coordinaciones.update', $coordinacion) }}" data-metodo="PUT"
+                    data-titulo="Editar coordinación" data-texto="" data-boton="Guardar cambios"
+                    data-valores='@json(['nombre' => $coordinacion->cona_nombre, 'descripcion' => $coordinacion->cona_descripcion, '_id' => $coordinacion->cona_id_coordinacion_nacional])'>
                 <x-icono nombre="lapiz" />
                 Editar coordinación
-            </a>
+            </button>
         </div>
     </header>
 
@@ -65,88 +69,5 @@
         @endif
     </section>
 
-    @if ($coordinacion->cona_activo)
-        <section class="tarjeta tarjeta--accion" aria-labelledby="estado-titulo">
-            <div>
-                <h2 id="estado-titulo" class="seccion__titulo">Desactivar coordinación</h2>
-                <p class="tarjeta__texto">No se borra: sus puestos y su historial se conservan, y se puede volver a activar.</p>
-            </div>
-            <button type="button" class="boton boton--secundario" data-abrir-dialogo="dialogo-estado">
-                <x-icono nombre="pausa" />
-                Desactivar
-            </button>
-        </section>
-
-        <dialog id="dialogo-estado" class="dialogo" aria-labelledby="dialogo-estado-titulo">
-            <form method="POST" action="{{ route('coordinaciones.estado', $coordinacion) }}" class="formulario">
-                @csrf
-                @method('PATCH')
-                <input type="hidden" name="activa" value="0">
-
-                <h2 id="dialogo-estado-titulo" class="dialogo__titulo">¿Desactivar {{ $coordinacion->cona_nombre }}?</h2>
-                <p class="dialogo__texto">Sus puestos y su historial se conservan. Puedes volver a activarla cuando quieras.</p>
-
-                <div class="dialogo__acciones">
-                    <button type="button" class="boton boton--secundario" data-cerrar-dialogo>Cancelar</button>
-                    <button type="submit" class="boton boton--primario">Desactivar</button>
-                </div>
-            </form>
-        </dialog>
-    @else
-        <section class="tarjeta tarjeta--accion" aria-labelledby="estado-titulo">
-            <div>
-                <h2 id="estado-titulo" class="seccion__titulo">Coordinación desactivada</h2>
-                <p class="tarjeta__texto">Sus puestos y su historial se conservaron. Al activarla vuelve a quedar disponible.</p>
-            </div>
-            <form method="POST" action="{{ route('coordinaciones.estado', $coordinacion) }}">
-                @csrf
-                @method('PATCH')
-                <input type="hidden" name="activa" value="1">
-                <button type="submit" class="boton boton--primario">
-                    <x-icono nombre="restaurar" />
-                    Activar
-                </button>
-            </form>
-        </section>
-    @endif
-
-    @if ($motivoParaNoBorrar !== null)
-        <p class="nota-borrado">{{ $motivoParaNoBorrar }}</p>
-    @else
-        <section class="tarjeta tarjeta--peligro" aria-labelledby="borrar-titulo">
-            <div>
-                <h2 id="borrar-titulo" class="seccion__titulo">Borrar coordinación</h2>
-                <p class="tarjeta__texto">No tiene puestos. El borrado queda en la bitácora con su motivo, y las que siguen suben un lugar.</p>
-            </div>
-            <button type="button" class="boton boton--peligro" data-abrir-dialogo="dialogo-borrar">
-                <x-icono nombre="papelera" />
-                Borrar coordinación
-            </button>
-        </section>
-
-        <dialog id="dialogo-borrar" class="dialogo" aria-labelledby="dialogo-borrar-titulo" @if ($errors->has('motivo')) data-abrir-al-cargar @endif>
-            <form method="POST" action="{{ route('coordinaciones.destroy', $coordinacion) }}" class="formulario" novalidate data-validar>
-                @csrf
-                @method('DELETE')
-
-                <h2 id="dialogo-borrar-titulo" class="dialogo__titulo">¿Borrar {{ $coordinacion->cona_nombre }}?</h2>
-                <p class="dialogo__texto">Esta acción no se puede deshacer.</p>
-
-                <div class="campo">
-                    <label for="motivo" class="campo__etiqueta">Motivo</label>
-                    <select id="motivo" name="motivo" class="campo__entrada" required @error('motivo') aria-invalid="true" @enderror>
-                        <option value="">Elige un motivo</option>
-                        @foreach ($motivos as $motivo)
-                            <option value="{{ $motivo }}" @selected(old('motivo') === $motivo)>{{ $motivo }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="dialogo__acciones">
-                    <button type="button" class="boton boton--secundario" data-cerrar-dialogo>Cancelar</button>
-                    <button type="submit" class="boton boton--peligro">Borrar</button>
-                </div>
-            </form>
-        </dialog>
-    @endif
+    @include('catalogos.coordinaciones._dialogo-coordinacion')
 @endsection

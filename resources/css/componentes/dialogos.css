@@ -50,3 +50,23 @@
         transform: translateY(0.5rem) scale(0.98);
     }
 }
+
+/* Ventana amplia (por ejemplo, una zona con sus 32 entidades) */
+.dialogo--amplio {
+    width: min(58rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+}
+
+/* Título con el botón de cerrar a la derecha */
+.dialogo__encabezado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+/* Texto sin formulario debajo (ventana de "no se puede borrar") */
+.dialogo__texto--separado {
+    margin: 0.5rem 0 1.25rem;
+}

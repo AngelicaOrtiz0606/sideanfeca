@@ -35,8 +35,12 @@ class ZonaService
             ->select('z.zore_id_zona_regional', 'z.zore_numero', 'z.zore_nombre')
             ->selectSub(fn ($q) => $q->from('entidad_federativa')->whereColumn('enfe_id_zona_regional', 'z.zore_id_zona_regional')->selectRaw('count(*)'), 'entidades')
             ->selectSub(fn ($q) => $q->from('institucion_educativa')->whereColumn('ined_id_zona_regional', 'z.zore_id_zona_regional')->selectRaw('count(*)'), 'instituciones')
+            ->selectSub(fn ($q) => $q->from('puesto')->whereColumn('pues_id_zona_regional', 'z.zore_id_zona_regional')->selectRaw('count(*)'), 'puestos')
             ->orderBy('z.zore_numero')
-            ->get();
+            ->get()
+            ->each(function (object $zona): void {
+                $zona->motivo_para_no_borrar = $this->explicar((int) $zona->entidades, (int) $zona->instituciones, (int) $zona->puestos);
+            });
     }
 
     /**
@@ -73,17 +77,32 @@ class ZonaService
     public function motivoParaNoBorrar(ZonaRegional $zona): ?string
     {
         $id = $zona->zore_id_zona_regional;
+
+        return $this->explicar(
+            DB::table('entidad_federativa')->where('enfe_id_zona_regional', $id)->count(),
+            DB::table('institucion_educativa')->where('ined_id_zona_regional', $id)->count(),
+            DB::table('puesto')->where('pues_id_zona_regional', $id)->count(),
+        );
+    }
+
+    /**
+     * "No se puede borrar porque tiene 5 entidades federativas y 2 instituciones. …"
+     */
+    private function explicar(int $entidades, int $instituciones, int $puestos): ?string
+    {
         $partes = array_filter([
-            $this->contar('entidad_federativa', 'enfe_id_zona_regional', $id, 'entidad federativa', 'entidades federativas'),
-            $this->contar('institucion_educativa', 'ined_id_zona_regional', $id, 'institución', 'instituciones'),
-            $this->contar('puesto', 'pues_id_zona_regional', $id, 'puesto', 'puestos'),
+            $this->cantidad($entidades, 'entidad federativa', 'entidades federativas'),
+            $this->cantidad($instituciones, 'institución', 'instituciones'),
+            $this->cantidad($puestos, 'puesto', 'puestos'),
         ]);
 
         if ($partes === []) {
             return null;
         }
 
-        return 'No se puede borrar porque tiene '.$this->unir($partes).'.';
+        $sugerencia = $entidades > 0 ? ' Para borrarla, primero pasa sus entidades a otra zona.' : '';
+
+        return 'No se puede borrar porque tiene '.$this->unir($partes).'.'.$sugerencia;
     }
 
     /**
@@ -195,10 +214,8 @@ class ZonaService
         return $movidas;
     }
 
-    private function contar(string $tabla, string $columna, int $id, string $singular, string $plural): ?string
+    private function cantidad(int $total, string $singular, string $plural): ?string
     {
-        $total = DB::table($tabla)->where($columna, $id)->count();
-
         return match (true) {
             $total === 0 => null,
             $total === 1 => "1 {$singular}",
