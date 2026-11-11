@@ -105,3 +105,75 @@
     color: var(--color-activo);
     font-weight: 600;
 }
+
+/* Cambiar el orden de las coordinaciones */
+.lista-orden {
+    display: grid;
+    gap: 0.375rem;
+    list-style: none;
+}
+
+.lista-orden__item {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3.25rem;
+    padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    background: var(--color-superficie);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.lista-orden__item:hover {
+    border-color: var(--color-borde-control);
+}
+
+.lista-orden__asa {
+    display: grid;
+    color: var(--color-texto-suave);
+    cursor: grab;
+}
+
+.lista-orden__lugar {
+    min-width: 1.5rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.lista-orden__nombre {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.9375rem;
+}
+
+.lista-orden__botones {
+    display: flex;
+    gap: 0.25rem;
+}
+
+/* Mientras se arrastra y cuando acaba de moverse */
+.lista-orden__item[data-arrastrando] {
+    opacity: 0.5;
+}
+
+.lista-orden__item[data-movida] {
+    border-color: var(--color-marca);
+    background: var(--color-marca-tinte);
+}
+
+@media (width < 40rem) {
+    .lista-orden__asa {
+        display: none;
+    }
+
+    .lista-orden__item {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+}

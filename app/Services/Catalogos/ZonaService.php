@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ZonaService
 {
+    use BitacoraCatalogo;
+
     /**
      * Zonas con cuántas entidades, instituciones y puestos tiene cada una.
      *
@@ -191,22 +193,6 @@ class ZonaService
         }
 
         return $movidas;
-    }
-
-    private function bitacora(Usuario $actor, string $accion, string $tabla, int $referencia, ?string $motivo = null): int
-    {
-        return (int) DB::selectOne(
-            'select bitacora_registrar(?, ?, ?, ?, ?) as id',
-            [$actor->usua_id_usuario, $accion, $tabla, $referencia, $motivo],
-        )->id;
-    }
-
-    private function detalle(int $idBitacora, int $referencia, string $campo, ?string $anterior, ?string $nuevo): void
-    {
-        DB::select(
-            'select bitacora_detalle_registrar(?, ?, ?, ?, ?)',
-            [$idBitacora, $referencia, $campo, $anterior, $nuevo],
-        );
     }
 
     private function contar(string $tabla, string $columna, int $id, string $singular, string $plural): ?string

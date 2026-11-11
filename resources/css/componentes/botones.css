@@ -129,3 +129,20 @@
     width: 1rem;
     height: 1rem;
 }
+
+/* Botón de ícono pequeño (subir y bajar en una lista) */
+.boton-icono--pequeno {
+    width: 2.25rem;
+    height: 2.25rem;
+    color: var(--color-texto);
+}
+
+.boton-icono--pequeno .icono {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.boton-icono:disabled {
+    opacity: 0.35;
+    cursor: default;
+}

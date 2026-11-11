@@ -10,8 +10,11 @@
     box-shadow: var(--sombra-suave);
 }
 
+/* La separación se respeta aunque entre dos tarjetas haya una ventana de confirmación */
 .tarjeta + .tarjeta,
-.tarjeta + .nota-borrado {
+.tarjeta + dialog + .tarjeta,
+.tarjeta + .nota-borrado,
+.tarjeta + dialog + .nota-borrado {
     margin-top: 1.25rem;
 }
 
@@ -44,4 +47,13 @@
     gap: 1rem;
     background: var(--color-error-fondo);
     box-shadow: none;
+}
+
+/* Acción sobre el registro al final de la pantalla (activar o desactivar) */
+.tarjeta--accion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
 }

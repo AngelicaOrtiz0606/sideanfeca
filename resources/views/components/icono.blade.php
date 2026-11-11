@@ -60,6 +60,15 @@
         @case('salir')
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" />
             @break
+        @case('arriba')
+            <path d="m18 15-6-6-6 6" />
+            @break
+        @case('abajo')
+            <path d="m6 9 6 6 6-6" />
+            @break
+        @case('arrastrar')
+            <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+            @break
         @case('subir')
             <path d="m5 12 7-7 7 7" /><path d="M12 19V5" />
             @break

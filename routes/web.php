@@ -3,6 +3,7 @@
 use App\Enums\Privilegio;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
+use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\PantallaPendienteController;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 // Los identificadores en las direcciones son siempre números
 Route::pattern('zona', '[0-9]+');
+Route::pattern('coordinacion', '[0-9]+');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
 Route::redirect('/', '/login');
@@ -51,6 +53,14 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     Route::resource('zonas', ZonaController::class)
         ->parameters(['zonas' => 'zona'])
         ->middleware(Privilegio::GestionarZonas->middleware());
+
+    Route::middleware(Privilegio::GestionarCoordinaciones->middleware())->group(function () {
+        Route::get('/coordinaciones/orden', [CoordinacionController::class, 'orden'])->name('coordinaciones.orden');
+        Route::put('/coordinaciones/orden', [CoordinacionController::class, 'guardarOrden'])->name('coordinaciones.guardar-orden');
+        Route::patch('/coordinaciones/{coordinacion}/estado', [CoordinacionController::class, 'cambiarEstado'])->name('coordinaciones.estado');
+        Route::resource('coordinaciones', CoordinacionController::class)
+            ->parameters(['coordinaciones' => 'coordinacion']);
+    });
 
     Route::get('/usuarios', PantallaPendienteController::class)
         ->defaults('titulo', 'Usuarios')

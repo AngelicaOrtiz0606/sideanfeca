@@ -47,6 +47,11 @@ function marcarRequisitos(campo) {
 function campoEsValido(campo) {
     const valor = campo.value;
 
+    // Un campo opcional vacío está bien; casillas y campos inactivos no se revisan
+    if (campo.disabled || campo.type === 'checkbox' || (!campo.required && valor.trim() === '')) {
+        return true;
+    }
+
     if (valor === '' && estaAutocompletado(campo)) {
         return true;
     }

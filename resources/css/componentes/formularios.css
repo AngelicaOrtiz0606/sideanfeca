@@ -268,3 +268,13 @@ fieldset {
     padding: 0;
     border: 0;
 }
+
+/* Formulario de pocos campos: no ocupa todo el ancho */
+.formulario--angosto {
+    max-width: 40rem;
+}
+
+.campo__opcional {
+    color: var(--color-texto-suave);
+    font-weight: 400;
+}
