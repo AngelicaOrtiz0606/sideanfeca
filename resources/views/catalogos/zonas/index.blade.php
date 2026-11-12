@@ -24,7 +24,7 @@
                         data-abrir-dialogo="dialogo-zona"
                         data-accion="{{ route('zonas.store') }}" data-metodo="POST" data-zona=""
                         data-titulo="Nueva zona" data-boton="Registrar zona"
-                        data-valores='@json(['numero' => $numerosLibres[0], 'nombre' => '', '_id' => ''])'>
+                        data-valores="{{ json_encode(['numero' => $numerosLibres[0], 'nombre' => '', '_id' => '']) }}">
                     <x-icono nombre="mas" />
                     Nueva zona
                 </button>
@@ -67,7 +67,7 @@
                                             data-accion="{{ route('zonas.update', $zona->zore_id_zona_regional) }}" data-metodo="PUT"
                                             data-zona="{{ $zona->zore_id_zona_regional }}"
                                             data-titulo="Editar zona" data-boton="Guardar cambios"
-                                            data-valores='@json(['numero' => $zona->zore_numero, 'nombre' => $zona->zore_nombre, '_id' => $zona->zore_id_zona_regional])'>
+                                            data-valores="{{ json_encode(['numero' => $zona->zore_numero, 'nombre' => $zona->zore_nombre, '_id' => $zona->zore_id_zona_regional]) }}">
                                         <x-icono nombre="lapiz" />
                                         <span class="accion__texto">Editar <span class="solo-lectores">{{ $etiqueta }}</span></span>
                                     </button>
@@ -76,7 +76,7 @@
                                             data-accion="{{ route('zonas.destroy', $zona->zore_id_zona_regional) }}"
                                             data-titulo="¿Borrar la {{ $etiqueta }}?"
                                             data-bloqueo="{{ $zona->motivo_para_no_borrar }}"
-                                            data-valores='@json(['_id' => $zona->zore_id_zona_regional, 'motivo' => ''])'>
+                                            data-valores="{{ json_encode(['_id' => $zona->zore_id_zona_regional, 'motivo' => '']) }}">
                                         <x-icono nombre="papelera" />
                                         <span class="accion__texto">Borrar <span class="solo-lectores">{{ $etiqueta }}</span></span>
                                     </button>

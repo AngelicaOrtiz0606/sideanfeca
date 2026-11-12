@@ -122,7 +122,7 @@ class ZonasTest extends TestCase
         $zona = $this->zona(1, 'Noroeste');
 
         $this->actingAs($this->admin)->put("/zonas/{$zona}", ['numero' => 2, 'nombre' => 'Noroeste'])
-            ->assertSessionHasErrors(['numero' => 'Ya existe una zona con ese número.']);
+            ->assertSessionHasErrors(['numero' => 'El número ya pertenece a otra zona.']);
     }
 
     public function test_el_nombre_no_se_repite_sin_importar_mayusculas(): void
@@ -131,7 +131,7 @@ class ZonasTest extends TestCase
         $zona = $this->zona(1, 'Noroeste');
 
         $this->actingAs($this->admin)->put("/zonas/{$zona}", ['numero' => 1, 'nombre' => '  NORTE '])
-            ->assertSessionHasErrors(['nombre' => 'Ya existe una zona con ese nombre.']);
+            ->assertSessionHasErrors(['nombre' => 'Ya existe la zona «Norte».']);
     }
 
     public function test_con_errores_la_ventana_se_vuelve_a_abrir_con_lo_escrito(): void
@@ -141,7 +141,7 @@ class ZonasTest extends TestCase
 
         $this->actingAs($this->admin)->from('/zonas')->followingRedirects()
             ->put("/zonas/{$zona}", ['numero' => 2, 'nombre' => 'Pacífico', '_dialogo' => 'zona', '_id' => $zona])
-            ->assertSeeText('Ya existe una zona con ese número.')
+            ->assertSeeText('El número ya pertenece a otra zona.')
             ->assertSee('id="dialogo-zona" class="dialogo dialogo--amplio" aria-labelledby="dialogo-zona-titulo"  data-abrir-al-cargar', false)
             ->assertSee('action="'.route('zonas.update', $zona).'"', false)
             ->assertSee('value="Pacífico"', false)

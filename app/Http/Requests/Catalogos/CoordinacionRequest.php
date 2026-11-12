@@ -3,13 +3,13 @@
 namespace App\Http\Requests\Catalogos;
 
 use App\Models\CoordinacionNacional;
-use Illuminate\Contracts\Validation\Validator;
+use App\Rules\NoRepetidoEnCatalogo;
+use App\Support\TextoCatalogo;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Registro y edición de una coordinación nacional: nombre (sin repetirse,
- * sin importar mayúsculas) y descripción opcional.
+ * sin importar mayúsculas, acentos ni espacios) y descripción opcional.
  */
 class CoordinacionRequest extends FormRequest
 {
@@ -19,33 +19,14 @@ class CoordinacionRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'nombre' => ['required', 'string', 'max:70'],
+            'nombre' => ['required', 'string', 'max:70',
+                new NoRepetidoEnCatalogo('coordinacion_nacional', 'cona_nombre', 'cona_id_coordinacion_nacional', $this->coordinacion()?->cona_id_coordinacion_nacional, 'Ya existe la coordinación «:existente».')],
             'descripcion' => ['nullable', 'string', 'max:100'],
-        ];
-    }
-
-    public function after(): array
-    {
-        return [
-            function (Validator $validator): void {
-                if ($validator->errors()->has('nombre')) {
-                    return;
-                }
-
-                $repetido = DB::table('coordinacion_nacional')
-                    ->whereRaw('lower(cona_nombre) = lower(?)', [$this->nombre()])
-                    ->when($this->coordinacion(), fn ($q, CoordinacionNacional $c) => $q->where('cona_id_coordinacion_nacional', '!=', $c->cona_id_coordinacion_nacional))
-                    ->exists();
-
-                if ($repetido) {
-                    $validator->errors()->add('nombre', 'Ya existe una coordinación con ese nombre.');
-                }
-            },
         ];
     }
 
@@ -63,12 +44,12 @@ class CoordinacionRequest extends FormRequest
 
     public function nombre(): string
     {
-        return trim((string) $this->input('nombre'));
+        return TextoCatalogo::limpiar($this->input('nombre'));
     }
 
     public function descripcion(): ?string
     {
-        $descripcion = trim((string) $this->input('descripcion'));
+        $descripcion = TextoCatalogo::limpiar($this->input('descripcion'));
 
         return $descripcion === '' ? null : $descripcion;
     }

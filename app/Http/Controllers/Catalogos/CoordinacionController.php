@@ -35,6 +35,7 @@ class CoordinacionController extends Controller
         return view('catalogos.coordinaciones.show', [
             'coordinacion' => $coordinacion,
             'puestos' => $this->coordinaciones->puestos($coordinacion),
+            'coordinaciones' => $this->coordinaciones->listado(),
         ]);
     }
 

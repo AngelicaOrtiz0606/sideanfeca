@@ -47,7 +47,7 @@ class Menu extends Component
                 ['etiqueta' => 'Puestos', 'ruta' => 'puestos.index', 'privilegio' => 'gestionar_puestos', 'icono' => 'maletin'],
                 ['etiqueta' => 'Coordinaciones nacionales', 'ruta' => 'coordinaciones.index', 'privilegio' => 'gestionar_coordinaciones', 'icono' => 'organigrama'],
                 ['etiqueta' => 'Zonas regionales', 'ruta' => 'zonas.index', 'privilegio' => 'gestionar_zonas', 'icono' => 'mapa'],
-                ['etiqueta' => 'Niveles académicos', 'ruta' => 'niveles.index', 'privilegio' => 'gestionar_grados', 'icono' => 'birrete'],
+                ['etiqueta' => 'Grados académicos', 'ruta' => 'grados.index', 'privilegio' => 'gestionar_grados', 'icono' => 'birrete'],
             ],
         ],
         [

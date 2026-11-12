@@ -21,7 +21,7 @@
                     data-accion="{{ route('zonas.update', $zona) }}" data-metodo="PUT"
                     data-zona="{{ $zona->zore_id_zona_regional }}"
                     data-titulo="Editar zona" data-boton="Guardar cambios"
-                    data-valores='@json(['numero' => $zona->zore_numero, 'nombre' => $zona->zore_nombre, '_id' => $zona->zore_id_zona_regional])'>
+                    data-valores="{{ json_encode(['numero' => $zona->zore_numero, 'nombre' => $zona->zore_nombre, '_id' => $zona->zore_id_zona_regional]) }}">
                 <x-icono nombre="lapiz" />
                 Editar zona
             </button>
@@ -79,5 +79,5 @@
         @endif
     </section>
 
-    @include('catalogos.zonas._dialogo-zona', ['zonas' => collect([$zona]), 'entidades' => $todasLasEntidades])
+    @include('catalogos.zonas._dialogo-zona', ['zonas' => $todasLasZonas, 'entidades' => $todasLasEntidades])
 @endsection

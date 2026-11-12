@@ -38,6 +38,7 @@ class ZonaController extends Controller
             'entidades' => $zona->entidades,
             'instituciones' => $this->zonas->instituciones($zona),
             'todasLasEntidades' => $this->entidades(),
+            'todasLasZonas' => $this->zonas->listado(),
         ]);
     }
 

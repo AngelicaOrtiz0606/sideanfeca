@@ -27,7 +27,7 @@
         @endif
 
         <div class="campo">
-            <label for="motivo" class="campo__etiqueta">Motivo</label>
+            <label for="motivo" class="campo__etiqueta">Motivo <x-obligatorio /></label>
             <select id="motivo" name="motivo" class="campo__entrada" required @if ($abrir && $errors->has('motivo')) aria-invalid="true" @endif>
                 <option value="">Elige un motivo</option>
                 @foreach ($motivos as $motivo)

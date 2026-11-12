@@ -61,7 +61,7 @@ function preparar(dialogo, boton) {
         textoBloqueo.textContent = datos.bloqueo ?? '';
     }
 
-    dialogo.dispatchEvent(new CustomEvent('dialogo:preparado', { detail: { boton } }));
+    dialogo.dispatchEvent(new CustomEvent('dialogo:preparado', { bubbles: true, detail: { boton } }));
 
     // La validación discreta vuelve a revisar los campos ya llenos
     formulario?.dispatchEvent(new Event('change', { bubbles: true }));

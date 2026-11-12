@@ -28,7 +28,7 @@
                     data-abrir-dialogo="dialogo-coordinacion"
                     data-accion="{{ route('coordinaciones.store') }}" data-metodo="POST"
                     data-titulo="Nueva coordinación" data-texto="Quedará al final del orden." data-boton="Registrar coordinación"
-                    data-valores='@json(['nombre' => '', 'descripcion' => '', '_id' => ''])'>
+                    data-valores="{{ json_encode(['nombre' => '', 'descripcion' => '', '_id' => '']) }}">
                 <x-icono nombre="mas" />
                 Nueva coordinación
             </button>
@@ -79,7 +79,7 @@
                                             data-abrir-dialogo="dialogo-coordinacion"
                                             data-accion="{{ route('coordinaciones.update', $id) }}" data-metodo="PUT"
                                             data-titulo="Editar coordinación" data-texto="" data-boton="Guardar cambios"
-                                            data-valores='@json(['nombre' => $coordinacion->cona_nombre, 'descripcion' => $coordinacion->cona_descripcion, '_id' => $id])'>
+                                            data-valores="{{ json_encode(['nombre' => $coordinacion->cona_nombre, 'descripcion' => $coordinacion->cona_descripcion, '_id' => $id]) }}">
                                         <x-icono nombre="lapiz" />
                                         <span class="accion__texto">Editar <span class="solo-lectores">{{ $coordinacion->cona_nombre }}</span></span>
                                     </button>
@@ -109,7 +109,7 @@
                                             data-accion="{{ route('coordinaciones.destroy', $id) }}"
                                             data-titulo="¿Borrar {{ $coordinacion->cona_nombre }}?"
                                             data-bloqueo="{{ $coordinacion->motivo_para_no_borrar }}"
-                                            data-valores='@json(['_id' => $id, 'motivo' => ''])'>
+                                            data-valores="{{ json_encode(['_id' => $id, 'motivo' => '']) }}">
                                         <x-icono nombre="papelera" />
                                         <span class="accion__texto">Borrar <span class="solo-lectores">{{ $coordinacion->cona_nombre }}</span></span>
                                     </button>
@@ -124,6 +124,7 @@
 
     @include('catalogos.coordinaciones._dialogo-coordinacion')
     @include('catalogos.coordinaciones._dialogo-orden')
+    @include('catalogos._dialogo-desactivar', ['texto' => 'No se borra: sus puestos y su historial se conservan, y la puedes volver a activar cuando quieras.'])
 
     @include('catalogos._dialogo-borrar', [
         'motivos' => $motivos,

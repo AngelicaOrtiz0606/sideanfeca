@@ -26,7 +26,7 @@
                     data-abrir-dialogo="dialogo-coordinacion"
                     data-accion="{{ route('coordinaciones.update', $coordinacion) }}" data-metodo="PUT"
                     data-titulo="Editar coordinación" data-texto="" data-boton="Guardar cambios"
-                    data-valores='@json(['nombre' => $coordinacion->cona_nombre, 'descripcion' => $coordinacion->cona_descripcion, '_id' => $coordinacion->cona_id_coordinacion_nacional])'>
+                    data-valores="{{ json_encode(['nombre' => $coordinacion->cona_nombre, 'descripcion' => $coordinacion->cona_descripcion, '_id' => $coordinacion->cona_id_coordinacion_nacional]) }}">
                 <x-icono nombre="lapiz" />
                 Editar coordinación
             </button>

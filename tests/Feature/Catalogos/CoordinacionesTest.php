@@ -78,7 +78,7 @@ class CoordinacionesTest extends TestCase
     {
         $this->actingAs($this->admin)->post('/coordinaciones', ['nombre' => ''])->assertSessionHasErrors('nombre');
         $this->actingAs($this->admin)->post('/coordinaciones', ['nombre' => ' historia '])
-            ->assertSessionHasErrors(['nombre' => 'Ya existe una coordinación con ese nombre.']);
+            ->assertSessionHasErrors(['nombre' => 'Ya existe la coordinación «Historia».']);
         $this->actingAs($this->admin)->post('/coordinaciones', ['nombre' => str_repeat('a', 71)])->assertSessionHasErrors('nombre');
         $this->actingAs($this->admin)->post('/coordinaciones', ['nombre' => 'Nueva', 'descripcion' => str_repeat('a', 101)])->assertSessionHasErrors('descripcion');
     }
@@ -283,7 +283,7 @@ class CoordinacionesTest extends TestCase
     {
         $this->actingAs($this->admin)->from('/coordinaciones')->followingRedirects()
             ->post('/coordinaciones', ['nombre' => 'Historia', '_dialogo' => 'coordinacion', '_id' => ''])
-            ->assertSeeText('Ya existe una coordinación con ese nombre.')
+            ->assertSeeText('Ya existe la coordinación «Historia».')
             ->assertSee('id="dialogo-coordinacion" class="dialogo" aria-labelledby="dialogo-coordinacion-titulo"  data-abrir-al-cargar', false);
     }
 

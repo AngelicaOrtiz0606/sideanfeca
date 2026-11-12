@@ -104,3 +104,8 @@
 .dialogo--orden .dialogo__acciones {
     flex-wrap: nowrap;
 }
+
+/* Ventana mediana (por ejemplo, un cargo con sus tres niveles) */
+.dialogo--mediano {
+    width: min(44rem, calc(100% - 2rem));
+}
