@@ -3,6 +3,7 @@
 use App\Enums\Privilegio;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
+use App\Http\Controllers\Catalogos\CodigoPostalController;
 use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\InicioController;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 // Los identificadores en las direcciones son siempre números
 Route::pattern('zona', '[0-9]+');
 Route::pattern('coordinacion', '[0-9]+');
+Route::pattern('codigo', '[0-9]{5}');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
 Route::redirect('/', '/login');
@@ -50,6 +52,9 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         ->name('bitacora.index');
 
     // Catálogos (M3)
+    // Catálogo de SEPOMEX: solo se lee, para llenar domicilios desde el código postal (M4)
+    Route::get('/codigos-postales/{codigo}', CodigoPostalController::class)->name('codigos-postales.show');
+
     Route::resource('zonas', ZonaController::class)
         ->parameters(['zonas' => 'zona'])
         ->except(['create', 'edit'])
