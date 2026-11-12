@@ -32,7 +32,7 @@
 
         <div class="campo">
             <label for="grado-nombre" class="campo__etiqueta">Nombre <x-obligatorio /></label>
-            <input id="grado-nombre" name="nombre" type="text" maxlength="50" required autocomplete="off" placeholder="Ej. Doctorado"
+            <input id="grado-nombre" data-texto-seguro name="nombre" type="text" maxlength="50" required autocomplete="off" placeholder="Ej. Doctorado"
                    class="campo__entrada" value="{{ old('nombre') }}" @if ($abrir && $errors->has('nombre')) aria-invalid="true" @endif
                    data-existentes="{{ json_encode($nombresExistentes) }}" data-mensaje-repetido="Ya existe el grado «:existente».">
         </div>
@@ -40,12 +40,12 @@
         <div class="formulario__fila formulario__fila--pares">
             <div class="campo">
                 <label for="grado-masculina" class="campo__etiqueta">Abreviatura en masculino <x-obligatorio /></label>
-                <input id="grado-masculina" name="masculina" type="text" maxlength="10" required autocomplete="off" placeholder="Ej. Dr."
+                <input id="grado-masculina" data-texto-seguro name="masculina" type="text" maxlength="10" required autocomplete="off" placeholder="Ej. Dr."
                        class="campo__entrada" value="{{ old('masculina') }}" @if ($abrir && $errors->has('masculina')) aria-invalid="true" @endif>
             </div>
             <div class="campo">
                 <label for="grado-femenina" class="campo__etiqueta">Abreviatura en femenino <x-obligatorio /></label>
-                <input id="grado-femenina" name="femenina" type="text" maxlength="10" required autocomplete="off" placeholder="Ej. Dra."
+                <input id="grado-femenina" data-texto-seguro name="femenina" type="text" maxlength="10" required autocomplete="off" placeholder="Ej. Dra."
                        class="campo__entrada" value="{{ old('femenina') }}" @if ($abrir && $errors->has('femenina')) aria-invalid="true" @endif>
             </div>
         </div>

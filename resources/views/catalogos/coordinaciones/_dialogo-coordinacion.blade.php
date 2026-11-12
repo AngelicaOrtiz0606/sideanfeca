@@ -36,14 +36,14 @@
 
         <div class="campo">
             <label for="coordinacion-nombre" class="campo__etiqueta">Nombre <x-obligatorio /></label>
-            <input id="coordinacion-nombre" name="nombre" type="text" maxlength="70" required autocomplete="off"
+            <input id="coordinacion-nombre" data-texto-seguro name="nombre" type="text" maxlength="70" required autocomplete="off"
                    class="campo__entrada" value="{{ old('nombre') }}" @if ($abrir && $errors->has('nombre')) aria-invalid="true" @endif
                    data-existentes="{{ json_encode($nombresExistentes) }}" data-mensaje-repetido="Ya existe la coordinación «:existente».">
         </div>
 
         <div class="campo">
             <label for="coordinacion-descripcion" class="campo__etiqueta">Descripción <span class="campo__opcional">(opcional)</span></label>
-            <input id="coordinacion-descripcion" name="descripcion" type="text" maxlength="100" autocomplete="off"
+            <input id="coordinacion-descripcion" data-texto-seguro name="descripcion" type="text" maxlength="100" autocomplete="off"
                    class="campo__entrada" value="{{ old('descripcion') }}" @if ($abrir && $errors->has('descripcion')) aria-invalid="true" @endif>
         </div>
 

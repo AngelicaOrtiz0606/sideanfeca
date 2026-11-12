@@ -4,6 +4,7 @@ namespace App\Http\Requests\Catalogos;
 
 use App\Models\ZonaRegional;
 use App\Rules\NoRepetidoEnCatalogo;
+use App\Rules\TextoSeguro;
 use App\Support\TextoCatalogo;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,7 +31,7 @@ class ZonaRequest extends FormRequest
 
         return [
             'numero' => ['required', 'integer', 'between:1,7', Rule::unique('zona_regional', 'zore_numero')->ignore($id, 'zore_id_zona_regional')],
-            'nombre' => ['required', 'string', 'max:60',
+            'nombre' => ['required', 'string', new TextoSeguro, 'max:60',
                 new NoRepetidoEnCatalogo('zona_regional', 'zore_nombre', 'zore_id_zona_regional', $id, 'Ya existe la zona «:existente».')],
             'entidades' => ['nullable', 'array'],
             'entidades.*' => ['integer', 'distinct', Rule::exists('entidad_federativa', 'enfe_id_entidad_federativa')],

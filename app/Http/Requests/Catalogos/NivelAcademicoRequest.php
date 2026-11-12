@@ -4,6 +4,7 @@ namespace App\Http\Requests\Catalogos;
 
 use App\Models\NivelAcademico;
 use App\Rules\NoRepetidoEnCatalogo;
+use App\Rules\TextoSeguro;
 use App\Support\TextoCatalogo;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -27,10 +28,10 @@ class NivelAcademicoRequest extends FormRequest
         $grado = $this->route('grado');
 
         return [
-            'nombre' => ['required', 'string', 'max:50',
+            'nombre' => ['required', 'string', new TextoSeguro, 'max:50',
                 new NoRepetidoEnCatalogo('nivel_academico', 'niac_nombre', 'niac_id_nivel_academico', $grado instanceof NivelAcademico ? $grado->niac_id_nivel_academico : null, 'Ya existe el grado «:existente».')],
-            'masculina' => ['required', 'string', 'max:10'],
-            'femenina' => ['required', 'string', 'max:10'],
+            'masculina' => ['required', 'string', new TextoSeguro, 'max:10'],
+            'femenina' => ['required', 'string', new TextoSeguro, 'max:10'],
         ];
     }
 

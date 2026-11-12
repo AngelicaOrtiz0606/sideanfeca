@@ -1,5 +1,9 @@
 /*
- * Aviso inmediato de nombres repetidos en los catálogos.
+ * Aviso inmediato en los textos de los catálogos, mientras se escribe.
+ *
+ * 1. Texto seguro (campos con data-texto-seguro): sin caracteres de control,
+ *    sin < ni >, y sin empezar con = + - @ (igual que App\Rules\TextoSeguro).
+ * 2. Nombres repetidos:
  *
  * Un campo con data-existentes='[[id, "valor", "como se muestra"], ...]' y
  * data-mensaje-repetido="Ya existe el cargo «:existente»." se revisa mientras
@@ -33,7 +37,24 @@ function retroDe(campo) {
     return retro;
 }
 
-function revisar(campo) {
+function problemaDeTexto(valor) {
+    if (/[\u0000-\u001F\u007F]/.test(valor)) {
+        return 'El texto tiene caracteres que no se permiten (por ejemplo, saltos de línea).';
+    }
+    if (/[<>]/.test(valor)) {
+        return 'El texto no puede llevar los símbolos < ni >.';
+    }
+    if (/^\s*[=+\-@]/.test(valor)) {
+        return 'El texto no puede empezar con =, +, - ni @.';
+    }
+    return null;
+}
+
+function repetidoDe(campo) {
+    if (!campo.dataset.existentes) {
+        return null;
+    }
+
     const existentes = JSON.parse(campo.dataset.existentes);
     const propio = campo.form?.elements.namedItem('_id')?.value ?? '';
     const valor = clave(campo.value);
@@ -41,11 +62,17 @@ function revisar(campo) {
         ? null
         : existentes.find(([id, comparado]) => String(id) !== String(propio) && clave(String(comparado)) === valor);
 
+    return repetido
+        ? campo.dataset.mensajeRepetido.replace(':existente', repetido[2] ?? repetido[1]).replace(':valor', campo.value.trim())
+        : null;
+}
+
+function revisar(campo) {
+    const inseguro = campo.hasAttribute('data-texto-seguro') ? problemaDeTexto(campo.value) : null;
+    const mensaje = inseguro ?? repetidoDe(campo);
+
     const retro = retroDe(campo);
-    if (repetido) {
-        const mensaje = campo.dataset.mensajeRepetido
-            .replace(':existente', repetido[2] ?? repetido[1])
-            .replace(':valor', campo.value.trim());
+    if (mensaje) {
         campo.setCustomValidity(mensaje);
         campo.setAttribute('aria-invalid', 'true');
         retro.textContent = mensaje;
@@ -61,11 +88,13 @@ function revisar(campo) {
     }
 }
 
-document.querySelectorAll('[data-existentes]').forEach((campo) => {
+const CAMPOS = '[data-existentes], [data-texto-seguro]';
+
+document.querySelectorAll(CAMPOS).forEach((campo) => {
     campo.addEventListener('input', () => revisar(campo));
 });
 
 // Al abrir una ventana ya llena (Editar), se revisa desde el principio
 document.addEventListener('dialogo:preparado', (evento) => {
-    evento.target.querySelectorAll('[data-existentes]').forEach(revisar);
+    evento.target.querySelectorAll(CAMPOS).forEach(revisar);
 });

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Catalogos;
 
 use App\Models\Cargo;
 use App\Rules\NoRepetidoEnCatalogo;
+use App\Rules\TextoSeguro;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,9 +32,9 @@ class CargoRequest extends FormRequest
         $id = $this->cargo()?->carg_id_cargo;
 
         return [
-            'masculino' => ['required', 'string', 'max:100',
+            'masculino' => ['required', 'string', new TextoSeguro, 'max:100',
                 new NoRepetidoEnCatalogo('cargo', 'carg_nombre_m', 'carg_id_cargo', $id, 'Ya existe el cargo «:existente».')],
-            'femenino' => ['required', 'string', 'max:100',
+            'femenino' => ['required', 'string', new TextoSeguro, 'max:100',
                 new NoRepetidoEnCatalogo('cargo', 'carg_nombre_f', 'carg_id_cargo', $id, 'Ya existe el cargo «:existente».')],
             'nivel' => ['required', Rule::in(Cargo::NIVELES)],
         ];

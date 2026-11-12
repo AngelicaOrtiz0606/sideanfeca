@@ -48,7 +48,7 @@
 
             <div class="campo">
                 <label for="zona-nombre" class="campo__etiqueta">Nombre <x-obligatorio /></label>
-                <input id="zona-nombre" name="nombre" type="text" maxlength="60" required autocomplete="off"
+                <input id="zona-nombre" data-texto-seguro name="nombre" type="text" maxlength="60" required autocomplete="off"
                        class="campo__entrada" value="{{ old('nombre') }}" @if ($abrir && $errors->has('nombre')) aria-invalid="true" @endif
                        data-existentes="{{ json_encode($nombresExistentes) }}" data-mensaje-repetido="Ya existe la zona «:existente».">
             </div>

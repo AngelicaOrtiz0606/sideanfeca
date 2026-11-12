@@ -42,13 +42,13 @@
         <div class="formulario__fila formulario__fila--pares">
             <div class="campo">
                 <label for="cargo-masculino" class="campo__etiqueta">Nombre en masculino <x-obligatorio /></label>
-                <input id="cargo-masculino" name="masculino" type="text" maxlength="100" required autocomplete="off" placeholder="Ej. Presidente"
+                <input id="cargo-masculino" data-texto-seguro name="masculino" type="text" maxlength="100" required autocomplete="off" placeholder="Ej. Presidente"
                        class="campo__entrada" value="{{ old('masculino') }}" @if ($abrir && $errors->has('masculino')) aria-invalid="true" @endif
                        data-existentes="{{ json_encode($masculinos) }}" data-mensaje-repetido="Ya existe el cargo «:existente».">
             </div>
             <div class="campo">
                 <label for="cargo-femenino" class="campo__etiqueta">Nombre en femenino <x-obligatorio /></label>
-                <input id="cargo-femenino" name="femenino" type="text" maxlength="100" required autocomplete="off" placeholder="Ej. Presidenta"
+                <input id="cargo-femenino" data-texto-seguro name="femenino" type="text" maxlength="100" required autocomplete="off" placeholder="Ej. Presidenta"
                        class="campo__entrada" value="{{ old('femenino') }}" @if ($abrir && $errors->has('femenino')) aria-invalid="true" @endif
                        data-existentes="{{ json_encode($femeninos) }}" data-mensaje-repetido="Ya existe el cargo «:existente».">
             </div>

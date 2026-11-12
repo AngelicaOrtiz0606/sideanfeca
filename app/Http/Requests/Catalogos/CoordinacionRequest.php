@@ -4,6 +4,7 @@ namespace App\Http\Requests\Catalogos;
 
 use App\Models\CoordinacionNacional;
 use App\Rules\NoRepetidoEnCatalogo;
+use App\Rules\TextoSeguro;
 use App\Support\TextoCatalogo;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -24,9 +25,9 @@ class CoordinacionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre' => ['required', 'string', 'max:70',
+            'nombre' => ['required', 'string', new TextoSeguro, 'max:70',
                 new NoRepetidoEnCatalogo('coordinacion_nacional', 'cona_nombre', 'cona_id_coordinacion_nacional', $this->coordinacion()?->cona_id_coordinacion_nacional, 'Ya existe la coordinación «:existente».')],
-            'descripcion' => ['nullable', 'string', 'max:100'],
+            'descripcion' => ['nullable', 'string', new TextoSeguro, 'max:100'],
         ];
     }
 
