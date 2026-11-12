@@ -1,0 +1,111 @@
+/*
+ * Ventana de confirmación (<dialog>): se abre encima de la pantalla y se
+ * cierra con Cancelar o con la tecla Esc.
+ */
+
+.dialogo {
+    width: min(28rem, calc(100% - 2rem));
+    margin: auto;
+    padding: 1.5rem;
+    border: 0;
+    border-radius: 0.875rem;
+    background: var(--color-superficie);
+    box-shadow: 0 20px 50px rgb(0 0 0 / 0.25);
+    color: var(--color-tinta);
+}
+
+.dialogo::backdrop {
+    background: rgb(20 20 20 / 0.45);
+}
+
+.dialogo__titulo {
+    color: var(--color-secundario);
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.dialogo__texto {
+    margin-top: -0.75rem;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+}
+
+.dialogo__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .dialogo[open] {
+        animation: dialogo-aparece 0.2s var(--curva-salida);
+    }
+}
+
+@keyframes dialogo-aparece {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem) scale(0.98);
+    }
+}
+
+/* Ventana amplia (por ejemplo, una zona con sus 32 entidades) */
+.dialogo--amplio {
+    width: min(58rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+}
+
+/* Título con el botón de cerrar a la derecha */
+.dialogo__encabezado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+/* Texto sin formulario debajo (ventana de "no se puede borrar") */
+.dialogo__texto--separado {
+    margin: 0.5rem 0 1.25rem;
+}
+
+/*
+ * Ventana para cambiar un orden: el título y los botones siempre quedan a la
+ * vista; solo la lista se desplaza (también en teléfono).
+ */
+.dialogo--orden {
+    width: min(38rem, calc(100% - 2rem));
+}
+
+.dialogo--orden[open] {
+    display: flex;
+    max-height: calc(100dvh - 2rem);
+    /* clip (y no hidden): la ventana nunca se desplaza sola al mover el foco */
+    overflow: clip;
+}
+
+.dialogo--orden > form {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.dialogo__desplazable {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-inline: -0.25rem;
+    padding: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dialogo--orden .dialogo__acciones {
+    flex-wrap: nowrap;
+}
+
+/* Ventana mediana (por ejemplo, un cargo con sus tres niveles) */
+.dialogo--mediano {
+    width: min(44rem, calc(100% - 2rem));
+}

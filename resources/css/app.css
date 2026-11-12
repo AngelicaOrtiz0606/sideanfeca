@@ -18,8 +18,14 @@
 @import '@fontsource-variable/inter';
 @import './style.css';
 @import './componentes/botones.css';
+@import './componentes/mensajes.css';
+@import './componentes/tarjetas.css';
+@import './componentes/tablas.css';
+@import './componentes/insignias.css';
+@import './componentes/dialogos.css';
 @import './componentes/encabezado.css';
 @import './layouts/estructura.css';
+@import './layouts/pagina.css';
 @import './componentes/menu.css';
 @import './componentes/pie.css';
 @import './componentes/boton-subir.css';
@@ -27,6 +33,7 @@
 @import './paginas/acceso.css';
 @import './paginas/inicio.css';
 @import './paginas/avisos.css';
+@import './paginas/catalogos.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

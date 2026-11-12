@@ -193,13 +193,6 @@
     font-weight: 600;
 }
 
-.vacio {
-    padding: 1rem 1.125rem;
-    border-radius: var(--radio);
-    background: var(--color-fondo);
-    color: var(--color-texto-suave);
-}
-
 /* Actividad reciente: una fila por movimiento */
 .actividad {
     display: flex;

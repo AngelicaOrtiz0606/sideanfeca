@@ -218,3 +218,150 @@
     color: var(--color-exito);
     font-weight: 500;
 }
+
+/* Texto de ayuda debajo de la etiqueta de un campo */
+.campo__ayuda {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+/* Formulario dentro de una pantalla interna (no de acceso) */
+.formulario--pantalla {
+    gap: 1.5rem;
+    max-width: 56rem;
+}
+
+/* Campos lado a lado en computadora, uno debajo de otro en teléfono */
+.formulario__fila {
+    display: grid;
+    gap: 1.25rem;
+}
+
+@media (width >= 40rem) {
+    .formulario__fila {
+        grid-template-columns: 10rem minmax(0, 1fr);
+    }
+}
+
+.formulario__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-top: 0.25rem;
+}
+
+.formulario__acciones .boton {
+    text-decoration: none;
+}
+
+select.campo__entrada {
+    padding-right: 2.5rem;
+    appearance: none;
+    background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23575757' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.875rem center / 1rem;
+    cursor: pointer;
+}
+
+fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+/* Formulario de pocos campos: no ocupa todo el ancho */
+.formulario--angosto {
+    max-width: 40rem;
+}
+
+.campo__opcional {
+    color: var(--color-texto-suave);
+    font-weight: 400;
+}
+
+/* Dos campos del mismo ancho (masculino y femenino) */
+@media (width >= 40rem) {
+    .formulario__fila--pares {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Opciones como tarjetas (por ejemplo, el nivel de un cargo) */
+.opciones-nivel__lista {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+@media (width >= 40rem) {
+    .opciones-nivel__lista {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.opcion-nivel {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.5rem;
+    align-items: start;
+    padding: 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.opcion-nivel:hover {
+    border-color: var(--color-borde-control);
+}
+
+.opcion-nivel input {
+    grid-row: span 2;
+    width: 1.0625rem;
+    height: 1.0625rem;
+    margin-top: 0.15rem;
+    accent-color: var(--color-marca);
+}
+
+.opcion-nivel__nombre {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.opcion-nivel__ayuda {
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+}
+
+.opcion-nivel:has(input:checked) {
+    border-color: var(--color-marca);
+    background: var(--color-marca-tinte);
+}
+
+.opcion-nivel:has(input:focus-visible) {
+    outline: 3px solid var(--color-marca);
+    outline-offset: 2px;
+}
+
+.opcion-nivel:has(input:disabled) {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.opcion-nivel:has(input:disabled:checked) {
+    opacity: 1;
+}
+
+/* Campo obligatorio: asterisco rojo junto a la etiqueta */
+.campo__obligatorio {
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+/* "Los campos con * son obligatorios", al inicio del formulario */
+.nota-obligatorios {
+    margin-top: -0.5rem;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}

@@ -47,6 +47,11 @@ function marcarRequisitos(campo) {
 function campoEsValido(campo) {
     const valor = campo.value;
 
+    // Un campo opcional vacío está bien; casillas y campos inactivos no se revisan
+    if (campo.disabled || campo.type === 'checkbox' || (!campo.required && valor.trim() === '')) {
+        return true;
+    }
+
     if (valor === '' && estaAutocompletado(campo)) {
         return true;
     }
@@ -73,7 +78,7 @@ function campoEsValido(campo) {
 
 document.querySelectorAll('form[data-validar]').forEach((formulario) => {
     const boton = formulario.querySelector('[type="submit"]');
-    const campos = [...formulario.querySelectorAll('input:not([type="hidden"])')];
+    const campos = [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
     const escritos = new Set();
 
     const actualizar = () => {

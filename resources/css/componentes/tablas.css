@@ -1,0 +1,259 @@
+/*
+ * Tablas de los catálogos. En teléfono cada fila se vuelve una ficha y cada
+ * dato muestra su encabezado (atributo data-etiqueta), sin desplazamiento lateral.
+ */
+
+.tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+}
+
+.tabla thead th {
+    padding: 0.875rem 1.5rem;
+    border-bottom: 1px solid var(--color-borde);
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.tabla tbody th,
+.tabla tbody td {
+    padding: 0.875rem 1.5rem;
+    border-bottom: 1px solid #ececec;
+    font-weight: 400;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.tabla tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+.tabla tbody tr:hover > * {
+    background: #fafafa;
+}
+
+.tabla .tabla__cifra {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.tabla .tabla__numero {
+    width: 5.5rem;
+}
+
+.tabla .tabla__acciones {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tabla__enlace {
+    color: var(--color-tinta);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.tabla__enlace:hover {
+    color: var(--color-enlace);
+    text-decoration: underline;
+}
+
+/* Tabla dentro de una tarjeta con relleno: sin márgenes laterales propios */
+.tabla--simple thead th,
+.tabla--simple tbody th,
+.tabla--simple tbody td {
+    padding-inline: 0.75rem;
+}
+
+@media (width < 40rem) {
+    /* En teléfono cada fila es una ficha compacta:
+       [número]  Nombre                 [Editar]
+                 Entidades: 5
+                 Instituciones: 0                */
+    .tabla thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .tabla tbody tr {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        row-gap: 0.125rem;
+        padding: 0.875rem 1.25rem;
+        border-bottom: 1px solid #ececec;
+    }
+
+    .tabla tbody tr:last-child {
+        border-bottom: 0;
+    }
+
+    .tabla tbody th,
+    .tabla tbody td {
+        grid-column: 2;
+        padding: 0;
+        border: 0;
+        text-align: left;
+    }
+
+    .tabla tbody tr:hover > * {
+        background: none;
+    }
+
+    .tabla tbody th {
+        font-weight: 600;
+    }
+
+    .tabla .tabla__numero {
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        width: auto;
+        margin-right: 0.875rem;
+    }
+
+    .tabla .tabla__acciones {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        width: auto;
+    }
+
+    .tabla tbody td[data-etiqueta]:not(.tabla__numero) {
+        color: var(--color-texto-suave);
+        font-size: 0.875rem;
+    }
+
+    .tabla tbody td[data-etiqueta]:not(.tabla__numero)::before {
+        content: attr(data-etiqueta) ': ';
+    }
+
+    .tabla .tabla__cifra {
+        text-align: left;
+    }
+}
+
+/* Texto secundario debajo del dato principal (descripción) */
+.tabla__detalle {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}
+
+/* Registro desactivado: se ve más tenue */
+.tabla__fila--inactiva .tabla__enlace {
+    color: var(--color-texto-suave);
+}
+
+/* Lugar en un orden (1, 2, 3...) */
+.numero-orden {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.375rem;
+    border-radius: var(--radio);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Dato principal de la fila (el nombre) */
+.tabla__principal {
+    font-weight: 600;
+}
+
+.tabla__separador {
+    color: var(--color-borde-control);
+}
+
+/* Mensaje dentro de una tarjeta de tabla (sin registros o sin coincidencias) */
+.vacio--en-tabla {
+    margin: 1rem 1.5rem;
+}
+
+/* Filtro rápido arriba de una tabla: búsqueda y botones de grupo */
+.filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding: 1rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.filtros__buscar {
+    flex: 1 1 14rem;
+    max-width: 22rem;
+    min-height: 2.5rem;
+}
+
+.filtros__grupo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.filtro {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 999px;
+    background: var(--color-superficie);
+    color: var(--color-texto);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.filtro:hover {
+    border-color: var(--color-borde-control);
+}
+
+.filtro[aria-pressed='true'] {
+    border-color: var(--color-secundario);
+    background: var(--color-secundario);
+    color: #fff;
+}
+
+.filtro__cifra {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+}
+
+/* Nivel del cargo, en una etiqueta de color suave */
+.nivel-cargo {
+    display: inline-block;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.nivel-cargo--nacional {
+    background: #e7edf6;
+    color: var(--color-secundario);
+}
+
+.nivel-cargo--regional {
+    background: #e8f1fa;
+    color: var(--color-enlace-hover);
+}
+
+.nivel-cargo--institucional {
+    background: var(--color-fondo);
+    color: var(--color-texto);
+}

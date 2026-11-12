@@ -33,7 +33,7 @@ class BitacoraService
         'PUESTO' => ['el puesto', 'los puestos'],
         'PUESTO_DIRECTORIO' => ['el lugar en el directorio', 'el orden de los directorios'],
         'DESIGNACION' => ['la designación', 'las designaciones'],
-        'NIVEL_ACADEMICO' => ['el nivel académico', 'los niveles académicos'],
+        'NIVEL_ACADEMICO' => ['el grado académico', 'los grados académicos'],
         'CONTACTO' => ['el contacto', 'los contactos'],
     ];
 
@@ -182,8 +182,9 @@ class BitacoraService
         $generico = strtolower(str_replace('_', ' ', $movimiento->bita_tabla));
         [$singular, $plural] = self::TABLAS[$movimiento->bita_tabla] ?? ["el registro de {$generico}", "los registros de {$generico}"];
 
-        // Sin referencia: la acción fue sobre el conjunto (por ejemplo, reordenar las coordinaciones)
-        if ($referencia === null) {
+        // Sin referencia, o un reordenamiento: la acción fue sobre el conjunto
+        // ("reordenó las coordinaciones nacionales"); cada cambio dice cuál se movió
+        if ($referencia === null || $movimiento->bita_accion === 'Reordenamiento') {
             return $plural;
         }
 
@@ -219,7 +220,8 @@ class BitacoraService
         $campo = $detalle->bide_campo;
 
         // Si el cambio es de otro registro (por ejemplo, cada coordinación reordenada), se dice cuál
-        if ($detalle->bide_referencia !== null && $detalle->bide_referencia !== $movimiento->bita_referencia) {
+        $esDeOtro = $detalle->bide_referencia !== $movimiento->bita_referencia || $movimiento->bita_accion === 'Reordenamiento';
+        if ($detalle->bide_referencia !== null && $esDeOtro) {
             $registro = $nombres[$movimiento->bita_tabla][$detalle->bide_referencia] ?? "#{$detalle->bide_referencia}";
             $campo = "{$registro}, ".mb_strtolower($campo);
         }
@@ -249,6 +251,10 @@ class BitacoraService
                 ->whereIn('cona_id_coordinacion_nacional', $ids)->pluck('cona_nombre', 'cona_id_coordinacion_nacional'),
             'ZONA_REGIONAL' => fn (Collection $ids) => DB::table('zona_regional')
                 ->whereIn('zore_id_zona_regional', $ids)->pluck('zore_nombre', 'zore_id_zona_regional'),
+            'ENTIDAD_FEDERATIVA' => fn (Collection $ids) => DB::table('entidad_federativa')
+                ->whereIn('enfe_id_entidad_federativa', $ids)->pluck('enfe_nombre', 'enfe_id_entidad_federativa'),
+            'NIVEL_ACADEMICO' => fn (Collection $ids) => DB::table('nivel_academico')
+                ->whereIn('niac_id_nivel_academico', $ids)->pluck('niac_nombre', 'niac_id_nivel_academico'),
             'CARGO' => fn (Collection $ids) => DB::table('cargo')
                 ->whereIn('carg_id_cargo', $ids)->pluck('carg_nombre_m', 'carg_id_cargo'),
             'ORGANIZACION' => fn (Collection $ids) => DB::table('organizacion')

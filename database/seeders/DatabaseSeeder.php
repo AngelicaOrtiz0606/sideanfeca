@@ -13,6 +13,7 @@ use Illuminate\Database\Seeder;
  * Orden:
  *   1. SeguridadSeeder: privilegios, roles y sus permisos.
  *   2. CatalogosInicialesSeeder: zonas, entidades y coordinaciones.
+ *   3. GradosAcademicosSeeder: Licenciatura, Maestría y Doctorado.
  *
  * Municipios y colonias no van aquí: se cargan con
  *   php artisan catalogos:importar-correos
@@ -24,6 +25,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SeguridadSeeder::class,
             CatalogosInicialesSeeder::class,
+            GradosAcademicosSeeder::class,
         ]);
     }
 }

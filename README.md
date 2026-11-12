@@ -137,6 +137,20 @@ php artisan config:cache
 
 Regla de diseño: nunca usar líneas de acento arriba ni a los lados de las tarjetas.
 
+### Cómo se trabaja en las pantallas de catálogo
+
+Zonas, coordinaciones, cargos y grados académicos siguen el mismo patrón, para que se den los menos clics posibles:
+
+- **Todo desde la lista.** Cada fila tiene sus acciones: Editar, Desactivar o Activar, y Borrar.
+- **Nuevo y Editar se abren en una ventana** sobre la lista. Solo los registros con mucha información (personas, instituciones) tienen pantalla propia.
+- **Borrar** pide el motivo. Si el registro tiene cosas relacionadas, el botón se ve gris y explica por qué no se puede y qué hacer.
+- **Desactivar** pide confirmación; **activar** es un clic.
+- Si el servidor rechaza los datos, la ventana se vuelve a abrir con lo escrito y el error arriba.
+- La consulta (al dar clic en el nombre) es solo para ver lo relacionado, con su botón Editar.
+- **Nombres sin repetirse:** se guardan como se escriben (respetando siglas), sin espacios de sobra, y se comparan sin importar mayúsculas, acentos ni espacios ("Presidente" = "PRESIDENTE" = "presidénte"; la ñ sí cuenta). Mientras se escribe, la casilla se marca en rojo y abajo dice cuál ya existe (`App\Support\TextoCatalogo`, `App\Rules\NoRepetidoEnCatalogo` y `resources/js/modulos/nombres-unicos.js`).
+
+Piezas que se reutilizan: `resources/views/catalogos/_dialogo-borrar.blade.php`, `resources/js/modulos/dialogos.js` (abre y llena cada ventana con atributos `data-*`) y los botones `.accion` de `resources/css/componentes/botones.css`.
+
 ## Reglas para programar
 
 - La lógica de negocio vive en la base de datos. Laravel llama a las funciones SQL y les pasa la cuenta que actúa.

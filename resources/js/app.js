@@ -10,6 +10,12 @@
  *   validacion-formularios.js   validación discreta y botón inactivo
  *   boton-subir.js              botón flotante para subir
  *   contadores.js               números que se cuentan en la pantalla de inicio
+ *   dialogos.js                 ventanas de confirmación (borrar)
+ *   cambio-de-zona.js           pregunta antes de pasar una entidad a otra zona
+ *   ordenar-lista.js            cambiar el orden arrastrando o con flechas
+ *   filtro-tabla.js             filtro rápido de una tabla (texto y grupo)
+ *   cargo-nivel.js              nivel del cargo en su ventana
+ *   nombres-unicos.js           aviso inmediato de nombres repetidos en catálogos
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
  */
 import './modulos/menu-movil.js';
@@ -18,3 +24,9 @@ import './modulos/validacion-formularios.js';
 import './modulos/boton-subir.js';
 import './modulos/contadores.js';
 import './modulos/regreso-seguro.js';
+import './modulos/dialogos.js';
+import './modulos/cambio-de-zona.js';
+import './modulos/ordenar-lista.js';
+import './modulos/filtro-tabla.js';
+import './modulos/cargo-nivel.js';
+import './modulos/nombres-unicos.js';
