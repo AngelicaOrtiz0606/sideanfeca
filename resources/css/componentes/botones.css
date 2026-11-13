@@ -265,3 +265,21 @@
     background: var(--color-fondo);
     color: #6b6b6b;
 }
+
+/* Botón que se ve como enlace (acción pequeña dentro de un campo) */
+.boton-texto {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-enlace);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    cursor: pointer;
+}
+
+.boton-texto:hover {
+    color: var(--color-enlace-hover);
+}

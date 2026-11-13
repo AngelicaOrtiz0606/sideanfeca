@@ -33,7 +33,9 @@ class ParticipacionRequest extends FormRequest
         return [
             'participacion' => ['required', Rule::in(['Afiliada'])],
             'desde' => ['required', 'date', 'before_or_equal:today'],
+            'numero_modo' => ['nullable', Rule::in(['automatico', 'manual'])],
             'numero' => [
+                Rule::excludeIf($this->numeroAutomatico()),
                 'required', 'string', 'regex:/^[0-9]{7}$/',
                 new NoRepetidoEnCatalogo('institucion_educativa', 'ined_num_afiliacion', 'ined_id_institucion_educativa', $id, 'El número :existente ya pertenece a otra institución.'),
             ],
@@ -80,6 +82,25 @@ class ParticipacionRequest extends FormRequest
             'numero.required' => 'Una afiliada necesita su número de afiliación de 7 dígitos.',
             'numero.regex' => 'El número de afiliación tiene exactamente 7 dígitos.',
         ];
+    }
+
+    /**
+     * El número lo asigna el sistema salvo que se elija escribirlo
+     * (numero_modo=manual). Sin modo, se toma como manual si trae número.
+     */
+    public function numeroAutomatico(): bool
+    {
+        $modo = $this->input('numero_modo');
+
+        return $modo === 'automatico' || ($modo === null && blank($this->input('numero')));
+    }
+
+    /**
+     * Número escrito, o null para que el sistema asigne el consecutivo.
+     */
+    public function numero(): ?string
+    {
+        return $this->numeroAutomatico() ? null : (string) $this->validated('numero');
     }
 
     public function institucion(): ?object

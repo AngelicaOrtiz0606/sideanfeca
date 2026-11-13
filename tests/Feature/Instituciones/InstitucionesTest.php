@@ -87,7 +87,8 @@ class InstitucionesTest extends TestCase
     {
         $unam = $this->registrar($this->matriz());
 
-        $this->actingAs($this->admin)->post('/instituciones', ['numero' => ''] + $this->afiliada($unam, '', $this->zona(7)))
+        // Escrito a mano (numero_modo=manual): vacío no se acepta
+        $this->actingAs($this->admin)->post('/instituciones', ['numero' => '', 'numero_modo' => 'manual'] + $this->afiliada($unam, '', $this->zona(7)))
             ->assertSessionHasErrors(['numero' => 'Una afiliada necesita su número de afiliación de 7 dígitos.']);
 
         foreach (['260700', '26070021', '26O7002', ' 2607002x'] as $malo) {

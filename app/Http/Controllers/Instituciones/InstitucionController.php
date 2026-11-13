@@ -53,9 +53,11 @@ class InstitucionController extends Controller
     public function store(InstitucionRequest $request): RedirectResponse
     {
         $datos = $request->datos();
-        $this->instituciones->registrar($request->user(), $datos);
+        $id = $this->instituciones->registrar($request->user(), $datos);
+        $numero = $this->instituciones->buscar($id)?->numero;
 
-        return redirect()->route('instituciones.index')->with('estado', "Se registró {$datos['razon_social']}.");
+        return redirect()->route('instituciones.index')
+            ->with('estado', "Se registró {$datos['razon_social']}".($numero ? " con el número {$numero}" : '').'.');
     }
 
     /**
@@ -110,10 +112,10 @@ class InstitucionController extends Controller
 
         $participacion = (string) $request->validated('participacion');
         $desde = (string) $request->validated('desde');
-        $this->instituciones->cambiarParticipacion($request->user(), $institucion, $participacion, $request->validated('numero'), $desde);
+        $this->instituciones->cambiarParticipacion($request->user(), $institucion, $participacion, $request->numero(), $desde);
 
         return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => 'participacion'])
-            ->with('estado', 'Ahora es afiliada desde el '.date('d/m/Y', strtotime($desde)).'.');
+            ->with('estado', 'Ahora es afiliada desde el '.date('d/m/Y', strtotime($desde)).', con el número '.$this->instituciones->buscar($institucion)?->numero.'.');
     }
 
     public function update(InstitucionRequest $request, int $institucion): RedirectResponse

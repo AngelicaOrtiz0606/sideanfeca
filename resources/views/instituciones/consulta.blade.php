@@ -470,21 +470,13 @@
                 @endif
 
                 <div class="campo">
-                    <label for="nuevo-numero" class="campo__etiqueta">Número de afiliación <x-obligatorio /></label>
-                    <input id="nuevo-numero" name="numero" type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" required
-                           class="campo__entrada campo__entrada--numerica" value="{{ $ventanaConError === 'participacion' ? old('numero') : '' }}"
-                           data-existentes="{{ json_encode($numerosUsados) }}"
-                           data-mensaje-repetido="El número ya pertenece a :existente."
-                           data-mensaje-formato="El número de afiliación tiene exactamente 7 dígitos."
-                           @if ($ventanaConError === 'participacion' && $errors->has('numero')) aria-invalid="true" @endif>
-                </div>
-
-                <div class="campo">
                     <label for="participacion-desde" class="campo__etiqueta">Afiliada desde <x-obligatorio /></label>
                     <input id="participacion-desde" name="desde" type="date" required min="{{ $inicios['participacion'] }}" max="{{ $hoy }}"
                            class="campo__entrada" value="{{ $ventanaConError === 'participacion' ? old('desde') : $hoy }}"
                            @if ($ventanaConError === 'participacion' && $errors->has('desde')) aria-invalid="true" @endif>
                 </div>
+
+                <x-numero-afiliacion id="nuevo-numero" :existentes="$numerosUsados" fecha="#participacion-desde" :zona-numero="$institucion->zona_numero" />
 
                 <div class="dialogo__acciones">
                     <button type="button" class="boton boton--secundario" data-cerrar-dialogo>Cancelar</button>

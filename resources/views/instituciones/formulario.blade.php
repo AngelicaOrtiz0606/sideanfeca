@@ -79,24 +79,16 @@
             </div>
 
             <div class="formulario__rejilla" data-paso-resto @unless ($tipo && $participacion) hidden @endunless>
-                <div class="campo" data-solo-afiliada @unless ($participacion === 'Afiliada') hidden @endunless>
-                    <label for="numero" class="campo__etiqueta">Número de afiliación <x-obligatorio /></label>
-                    <input id="numero" name="numero" type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" required
-                           class="campo__entrada campo__entrada--numerica" value="{{ old('numero') }}"
-                           @unless ($participacion === 'Afiliada') disabled @endunless
-                           data-existentes="{{ json_encode($numerosUsados) }}"
-                           data-mensaje-repetido="El número ya pertenece a :existente."
-                           data-mensaje-formato="El número de afiliación tiene exactamente 7 dígitos."
-                           @if ($errors->has('numero')) aria-invalid="true" @endif>
-                </div>
-
-                <div class="campo">
+                <div class="campo campo--mitad">
                     <label for="desde" class="campo__etiqueta">Participa desde <x-obligatorio /></label>
                     <input id="desde" name="desde" type="date" required min="1900-01-01" max="{{ now()->toDateString() }}"
                            class="campo__entrada" value="{{ old('desde', now()->toDateString()) }}"
                            @if ($errors->has('desde')) aria-invalid="true" @endif>
                     <p class="campo__ayuda">Se usa en el historial y en el filtro por año.</p>
                 </div>
+
+                <x-numero-afiliacion id="numero" :existentes="$numerosUsados" fecha="#desde" zona="#zona"
+                                     class="campo--mitad" data-solo-afiliada :hidden="$participacion !== 'Afiliada'" />
             </div>
             <p class="formulario__guia" data-guia @if ($tipo && $participacion) hidden @endif>
                 {{ $tipo ? 'Ahora elige su participación para continuar.' : 'Elige el tipo de institución para continuar.' }}

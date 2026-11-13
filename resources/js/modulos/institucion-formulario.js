@@ -19,7 +19,8 @@ if (formulario) {
     const mostrar = (selector, visible) => {
         formulario.querySelectorAll(selector).forEach((bloque) => {
             bloque.hidden = !visible;
-            bloque.querySelectorAll('input, select').forEach((campo) => { campo.disabled = !visible; });
+            // Los campos con data-control-propio los activa su propio módulo (por ejemplo, el número escrito)
+            bloque.querySelectorAll('input:not([data-control-propio]), select').forEach((campo) => { campo.disabled = !visible; });
         });
     };
 

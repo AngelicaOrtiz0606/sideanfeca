@@ -164,7 +164,7 @@ class CambiosConHistorialTest extends TestCase
         $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero' => '1400001', 'desde' => '2020-02-01'])
             ->assertRedirect("/instituciones/{$udg}?pestana=participacion")
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('estado', 'Ahora es afiliada desde el 01/02/2020.');
+            ->assertSessionHas('estado', 'Ahora es afiliada desde el 01/02/2020, con el número 1400001.');
 
         // La actual cambia con su número…
         $this->assertDatabaseHas('institucion_educativa', ['ined_id_institucion_educativa' => $udg, 'ined_participacion' => 'Afiliada', 'ined_num_afiliacion' => '1400001']);
@@ -220,7 +220,7 @@ class CambiosConHistorialTest extends TestCase
         $this->registrarAfiliada($unam);
         $udg = $this->registrarObservadora();
 
-        $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'desde' => '2020-01-01'])
+        $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero_modo' => 'manual', 'desde' => '2020-01-01'])
             ->assertSessionHasErrors(['numero' => 'Una afiliada necesita su número de afiliación de 7 dígitos.']);
         $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero' => '123', 'desde' => '2020-01-01'])
             ->assertSessionHasErrors(['numero' => 'El número de afiliación tiene exactamente 7 dígitos.']);
@@ -260,6 +260,15 @@ class CambiosConHistorialTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame([['Afiliada', '2010-08-15', null]], $this->periodos($udg));
+    }
+
+    public function test_al_pasar_a_afiliada_el_sistema_asigna_el_numero_con_su_ano_y_zona(): void
+    {
+        $udg = $this->registrarObservadora(); // zona 4
+
+        $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero_modo' => 'automatico', 'desde' => '2022-03-01'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('estado', 'Ahora es afiliada desde el 01/03/2022, con el número 2204001.');
     }
 
     // ---- Edición por secciones desde la consulta ----

@@ -106,7 +106,9 @@ class InstitucionRequest extends FormRequest
             ],
             'participacion' => $id === null ? ['required', Rule::in(InstitucionService::PARTICIPACIONES)] : ['prohibited'],
             'desde' => $id === null ? ['required', 'date', 'after_or_equal:1900-01-01', 'before_or_equal:today'] : ['prohibited'],
+            'numero_modo' => ['nullable', Rule::in(['automatico', 'manual'])],
             'numero' => [
+                Rule::excludeIf($this->numeroAutomatico()),
                 Rule::requiredIf($participacion === 'Afiliada'),
                 Rule::prohibitedIf($participacion !== 'Afiliada' && $participacion !== null),
                 'nullable', 'string', 'regex:/^[0-9]{7}$/',
@@ -190,7 +192,8 @@ class InstitucionRequest extends FormRequest
             'universidad' => in_array($datos['tipo'], ['Facultad', 'Campus'], true) ? (int) $datos['universidad'] : null,
             'participacion' => $datos['participacion'] ?? null,
             'desde' => $datos['desde'] ?? null,
-            'numero' => $this->participacion() === 'Afiliada' ? $datos['numero'] : null,
+            // Null en una afiliada nueva = el servicio asigna el siguiente consecutivo al guardar
+            'numero' => $this->participacion() === 'Afiliada' && ! $this->numeroAutomatico() ? $datos['numero'] : null,
             'razon_social' => TextoCatalogo::limpiar($datos['razon_social']),
             'sector' => $datos['sector'],
             'sitio_web' => ($datos['sitio_web'] ?? null) ?: null,
@@ -218,6 +221,22 @@ class InstitucionRequest extends FormRequest
         }
 
         return DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->value('ined_participacion');
+    }
+
+    /**
+     * Al registrar una afiliada, el número lo asigna el sistema (año + zona +
+     * consecutivo) salvo que se elija "Escribir el número" (numero_modo=manual).
+     * Si no se envía el modo, se toma como manual cuando ya trae un número.
+     */
+    public function numeroAutomatico(): bool
+    {
+        if ($this->idInstitucion() !== null || $this->participacion() !== 'Afiliada') {
+            return false;
+        }
+
+        $modo = $this->input('numero_modo');
+
+        return $modo === 'automatico' || ($modo === null && blank($this->input('numero')));
     }
 
     private function idInstitucion(): ?int

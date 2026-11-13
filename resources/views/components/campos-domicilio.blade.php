@@ -42,7 +42,7 @@
             <output class="campo__salida" data-municipio>{{ $domicilio?->municipio ?? '—' }}</output>
         </div>
 
-        <div class="campo campo--ancho">
+        <div class="campo campo--mitad">
             <label for="colonia" class="campo__etiqueta">Colonia <x-obligatorio /></label>
             <select id="colonia" name="colonia" class="campo__entrada" data-colonias @required($obligatorio)
                     @if ($errors->has('colonia')) aria-invalid="true" @endif>
@@ -55,38 +55,39 @@
             <p class="campo__retro" data-tipo="error" data-retro-cp hidden></p>
         </div>
 
-        <div class="campo campo--ancho">
+        @if ($zonas !== null)
+            <div class="campo campo--mitad">
+                <label for="zona" class="campo__etiqueta">Zona regional <x-obligatorio /></label>
+                <select id="zona" name="zona" class="campo__entrada" data-zona @required($obligatorio)
+                        @if ($errors->has('zona')) aria-invalid="true" @endif>
+                    <option value="">Elige la zona</option>
+                    @foreach ($zonas as $z)
+                        <option value="{{ $z->id }}" data-numero="{{ $z->numero }}" @selected($zonaElegida === $z->id)>Zona {{ $z->numero }} · {{ $z->nombre }}</option>
+                    @endforeach
+                </select>
+                <p class="campo__ayuda" data-zona-sugerida>Se sugiere sola según la entidad; la puedes cambiar.</p>
+            </div>
+        @endif
+
+        <div class="campo campo--mitad">
             <label for="calle" class="campo__etiqueta">Calle <x-obligatorio /></label>
             <input id="calle" name="calle" type="text" maxlength="60" autocomplete="address-line1" data-texto-seguro
                    class="campo__entrada" value="{{ old('calle', $domicilio?->calle) }}" @required($obligatorio)
                    @if ($errors->has('calle')) aria-invalid="true" @endif>
         </div>
 
-        <div class="campo">
+        <div class="campo campo--cuarto">
             <label for="num_ext" class="campo__etiqueta">Número exterior <x-obligatorio /></label>
             <input id="num_ext" name="num_ext" type="text" maxlength="10" data-texto-seguro
                    class="campo__entrada" value="{{ old('num_ext', $domicilio?->num_ext) }}" @required($obligatorio)
                    @if ($errors->has('num_ext')) aria-invalid="true" @endif>
         </div>
 
-        <div class="campo">
+        <div class="campo campo--cuarto">
             <label for="num_int" class="campo__etiqueta">Número interior <span class="campo__opcional">(opcional)</span></label>
             <input id="num_int" name="num_int" type="text" maxlength="10" data-texto-seguro
                    class="campo__entrada" value="{{ old('num_int', $domicilio?->num_int) }}">
         </div>
 
-        @if ($zonas !== null)
-            <div class="campo">
-                <label for="zona" class="campo__etiqueta">Zona regional <x-obligatorio /></label>
-                <select id="zona" name="zona" class="campo__entrada" data-zona @required($obligatorio)
-                        @if ($errors->has('zona')) aria-invalid="true" @endif>
-                    <option value="">Elige la zona</option>
-                    @foreach ($zonas as $z)
-                        <option value="{{ $z->id }}" @selected($zonaElegida === $z->id)>Zona {{ $z->numero }} · {{ $z->nombre }}</option>
-                    @endforeach
-                </select>
-                <p class="campo__ayuda" data-zona-sugerida>Se sugiere sola según la entidad; la puedes cambiar.</p>
-            </div>
-        @endif
     </div>
 </fieldset>

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Instituciones educativas: matrices, afiliadas y observadoras; facultades
@@ -140,6 +141,11 @@ class InstitucionService
     public function registrar(Usuario $actor, array $datos): int
     {
         return DB::transaction(function () use ($actor, $datos): int {
+            // Afiliada con número automático: se asigna aquí, con candado, el siguiente consecutivo
+            if ($datos['participacion'] === 'Afiliada' && $datos['numero'] === null) {
+                $datos['numero'] = $this->asignarNumero($datos['desde'], (int) $datos['zona']);
+            }
+
             $domicilio = $datos['domicilio'] !== null ? $this->domicilios->guardar(null, $datos['domicilio']) : null;
 
             $id = (int) DB::table('institucion_educativa')->insertGetId([
@@ -409,7 +415,7 @@ class InstitucionService
         DB::transaction(function () use ($actor, $id, $participacion, $numero, $desde): void {
             $actual = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->lockForUpdate()->first();
             $periodo = DB::table('institucion_participacion')->where('inpa_id_institucion', $id)->whereNull('inpa_fecha_fin')->lockForUpdate()->first();
-            $numero = $participacion === 'Afiliada' ? $numero : null;
+            $numero = $participacion === 'Afiliada' ? ($numero ?? $this->asignarNumero($desde, (int) $actual->ined_id_zona_regional)) : null;
 
             DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->update([
                 'ined_participacion' => $participacion,
@@ -438,6 +444,54 @@ class InstitucionService
                 $this->detalle($idBitacora, $id, 'Número de afiliación', $actual->ined_num_afiliacion, $numero);
             }
         });
+    }
+
+    /**
+     * Inicio del número de afiliación: año (2 dígitos) y zona (2 dígitos).
+     * Por ejemplo, 2026 y zona 7 → "2607". Null si la zona no existe o pasa de 99.
+     */
+    public function prefijoDeNumero(string $fecha, int $zona): ?string
+    {
+        $numeroZona = DB::table('zona_regional')->where('zore_id_zona_regional', $zona)->value('zore_numero');
+
+        return $numeroZona === null || (int) $numeroZona > 99 ? null
+            : substr($fecha, 2, 2).str_pad((string) $numeroZona, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Siguiente número de afiliación para ese año y zona: el consecutivo más
+     * alto que ya existe, más uno (cada año y zona empieza en 001). Los huecos
+     * no se rellenan. Null si no hay prefijo o ya se llegó a 999.
+     */
+    public function siguienteNumero(string $fecha, int $zona): ?string
+    {
+        $prefijo = $this->prefijoDeNumero($fecha, $zona);
+        if ($prefijo === null) {
+            return null;
+        }
+
+        $mayor = (int) DB::table('institucion_educativa')
+            ->where('ined_num_afiliacion', 'like', $prefijo.'%')
+            ->max(DB::raw('cast(substr(ined_num_afiliacion, 5, 3) as integer)'));
+
+        return $mayor >= 999 ? null : $prefijo.str_pad((string) ($mayor + 1), 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Asigna el número dentro de la transacción. El candado por año y zona
+     * hace que dos registros al mismo tiempo esperen su turno: nunca reciben
+     * el mismo consecutivo.
+     */
+    private function asignarNumero(string $fecha, int $zona): string
+    {
+        $prefijo = $this->prefijoDeNumero($fecha, $zona);
+        if ($prefijo !== null) {
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', ['numero-afiliacion-'.$prefijo]);
+        }
+
+        return $this->siguienteNumero($fecha, $zona) ?? throw ValidationException::withMessages([
+            'numero' => 'Ya no hay consecutivos para ese año y zona. Escribe el número.',
+        ]);
     }
 
     private function diaAnterior(string $fecha): string
