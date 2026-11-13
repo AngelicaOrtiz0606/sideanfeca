@@ -257,3 +257,180 @@
     background: var(--color-fondo);
     color: var(--color-texto);
 }
+
+/* Celda sin dato */
+.tabla__vacio {
+    color: var(--color-borde-control);
+}
+
+/* Número de afiliación (7 dígitos) */
+.numero-afiliacion {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    background: var(--color-fondo);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+/* Participación de una institución */
+.participacion {
+    display: inline-block;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.participacion--afiliada {
+    background: var(--color-exito-fondo);
+    color: var(--color-exito);
+}
+
+.participacion--observadora {
+    background: var(--color-aviso-fondo);
+    color: var(--color-aviso);
+}
+
+.participacion--matriz {
+    background: #e7edf6;
+    color: var(--color-secundario);
+}
+
+/* Filtros que se aplican en el servidor (listas largas) */
+.filtros--servidor {
+    align-items: flex-end;
+}
+
+.filtros__selector {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.filtros__selector .campo__entrada {
+    min-height: 2.5rem;
+    padding-block: 0;
+    font-size: 0.9375rem;
+}
+
+.filtros__etiqueta {
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.filtros__aplicar {
+    min-height: 2.5rem;
+}
+
+.filtros__limpiar {
+    align-self: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* Paginación debajo de una tabla */
+.paginacion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1.5rem;
+    border-top: 1px solid var(--color-borde);
+}
+
+.paginacion__resumen {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}
+
+.paginacion__lista {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    list-style: none;
+}
+
+.paginacion__enlace {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    color: var(--color-texto);
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+a.paginacion__enlace:hover {
+    border-color: var(--color-borde-control);
+}
+
+.paginacion__enlace--actual {
+    border-color: var(--color-secundario);
+    background: var(--color-secundario);
+    color: #fff;
+}
+
+.paginacion__enlace[aria-disabled='true'] {
+    color: var(--color-borde-control);
+}
+
+/* En teléfono los filtros se abren y se cierran con el botón "Filtros";
+   en computadora siempre están a la vista, en una sola fila */
+.filtros__resumen {
+    display: none;
+}
+
+.filtros__opciones {
+    display: contents;
+}
+
+@media (width < 48rem) {
+    .filtros__buscar {
+        flex: 1 1 10rem;
+        max-width: none;
+    }
+
+    .filtros__resumen {
+        display: inline-flex;
+        order: 3;
+        align-items: center;
+        gap: 0.375rem;
+        min-height: 2.5rem;
+        padding: 0 0.875rem;
+        border: 1px solid var(--color-borde);
+        border-radius: var(--radio);
+        background: var(--color-superficie);
+        color: var(--color-texto);
+        font: inherit;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .filtros__resumen[aria-expanded='true'] {
+        border-color: var(--color-secundario);
+    }
+
+    .filtros__opciones {
+        display: grid;
+        order: 4;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .filtros__opciones[data-cerrado] {
+        display: none;
+    }
+
+    .filtros__limpiar {
+        order: 5;
+    }
+}

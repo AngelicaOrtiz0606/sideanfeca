@@ -56,7 +56,7 @@ class DefensasTest extends TestCase
     {
         DB::table('cargo')->insert(['carg_nombre_m' => 'Presidente', 'carg_nombre_f' => 'Presidenta', 'carg_nivel' => 'Nacional']);
 
-        foreach (['/inicio', '/zonas', '/coordinaciones', '/cargos', '/grados-academicos'] as $direccion) {
+        foreach (['/inicio', '/zonas', '/coordinaciones', '/cargos', '/grados-academicos', '/instituciones', '/instituciones/create'] as $direccion) {
             $html = $this->actingAs($this->admin)->get($direccion)->getContent();
 
             $this->assertDoesNotMatchRegularExpression('/<script(?![^>]*\bsrc=)[^>]*>/i', $html, "{$direccion} tiene un script escrito dentro.");

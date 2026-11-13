@@ -64,7 +64,9 @@
                 </thead>
                 <tbody>
                     @foreach ($cargos as $cargo)
-                        @php($id = $cargo->carg_id_cargo)
+                        @php
+                            $id = $cargo->carg_id_cargo;
+                        @endphp
                         <tr @class(['tabla__fila--inactiva' => ! $cargo->carg_activo])
                             data-filtro-fila data-grupo="{{ $cargo->carg_nivel }}"
                             data-texto="{{ $cargo->carg_nombre_m }} {{ $cargo->carg_nombre_f }}">

@@ -93,7 +93,9 @@
 
                                 {{-- Los cambios se muestran solo si la persona los abre, para no saturar la lista --}}
                                 @if ($movimiento['detalles'] !== [])
-                                    @php($totalCambios = count($movimiento['detalles']) + $movimiento['mas_detalles'])
+                                    @php
+                                        $totalCambios = count($movimiento['detalles']) + $movimiento['mas_detalles'];
+                                    @endphp
                                     <details class="actividad__cambios">
                                         <summary>Ver {{ $totalCambios === 1 ? 'el cambio' : "los {$totalCambios} cambios" }}</summary>
                                         <ul>

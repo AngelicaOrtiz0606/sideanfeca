@@ -365,3 +365,157 @@ fieldset {
     color: var(--color-texto-suave);
     font-size: 0.8125rem;
 }
+
+/* Formulario largo por secciones: cada sección es su propia tarjeta
+   (por ejemplo, una institución: tipo, datos generales y domicilio) */
+.seccion-formulario {
+    display: grid;
+    gap: 1.125rem;
+}
+
+.seccion-formulario.tarjeta {
+    padding: 1.5rem;
+}
+
+.seccion-formulario.tarjeta + .seccion-formulario.tarjeta {
+    margin-top: 0;
+}
+
+.seccion-formulario__titulo {
+    float: left; /* así la leyenda respeta el espacio de la cuadrícula */
+    width: 100%;
+    color: var(--color-secundario);
+    font-size: 1.0625rem;
+    font-weight: 700;
+}
+
+.seccion-formulario__nota {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    font-weight: 400;
+}
+
+/* Campos en cuadrícula: 3 por fila en computadora, 1 en teléfono */
+.formulario__rejilla {
+    display: grid;
+    gap: 1.125rem 1.25rem;
+}
+
+@media (width >= 48rem) {
+    .formulario__rejilla {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .campo--ancho {
+        grid-column: span 2;
+    }
+}
+
+/* Dato que se muestra pero no se escribe (lo llena el sistema) */
+.campo__salida {
+    display: flex;
+    align-items: center;
+    min-height: 3rem;
+    padding: 0 0.875rem;
+    border-radius: var(--radio);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+}
+
+.campo__entrada--numerica {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+}
+
+/* Opciones cortas en una línea (por ejemplo, sector: Pública / Privada) */
+.opciones-en-linea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.opcion-en-linea {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    cursor: pointer;
+}
+
+.opcion-en-linea input {
+    width: 1.0625rem;
+    height: 1.0625rem;
+    accent-color: var(--color-marca);
+}
+
+.opcion-en-linea:has(input:checked) {
+    border-color: var(--color-marca);
+    background: var(--color-marca-tinte);
+}
+
+.opcion-en-linea:has(input:focus-visible) {
+    outline: 3px solid var(--color-marca);
+    outline-offset: 2px;
+}
+
+.formulario--institucion {
+    gap: 1.25rem;
+    max-width: 64rem;
+}
+
+.formulario--institucion > .nota-obligatorios {
+    margin-top: 0;
+}
+
+/* Buscador con lista que se filtra mientras se escribe */
+.buscador {
+    position: relative;
+}
+
+.buscador__lista {
+    position: absolute;
+    top: calc(3rem + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 18rem;
+    margin: 0;
+    padding: 0.375rem;
+    overflow-y: auto;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+    background: var(--color-superficie);
+    box-shadow: 0 12px 28px rgb(0 0 0 / 0.12);
+    list-style: none;
+}
+
+.buscador__opcion {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.buscador__opcion:hover,
+.buscador__opcion[aria-selected='true'] {
+    background: var(--color-marca-tinte);
+}
+
+.buscador__nombre {
+    font-size: 0.9375rem;
+}
+
+.buscador__detalle {
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}
+
+.buscador__vacio {
+    padding: 0.75rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}
