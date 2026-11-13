@@ -176,7 +176,7 @@ class InstitucionesTest extends TestCase
         $this->actingAs($this->admin)->put("/instituciones/{$id}", [
             'razon_social' => 'Facultad de Contaduría y Administración (FCA)', 'numero' => '2607003',
         ] + array_diff_key($this->afiliada($unam, '', $this->zona(7)), ['participacion' => 1, 'desde' => 1, 'numero' => 1]))
-            ->assertRedirect('/instituciones');
+            ->assertRedirect("/instituciones/{$id}");
 
         $this->assertSame(1, DB::table('institucion_nombre')->where('instn_id_institucion', $id)->count());
         $this->assertDatabaseHas('institucion_nombre', ['instn_id_institucion' => $id, 'instn_nombre' => 'Facultad de Contaduría y Administración (FCA)', 'instn_fecha_fin' => null]);
@@ -416,7 +416,7 @@ class InstitucionesTest extends TestCase
      */
     private function filas(string $direccion): array
     {
-        preg_match_all('/class="tabla__principal">([^<]*)</', $this->actingAs($this->admin)->get($direccion)->assertOk()->getContent(), $coincidencias);
+        preg_match_all('/class="tabla__principal[^"]*">([^<]*)</', $this->actingAs($this->admin)->get($direccion)->assertOk()->getContent(), $coincidencias);
 
         return array_map('trim', $coincidencias[1]);
     }

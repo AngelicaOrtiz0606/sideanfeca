@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Instituciones\EstadoInstitucionRequest;
 use App\Http\Requests\Instituciones\InstitucionRequest;
+use App\Http\Requests\Instituciones\ParticipacionRequest;
+use App\Http\Requests\Instituciones\RazonSocialRequest;
 use App\Services\Instituciones\InstitucionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +16,8 @@ use Illuminate\View\View;
 
 /**
  * Instituciones (privilegio gestionar_instituciones, revisado en la ruta).
- * Tienen mucha información, así que registrar y editar van en pantalla propia.
+ * Registrar va en pantalla propia, paso a paso. Se consultan por pestañas y
+ * cada sección de la consulta se edita en su propia ventana.
  * Se desactivan (conservan su número); solo se borran si no tienen personas,
  * sedes ni puestos (por ejemplo, una captura por error).
  */
@@ -44,7 +47,7 @@ class InstitucionController extends Controller
 
     public function create(): View
     {
-        return $this->formulario(null);
+        return $this->formulario();
     }
 
     public function store(InstitucionRequest $request): RedirectResponse
@@ -55,22 +58,72 @@ class InstitucionController extends Controller
         return redirect()->route('instituciones.index')->with('estado', "Se registró {$datos['razon_social']}.");
     }
 
-    public function edit(int $institucion): View
+    /**
+     * Consulta: pestañas General, Participación, Razón social y (si es
+     * universidad) Sedes. Desde aquí se registran los cambios con historial.
+     */
+    public function show(Request $request, int $institucion): View
     {
         $encontrada = $this->instituciones->buscar($institucion);
         abort_if($encontrada === null, 404);
 
-        return $this->formulario($encontrada);
+        $esUniversidad = $encontrada->tipo === 'Universidad';
+        $pestanas = ['general' => 'General', 'participacion' => 'Participación', 'razon-social' => 'Razón social'] + ($esUniversidad ? ['sedes' => 'Sedes'] : []);
+        $pestana = array_key_exists((string) $request->query('pestana'), $pestanas) ? (string) $request->query('pestana') : 'general';
+
+        return view('instituciones.consulta', [
+            'institucion' => $encontrada,
+            'pestanas' => $pestanas,
+            'pestana' => $pestana,
+            'participaciones' => $this->instituciones->historialParticipacion($institucion),
+            'nombres' => $this->instituciones->historialNombres($institucion),
+            'sedes' => $esUniversidad ? $this->instituciones->sedes($institucion) : collect(),
+            'inicios' => $this->instituciones->iniciosVigentes($institucion),
+            'posibles' => $this->instituciones->participacionesPosibles($encontrada),
+            'motivoParticipacion' => $this->instituciones->motivoParaNoCambiarParticipacion($encontrada),
+            'numerosUsados' => $this->instituciones->numerosUsados(),
+            'motivoTipo' => $this->instituciones->motivoParaNoCambiarTipo($encontrada),
+            'tipos' => InstitucionService::TIPOS,
+            'sectores' => InstitucionService::SECTORES,
+            'universidades' => $this->instituciones->universidades()->reject(fn ($u) => $u->id === $encontrada->id)->values(),
+            'zonas' => $this->zonas(),
+        ]);
+    }
+
+    public function cambiarRazonSocial(RazonSocialRequest $request, int $institucion): RedirectResponse
+    {
+        $encontrada = $this->instituciones->buscar($institucion);
+        abort_if($encontrada === null, 404);
+
+        $nombre = $request->razonSocial();
+        $desde = (string) $request->validated('desde');
+        $this->instituciones->cambiarRazonSocial($request->user(), $institucion, $nombre, $desde);
+
+        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => 'razon-social'])
+            ->with('estado', 'Se registró el cambio de razón social desde el '.date('d/m/Y', strtotime($desde)).'.');
+    }
+
+    public function cambiarParticipacion(ParticipacionRequest $request, int $institucion): RedirectResponse
+    {
+        $encontrada = $request->institucion();
+        abort_if($encontrada === null, 404);
+
+        $participacion = (string) $request->validated('participacion');
+        $desde = (string) $request->validated('desde');
+        $this->instituciones->cambiarParticipacion($request->user(), $institucion, $participacion, $request->validated('numero'), $desde);
+
+        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => 'participacion'])
+            ->with('estado', 'Ahora es afiliada desde el '.date('d/m/Y', strtotime($desde)).'.');
     }
 
     public function update(InstitucionRequest $request, int $institucion): RedirectResponse
     {
         abort_if($this->instituciones->buscar($institucion) === null, 404);
 
-        $datos = $request->datos();
-        $this->instituciones->actualizar($request->user(), $institucion, $datos);
+        $this->instituciones->actualizar($request->user(), $institucion, $request->datos());
 
-        return redirect()->route('instituciones.index')->with('estado', "Se guardaron los cambios de {$datos['razon_social']}.");
+        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => $request->seccion() === 'razon' ? 'razon-social' : null])
+            ->with('estado', $request->seccion() === 'razon' ? 'Se corrigió la razón social.' : 'Se guardaron los cambios.');
     }
 
     public function cambiarEstado(EstadoInstitucionRequest $request, int $institucion): RedirectResponse
@@ -102,14 +155,13 @@ class InstitucionController extends Controller
         return redirect()->route('instituciones.index')->with('estado', "Se borró {$encontrada->nombre}.");
     }
 
-    private function formulario(?object $institucion): View
+    private function formulario(): View
     {
         return view('instituciones.formulario', [
-            'institucion' => $institucion,
             'tipos' => InstitucionService::TIPOS,
             'participaciones' => InstitucionService::PARTICIPACIONES,
             'sectores' => InstitucionService::SECTORES,
-            'universidades' => $this->instituciones->universidades()->reject(fn ($u) => $u->id === $institucion?->id)->values(),
+            'universidades' => $this->instituciones->universidades(),
             'numerosUsados' => $this->instituciones->numerosUsados(),
             'zonas' => $this->zonas(),
         ]);

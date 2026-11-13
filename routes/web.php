@@ -57,12 +57,14 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         ->middleware(Privilegio::VerBitacora->middleware())
         ->name('bitacora.index');
 
-    // Instituciones (M4): pantalla propia para registrar y editar; no se borran
+    // Instituciones (M4): pantalla propia para registrar, consultar y editar
     Route::middleware(Privilegio::GestionarInstituciones->middleware())->group(function () {
         Route::patch('/instituciones/{institucion}/estado', [InstitucionController::class, 'cambiarEstado'])->name('instituciones.estado');
+        Route::patch('/instituciones/{institucion}/razon-social', [InstitucionController::class, 'cambiarRazonSocial'])->name('instituciones.razon-social');
+        Route::patch('/instituciones/{institucion}/participacion', [InstitucionController::class, 'cambiarParticipacion'])->name('instituciones.participacion');
         Route::resource('instituciones', InstitucionController::class)
             ->parameters(['instituciones' => 'institucion'])
-            ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+            ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
     });
 
     // Catálogos (M3)

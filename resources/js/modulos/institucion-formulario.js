@@ -6,6 +6,7 @@
  * - Número de afiliación: solo para afiliada.
  * - Domicilio y zona: obligatorios, salvo para una matriz.
  * Los campos ocultos se desactivan, así no se envían ni se validan.
+ * Lo usan el registro y la ventana "Identificación" de la consulta.
  */
 const formulario = document.querySelector('form[data-institucion]');
 
@@ -68,5 +69,7 @@ if (formulario) {
     };
 
     [...tipos, ...participaciones].forEach((radio) => radio.addEventListener('change', actualizar));
+    // En una ventana que vuelve a sus datos guardados (reset), se ajusta de nuevo
+    formulario.addEventListener('reset', () => setTimeout(actualizar));
     actualizar();
 }

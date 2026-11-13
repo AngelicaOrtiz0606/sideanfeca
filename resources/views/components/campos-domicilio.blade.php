@@ -9,8 +9,9 @@
       zonas       zonas para elegir (null = sin campo de zona, por ejemplo organizaciones)
       zona        zona elegida
       obligatorio si el domicilio es obligatorio (una matriz no lo necesita)
+      enVentana   dentro de una ventana: sin tarjeta propia (la ventana ya tiene título)
 --}}
-@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true])
+@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true, 'enVentana' => false])
 
 @php
     $cp = old('codigo_postal', $domicilio?->codigo_postal);
@@ -18,9 +19,9 @@
     $zonaElegida = (int) old('zona', $zona);
 @endphp
 
-<fieldset class="tarjeta seccion-formulario" data-domicilio data-url-codigo-postal="{{ route('codigos-postales.show', ['codigo' => '00000']) }}"
+<fieldset @class(['tarjeta seccion-formulario' => ! $enVentana, 'seccion-ventana' => $enVentana]) data-domicilio data-url-codigo-postal="{{ route('codigos-postales.show', ['codigo' => '00000']) }}"
           data-obligatorio="{{ $obligatorio ? 'si' : 'no' }}">
-    <legend class="seccion-formulario__titulo">Domicilio <span class="seccion-formulario__nota" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></legend>
+    <legend @class(['seccion-formulario__titulo' => ! $enVentana, 'solo-lectores' => $enVentana])>Domicilio <span class="seccion-formulario__nota" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></legend>
 
     <div class="formulario__rejilla">
         <div class="campo">

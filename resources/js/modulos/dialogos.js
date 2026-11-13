@@ -17,6 +17,8 @@
  *   <button data-cerrar-dialogo>        la cierra (también la tecla Esc)
  *   <dialog data-abrir-al-cargar>       se abre sola al cargar (el servidor
  *                                       la marca si hubo errores al guardar)
+ *   <dialog data-reiniciar>             al abrirse vuelve a los datos guardados
+ *                                       (lo escrito y cancelado no se queda)
  *
  * Antes de abrirse, la ventana recibe el evento "dialogo:preparado" para
  * que cada pantalla agregue lo suyo (por ejemplo, las entidades de una zona).
@@ -24,6 +26,10 @@
 function preparar(dialogo, boton) {
     const formulario = dialogo.querySelector('form');
     const datos = boton.dataset;
+
+    if (formulario && dialogo.dataset.reiniciar !== undefined) {
+        formulario.reset();
+    }
 
     if (formulario && datos.accion) {
         formulario.action = datos.accion;

@@ -109,3 +109,16 @@
 .dialogo--mediano {
     width: min(44rem, calc(100% - 2rem));
 }
+
+/* Las ventanas con formularios largos se desplazan por dentro si no caben */
+.dialogo--mediano {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+}
+
+/* Campos agrupados dentro de una ventana (por ejemplo, el domicilio) */
+.seccion-ventana {
+    display: grid;
+    gap: 1.125rem;
+    min-width: 0;
+}

@@ -245,3 +245,23 @@
     opacity: 1;
     transform: translate(-50%, 0);
 }
+
+/* Botón pegado a la orilla derecha: el globo se alinea a la derecha para no salirse */
+.accion--a-la-derecha .accion__texto {
+    right: 0;
+    left: auto;
+    transform: translate(0, 0.25rem);
+}
+
+.accion--a-la-derecha:hover .accion__texto,
+.accion--a-la-derecha:focus-visible .accion__texto {
+    transform: translate(0, 0);
+}
+
+/* Botón de una acción que hoy no se puede: gris; al picarlo explica por qué */
+.boton--bloqueado,
+.boton--bloqueado:hover {
+    border-color: var(--color-borde);
+    background: var(--color-fondo);
+    color: #6b6b6b;
+}

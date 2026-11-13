@@ -281,6 +281,171 @@ class InstitucionService
     }
 
     /**
+     * Periodos de participación, del más reciente al más antiguo.
+     *
+     * @return Collection<int, object>
+     */
+    public function historialParticipacion(int $id): Collection
+    {
+        return DB::table('institucion_participacion')->where('inpa_id_institucion', $id)
+            ->orderByDesc('inpa_fecha_inicio')->orderByDesc('inpa_id_participacion')
+            ->get(['inpa_tipo as tipo', 'inpa_fecha_inicio as desde', 'inpa_fecha_fin as hasta']);
+    }
+
+    /**
+     * Razones sociales que ha tenido, de la vigente a la más antigua.
+     *
+     * @return Collection<int, object>
+     */
+    public function historialNombres(int $id): Collection
+    {
+        return DB::table('institucion_nombre')->where('instn_id_institucion', $id)
+            ->orderByDesc('instn_fecha_inicio')
+            ->get(['instn_nombre as nombre', 'instn_fecha_inicio as desde', 'instn_fecha_fin as hasta']);
+    }
+
+    /**
+     * Facultades y campus de una universidad.
+     *
+     * @return Collection<int, object>
+     */
+    public function sedes(int $id): Collection
+    {
+        return $this->consulta()->where('i.ined_id_institucion_padre', $id)
+            ->orderByDesc('i.ined_activo')->orderBy('n.instn_nombre')->get();
+    }
+
+    /**
+     * Fecha desde la que se puede registrar un cambio de razón social o de
+     * participación: no antes de que empezara la vigente.
+     *
+     * @return array{razon_social: ?string, participacion: ?string}
+     */
+    public function iniciosVigentes(int $id): array
+    {
+        return [
+            'razon_social' => DB::table('institucion_nombre')->where('instn_id_institucion', $id)->whereNull('instn_fecha_fin')->value('instn_fecha_inicio'),
+            'participacion' => DB::table('institucion_participacion')->where('inpa_id_institucion', $id)->whereNull('inpa_fecha_fin')->value('inpa_fecha_inicio'),
+        ];
+    }
+
+    /**
+     * Participaciones a las que puede cambiar con historial: solo una
+     * observadora puede pasar a afiliada. Una afiliada nunca vuelve a ser
+     * observadora y una matriz no cambia.
+     *
+     * @return array<int, string>
+     */
+    public function participacionesPosibles(object $institucion): array
+    {
+        return $institucion->participacion === 'Observadora' ? ['Afiliada'] : [];
+    }
+
+    /**
+     * Por qué no puede pasar a afiliada ahora, o null si sí puede.
+     */
+    public function motivoParaNoCambiarParticipacion(object $institucion): ?string
+    {
+        return match (true) {
+            $this->participacionesPosibles($institucion) === [] => 'Solo una observadora puede pasar a afiliada.',
+            ! $institucion->activa => 'Está desactivada. Actívala primero; después podrás hacerla afiliada.',
+            default => null,
+        };
+    }
+
+    /**
+     * Qué impide cambiar el tipo (universidad, facultad o campus), o null.
+     */
+    public function motivoParaNoCambiarTipo(object $institucion): ?string
+    {
+        return match (true) {
+            $institucion->participacion === 'Matriz' => 'Una matriz siempre es universidad.',
+            $institucion->tipo === 'Universidad' && DB::table('institucion_educativa')->where('ined_id_institucion_padre', $institucion->id)->exists() => 'Tiene facultades o campus, así que sigue siendo universidad.',
+            default => null,
+        };
+    }
+
+    /**
+     * Cambio de razón social con historial: la vigente se cierra el día
+     * anterior a la nueva fecha (sin traslape) y la nueva queda vigente.
+     * Si la fecha es el mismo día en que empezó la vigente, solo se corrige.
+     */
+    public function cambiarRazonSocial(Usuario $actor, int $id, string $nombre, string $desde): void
+    {
+        DB::transaction(function () use ($actor, $id, $nombre, $desde): void {
+            DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->lockForUpdate()->first();
+            $vigente = DB::table('institucion_nombre')->where('instn_id_institucion', $id)->whereNull('instn_fecha_fin')->lockForUpdate()->first();
+
+            if ($vigente !== null && $vigente->instn_fecha_inicio === $desde) {
+                DB::table('institucion_nombre')->where('instn_id_institucion_nombre', $vigente->instn_id_institucion_nombre)->update(['instn_nombre' => $nombre]);
+            } else {
+                if ($vigente !== null) {
+                    DB::table('institucion_nombre')->where('instn_id_institucion_nombre', $vigente->instn_id_institucion_nombre)
+                        ->update(['instn_fecha_fin' => $this->diaAnterior($desde)]);
+                }
+
+                DB::table('institucion_nombre')->insert([
+                    'instn_id_institucion' => $id,
+                    'instn_nombre' => $nombre,
+                    'instn_fecha_inicio' => $desde,
+                ]);
+            }
+
+            $idBitacora = $this->bitacora($actor, 'Modificacion', 'INSTITUCION_EDUCATIVA', $id);
+            $this->detalle($idBitacora, $id, 'Razón social', $vigente?->instn_nombre, $nombre);
+            $this->detalle($idBitacora, $id, 'Razón social vigente desde', $vigente?->instn_fecha_inicio, $desde);
+        });
+    }
+
+    /**
+     * Cambio de participación con historial (de observadora a afiliada): en
+     * la misma transacción se actualiza la participación actual con su número
+     * y se cierra el periodo anterior el día previo a la nueva fecha,
+     * abriendo uno nuevo. Si la fecha es el mismo día en que empezó el
+     * periodo actual, solo se corrige ese periodo.
+     */
+    public function cambiarParticipacion(Usuario $actor, int $id, string $participacion, ?string $numero, string $desde): void
+    {
+        DB::transaction(function () use ($actor, $id, $participacion, $numero, $desde): void {
+            $actual = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->lockForUpdate()->first();
+            $periodo = DB::table('institucion_participacion')->where('inpa_id_institucion', $id)->whereNull('inpa_fecha_fin')->lockForUpdate()->first();
+            $numero = $participacion === 'Afiliada' ? $numero : null;
+
+            DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->update([
+                'ined_participacion' => $participacion,
+                'ined_num_afiliacion' => $numero,
+            ]);
+
+            if ($periodo !== null && $periodo->inpa_fecha_inicio === $desde) {
+                DB::table('institucion_participacion')->where('inpa_id_participacion', $periodo->inpa_id_participacion)->update(['inpa_tipo' => $participacion]);
+            } else {
+                if ($periodo !== null) {
+                    DB::table('institucion_participacion')->where('inpa_id_participacion', $periodo->inpa_id_participacion)
+                        ->update(['inpa_fecha_fin' => $this->diaAnterior($desde)]);
+                }
+
+                DB::table('institucion_participacion')->insert([
+                    'inpa_id_institucion' => $id,
+                    'inpa_tipo' => $participacion,
+                    'inpa_fecha_inicio' => $desde,
+                ]);
+            }
+
+            $idBitacora = $this->bitacora($actor, 'Modificacion', 'INSTITUCION_EDUCATIVA', $id);
+            $this->detalle($idBitacora, $id, 'Participación', $actual->ined_participacion, $participacion);
+            $this->detalle($idBitacora, $id, 'Participa como tal desde', $periodo?->inpa_fecha_inicio, $desde);
+            if ($actual->ined_num_afiliacion !== $numero) {
+                $this->detalle($idBitacora, $id, 'Número de afiliación', $actual->ined_num_afiliacion, $numero);
+            }
+        });
+    }
+
+    private function diaAnterior(string $fecha): string
+    {
+        return date('Y-m-d', strtotime($fecha.' -1 day'));
+    }
+
+    /**
      * Fechas válidas para activar o desactivar: desactivar no antes del inicio
      * del periodo actual; activar no antes del último fin (el mismo día o el
      * siguiente reabre ese periodo).

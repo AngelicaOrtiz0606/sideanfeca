@@ -1,0 +1,224 @@
+/*
+ * Consulta de una institución: pestañas, tarjetas de datos e historiales.
+ */
+
+/* Pestañas: la elegida se subraya en rojo */
+.pestanas__lista {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-borde);
+    scrollbar-width: none;
+}
+
+.pestanas__pestana {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.pestanas__pestana:hover {
+    color: var(--color-tinta);
+}
+
+.pestanas__pestana[aria-selected='true'] {
+    border-bottom-color: var(--color-marca);
+    color: var(--color-marca);
+}
+
+.pestanas__cifra {
+    min-width: 1.375rem;
+    padding: 0.0625rem 0.4375rem;
+    border-radius: 999px;
+    background: var(--color-fondo);
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+/* General: tres tarjetas (identificación, ubicación, sitio web) */
+.ficha {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    align-items: start;
+}
+
+/* En la rejilla las tarjetas se alinean arriba (sin la separación entre tarjetas apiladas) */
+.ficha > .tarjeta {
+    margin-top: 0;
+}
+
+.ficha__encabezado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.625rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.ficha__titulo {
+    color: var(--color-secundario);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ficha__datos {
+    display: grid;
+    gap: 1rem;
+}
+
+.ficha__datos dt {
+    margin-bottom: 0.125rem;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}
+
+.ficha__datos dd {
+    color: var(--color-tinta);
+    line-height: 1.5;
+}
+
+.ficha__vacio {
+    color: var(--color-texto-suave);
+    line-height: 1.5;
+}
+
+.ficha__domicilio {
+    color: var(--color-tinta);
+    font-style: normal;
+    line-height: 1.5;
+}
+
+.ficha__domicilio + .ficha__datos,
+.ficha__vacio + .ficha__datos {
+    margin-top: 1rem;
+}
+
+.ficha__enlace {
+    color: var(--color-enlace);
+}
+
+.ficha__enlace--web {
+    overflow-wrap: anywhere;
+}
+
+/* Historial con su acción (cambio de nombre, pasar a afiliada) a la derecha */
+.historial {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+}
+
+.historial > .linea-tiempo {
+    flex: 1 1 20rem;
+    min-width: 0;
+}
+
+/* Historiales: línea de tiempo con un punto por periodo; el actual, en rojo */
+.linea-tiempo {
+    display: grid;
+    gap: 0;
+    padding-left: 0.25rem;
+    list-style: none;
+}
+
+.linea-tiempo__item {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0 0 1.25rem 1.5rem;
+}
+
+.linea-tiempo__item::before {
+    position: absolute;
+    top: 0.4375rem;
+    left: 0;
+    width: 0.625rem;
+    height: 0.625rem;
+    border: 2px solid var(--color-borde-control);
+    border-radius: 50%;
+    background: var(--color-superficie);
+    content: '';
+}
+
+.linea-tiempo__item:not(:last-child)::after {
+    position: absolute;
+    top: 1.25rem;
+    bottom: 0.125rem;
+    left: 0.28125rem;
+    width: 1px;
+    background: var(--color-borde);
+    content: '';
+}
+
+.linea-tiempo__item:last-child {
+    padding-bottom: 0;
+}
+
+.linea-tiempo__item--actual::before {
+    border-color: var(--color-marca);
+    background: var(--color-marca);
+}
+
+/* Nombre con su acción al lado: el nombre se acomoda en varias líneas, la acción no baja */
+.linea-tiempo__titulo {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.linea-tiempo__nombre {
+    color: var(--color-tinta);
+    font-weight: 600;
+}
+
+.linea-tiempo__fechas {
+    flex-basis: 100%;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+}
+
+.linea-tiempo__actual {
+    color: var(--color-marca);
+    font-weight: 600;
+}
+
+/* En teléfono, el botón del historial va arriba y ocupa el ancho */
+@media (width < 40rem) {
+    .historial__acciones {
+        order: -1;
+        width: 100%;
+    }
+
+    .historial__acciones .boton {
+        width: 100%;
+    }
+}
+
+/* Acción junto a un elemento del historial (corregir escritura): no agranda la línea */
+.linea-tiempo .accion {
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    margin-block: -0.25rem;
+}
