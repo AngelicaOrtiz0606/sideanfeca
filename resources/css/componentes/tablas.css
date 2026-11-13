@@ -321,15 +321,11 @@
     font-weight: 600;
 }
 
-.filtros__aplicar {
+.filtros__borrar {
     min-height: 2.5rem;
+    font-size: 0.875rem;
 }
 
-.filtros__limpiar {
-    align-self: center;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
 
 /* Paginación debajo de una tabla */
 .paginacion {
@@ -430,7 +426,7 @@ a.paginacion__enlace:hover {
         display: none;
     }
 
-    .filtros__limpiar {
+    .filtros__borrar {
         order: 5;
     }
 }

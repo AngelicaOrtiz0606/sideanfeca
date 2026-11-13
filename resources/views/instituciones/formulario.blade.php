@@ -1,5 +1,7 @@
 {{--
     Registro y edición de una institución, en pantalla propia y por secciones.
+    Al registrar se avanza paso a paso: primero el tipo; al elegirlo aparece la
+    participación; al elegirla aparece lo demás. Al editar se ve todo.
     - Las opciones que no aplican se ocultan solas (institucion-formulario.js):
       la universidad solo para facultad o campus; el número solo para afiliada;
       matriz solo para universidad; el domicilio es opcional para una matriz.
@@ -73,7 +75,7 @@
             </div>
 
             @if ($esNueva)
-                <div class="campo">
+                <div class="campo" data-paso-participacion @unless ($tipo) hidden @endunless>
                     <span class="campo__etiqueta" id="etiqueta-participacion">Participación <x-obligatorio /></span>
                     <div class="opciones-nivel__lista" role="radiogroup" aria-labelledby="etiqueta-participacion">
                         @foreach ($participaciones as $opcion)
@@ -95,7 +97,7 @@
                 </div>
             @endif
 
-            <div class="formulario__rejilla">
+            <div class="formulario__rejilla" data-paso-resto @if ($esNueva && ! ($tipo && $participacion)) hidden @endif>
                 <div class="campo" data-solo-afiliada @unless ($participacion === 'Afiliada') hidden @endunless>
                     <label for="numero" class="campo__etiqueta">Número de afiliación <x-obligatorio /></label>
                     <input id="numero" name="numero" type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" required
@@ -117,8 +119,14 @@
                     </div>
                 @endif
             </div>
+            @if ($esNueva)
+                <p class="formulario__guia" data-guia @if ($tipo && $participacion) hidden @endif>
+                    {{ $tipo ? 'Ahora elige su participación para continuar.' : 'Elige el tipo de institución para continuar.' }}
+                </p>
+            @endif
         </fieldset>
 
+        <div class="formulario__resto" data-paso-resto @if ($esNueva && ! ($tipo && $participacion)) hidden @endif>
         {{-- 2. Datos generales --}}
         <fieldset class="tarjeta seccion-formulario">
             <legend class="seccion-formulario__titulo">Datos generales</legend>
@@ -158,6 +166,7 @@
 
         {{-- 3. Domicilio (opcional para una matriz) --}}
         <x-campos-domicilio :domicilio="$institucion?->domicilio" :zonas="$zonas" :zona="$institucion?->zona_id" :obligatorio="! $esMatriz" />
+        </div>
 
         <div class="formulario__acciones">
             <button type="submit" class="boton boton--primario">

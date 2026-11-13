@@ -1,5 +1,6 @@
 /*
  * Formulario de institución ([data-institucion]): muestra solo lo que aplica.
+ * - Al registrar se avanza paso a paso: tipo → participación → lo demás.
  * - Universidad padre: solo para facultad o campus.
  * - Matriz: solo para universidad (si no, se desactiva esa opción).
  * - Número de afiliación: solo para afiliada.
@@ -38,6 +39,18 @@ if (formulario) {
         }
 
         const participacion = fija?.value ?? participaciones.find((r) => r.checked)?.value ?? '';
+
+        // Paso a paso (solo al registrar; al editar la participación ya está fija)
+        if (!fija) {
+            const conParticipacion = tipo !== '' && participacion !== '';
+            formulario.querySelectorAll('[data-paso-participacion]').forEach((bloque) => { bloque.hidden = tipo === ''; });
+            formulario.querySelectorAll('[data-paso-resto]').forEach((bloque) => { bloque.hidden = !conParticipacion; });
+            const guia = formulario.querySelector('[data-guia]');
+            if (guia) {
+                guia.hidden = conParticipacion;
+                guia.textContent = tipo === '' ? 'Elige el tipo de institución para continuar.' : 'Ahora elige su participación para continuar.';
+            }
+        }
 
         mostrar('[data-solo-con-universidad]', tipo === 'Facultad' || tipo === 'Campus');
         mostrar('[data-solo-afiliada]', participacion === 'Afiliada');

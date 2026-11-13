@@ -1,5 +1,7 @@
 {{--
     Instituciones: lista con filtros (en el servidor, porque pueden ser cientos).
+    Los filtros se aplican solos al elegir o al dejar de escribir; "Borrar
+    filtros" aparece cuando hay alguno activo.
     "Nueva institución" y "Editar" llevan a su pantalla. Desactivar y Activar
     piden la fecha (cierran o abren su periodo de participación). Borrar solo
     si no tiene personas, sedes ni puestos.
@@ -34,7 +36,8 @@
         <form method="GET" action="{{ route('instituciones.index') }}" class="filtros filtros--servidor" role="search" data-filtros-servidor>
             <label for="buscar-institucion" class="solo-lectores">Buscar por nombre o número</label>
             <input id="buscar-institucion" name="texto" type="search" class="campo__entrada filtros__buscar"
-                   placeholder="Buscar por nombre o número" value="{{ $filtros['texto'] }}" maxlength="100">
+                   placeholder="Buscar por nombre o número" value="{{ $filtros['texto'] }}" maxlength="100"
+                   data-filtro-escrito @if ($filtros['texto'] !== null) autofocus @endif>
 
             @php
                 $activos = collect($filtros)->except('texto')->filter()->count();
@@ -85,9 +88,11 @@
 
             </div>
 
-            <button type="submit" class="boton boton--discreto filtros__aplicar">Filtrar</button>
             @if ($hayFiltros)
-                <a href="{{ route('instituciones.index') }}" class="filtros__limpiar">Quitar filtros</a>
+                <a href="{{ route('instituciones.index') }}" class="boton boton--discreto filtros__borrar">
+                    <x-icono nombre="cerrar" />
+                    Borrar filtros
+                </a>
             @endif
         </form>
 
