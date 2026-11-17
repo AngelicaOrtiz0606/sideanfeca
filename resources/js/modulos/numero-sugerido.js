@@ -52,15 +52,19 @@ document.querySelectorAll('[data-numero-afiliacion]').forEach((bloque) => {
         const inicio = prefijo();
 
         // Vista previa del número automático
+        vista.toggleAttribute('data-pendiente', inicio === null);
         if (inicio === null) {
-            vista.textContent = '—';
-            ayuda.textContent = 'Se asigna al guardar, con el año y la zona regional.';
+            vista.textContent = 'Aparecerá aquí';
+            ayuda.textContent = bloque.dataset.zonaNumero
+                ? 'Se calcula al elegir la fecha.'
+                : 'Se calcula al elegir la zona regional (en Domicilio) y la fecha.';
         } else {
             const usados = existentes.filter((n) => n.startsWith(inicio)).map((n) => Number(n.slice(4)));
             const siguiente = (usados.length ? Math.max(...usados) : 0) + 1;
 
             if (siguiente > 999) {
                 vista.textContent = '—';
+                vista.setAttribute('data-pendiente', '');
                 ayuda.textContent = `Ya no hay consecutivos para el año ${inicio.slice(0, 2)} y la zona ${inicio.slice(2)}. Escribe el número.`;
             } else {
                 const numero = inicio + String(siguiente).padStart(3, '0');

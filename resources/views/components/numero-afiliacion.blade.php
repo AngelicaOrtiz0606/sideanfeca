@@ -31,8 +31,8 @@
     <input type="hidden" name="numero_modo" value="{{ $manual ? 'manual' : 'automatico' }}" data-numero-modo>
 
     <div class="numero-automatico" data-numero-automatico @if ($manual) hidden @endif>
-        <output class="numero-afiliacion numero-automatico__valor" data-numero-vista aria-live="polite">—</output>
-        <p class="campo__ayuda" data-numero-ayuda>Se asigna al guardar, con el año y la zona regional.</p>
+        <output class="numero-afiliacion numero-automatico__valor" data-numero-vista data-pendiente aria-live="polite">Aparecerá aquí</output>
+        <p class="campo__ayuda" data-numero-ayuda>Se calcula al elegir la zona regional (en Domicilio) y la fecha.</p>
         <button type="button" class="boton-texto" data-numero-escribir>Escribir el número</button>
     </div>
 

@@ -577,3 +577,13 @@ fieldset {
 .numero-manual > .campo__entrada {
     justify-self: stretch;
 }
+
+/* Aún sin zona o fecha: recuadro punteado que señala dónde aparecerá el número */
+.numero-automatico__valor[data-pendiente] {
+    border: 2px dashed var(--color-borde-control);
+    background: transparent;
+    color: var(--color-texto-suave);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: 0;
+}

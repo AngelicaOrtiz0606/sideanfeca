@@ -2,6 +2,11 @@
     Registro de una institución, en pantalla propia y por secciones. Se avanza
     paso a paso: primero el tipo; al elegirlo aparece la participación; al
     elegirla aparece lo demás. (Después se edita por secciones en su consulta.)
+    Secciones: tipo y participación (con la fecha) → datos generales → domicilio.
+    El número de afiliación se ve al final, junto a los botones: ahí termina
+    la captura y ya se conocen la zona y la fecha de las que depende.
+    "Registrar y capturar otra" guarda y regresa aquí conservando tipo,
+    universidad, participación, fecha y sector (para capturar muchas seguidas).
     - Las opciones que no aplican se ocultan solas (institucion-formulario.js):
       la universidad solo para facultad o campus; el número solo para afiliada;
       matriz solo para universidad; el domicilio es opcional para una matriz.
@@ -9,12 +14,14 @@
 @extends('layouts.admin')
 
 @php
-    $tipo = old('tipo');
-    $participacion = old('participacion');
-    $sector = old('sector');
+    // Al "Registrar y capturar otra" se conservan tipo, universidad, participación, fecha y sector
+    $tipo = old('tipo', $conservar['tipo'] ?? null);
+    $participacion = old('participacion', $conservar['participacion'] ?? null);
+    $sector = old('sector', $conservar['sector'] ?? null);
+    $desde = $conservar['desde'] ?? now()->toDateString();
     $esMatriz = $participacion === 'Matriz';
     $descripcionesTipo = ['Universidad' => 'Puede ser matriz o tener facultades y campus.', 'Facultad' => 'Pertenece a una universidad.', 'Campus' => 'Pertenece a una universidad.'];
-    $descripcionesParticipacion = ['Matriz' => 'Solo universidades. Sin número.', 'Afiliada' => 'Con número de afiliación de 7 dígitos.', 'Observadora' => 'Sin número de afiliación.'];
+    $descripcionesParticipacion = ['Matriz' => 'Solo universidades. Sin número.', 'Afiliada' => 'Su número de afiliación se calcula solo; lo verás junto al botón Registrar.', 'Observadora' => 'Sin número de afiliación.'];
 @endphp
 
 @section('titulo', 'Nueva institución')
@@ -30,6 +37,8 @@
             <h1 class="pagina__titulo">Nueva institución</h1>
         </div>
     </header>
+
+    <x-aviso-estado />
 
     <form method="POST" action="{{ route('instituciones.store') }}"
           class="formulario formulario--pantalla formulario--institucion" novalidate data-validar data-institucion>
@@ -57,7 +66,7 @@
 
             <div class="campo" data-solo-con-universidad @unless (in_array($tipo, ['Facultad', 'Campus'], true)) hidden @endunless>
                 <label for="universidad" class="campo__etiqueta">Universidad a la que pertenece <x-obligatorio /></label>
-                <x-buscador-universidad :universidades="$universidades" :elegida="old('universidad')"
+                <x-buscador-universidad :universidades="$universidades" :elegida="old('universidad', $conservar['universidad'] ?? null)"
                                         :desactivado="! in_array($tipo, ['Facultad', 'Campus'], true)" />
                 @if ($universidades->isEmpty())
                     <p class="campo__ayuda">Todavía no hay universidades registradas. Registra primero la universidad.</p>
@@ -78,18 +87,14 @@
                 <p class="campo__ayuda" data-aviso-matriz hidden>Solo una universidad puede ser matriz.</p>
             </div>
 
-            <div class="formulario__rejilla" data-paso-resto @unless ($tipo && $participacion) hidden @endunless>
-                <div class="campo campo--mitad">
-                    <label for="desde" class="campo__etiqueta">Participa desde <x-obligatorio /></label>
-                    <input id="desde" name="desde" type="date" required min="1900-01-01" max="{{ now()->toDateString() }}"
-                           class="campo__entrada" value="{{ old('desde', now()->toDateString()) }}"
-                           @if ($errors->has('desde')) aria-invalid="true" @endif>
-                    <p class="campo__ayuda">Se usa en el historial y en el filtro por año.</p>
-                </div>
-
-                <x-numero-afiliacion id="numero" :existentes="$numerosUsados" fecha="#desde" zona="#zona"
-                                     class="campo--mitad" data-solo-afiliada :hidden="$participacion !== 'Afiliada'" />
+            <div class="campo" data-paso-resto @unless ($tipo && $participacion) hidden @endunless>
+                <label for="desde" class="campo__etiqueta">Participa desde <x-obligatorio /></label>
+                <input id="desde" name="desde" type="date" required min="1900-01-01" max="{{ now()->toDateString() }}"
+                       class="campo__entrada campo__entrada--fecha" value="{{ old('desde', $desde) }}"
+                       @if ($errors->has('desde')) aria-invalid="true" @endif>
+                <p class="campo__ayuda">Se usa en el historial, en el filtro por año y en el número de afiliación.</p>
             </div>
+
             <p class="formulario__guia" data-guia @if ($tipo && $participacion) hidden @endif>
                 {{ $tipo ? 'Ahora elige su participación para continuar.' : 'Elige el tipo de institución para continuar.' }}
             </p>
@@ -132,14 +137,25 @@
 
         {{-- 3. Domicilio (opcional para una matriz) --}}
         <x-campos-domicilio :zonas="$zonas" :obligatorio="! $esMatriz" />
+
         </div>
 
-        <div class="formulario__acciones">
-            <button type="submit" class="boton boton--primario">
-                <x-icono nombre="correcto" />
-                Registrar institución
-            </button>
-            <a href="{{ route('instituciones.index') }}" class="boton boton--secundario">Cancelar</a>
+        {{-- Cierre: el número de afiliación se ve junto a los botones, donde termina la captura --}}
+        <div class="tarjeta cierre-registro">
+            <x-numero-afiliacion id="numero" :existentes="$numerosUsados" fecha="#desde" zona="#zona"
+                                 class="cierre-registro__numero" data-solo-afiliada :hidden="$participacion !== 'Afiliada'" />
+
+            <div class="cierre-registro__acciones">
+                <a href="{{ route('instituciones.index') }}" class="boton boton--secundario">Cancelar</a>
+                <button type="submit" name="despues" value="otra" class="boton boton--secundario">
+                    <x-icono nombre="mas" />
+                    Registrar y capturar otra
+                </button>
+                <button type="submit" class="boton boton--primario">
+                    <x-icono nombre="correcto" />
+                    Registrar institución
+                </button>
+            </div>
         </div>
     </form>
 @endsection

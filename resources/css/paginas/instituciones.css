@@ -222,3 +222,49 @@
     flex: none;
     margin-block: -0.25rem;
 }
+
+/*
+ * Cierre del registro: el número de afiliación a la izquierda y los botones a
+ * la derecha, en la misma franja, donde termina la captura. En pantallas
+ * angostas, uno debajo del otro y el botón principal primero.
+ */
+.cierre-registro {
+    display: grid;
+    gap: 1.25rem 2rem;
+}
+
+.cierre-registro__numero .campo__etiqueta {
+    color: var(--color-secundario);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.cierre-registro__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+@media (width >= 64rem) {
+    .cierre-registro {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+    }
+
+    /* Sin número (matriz u observadora): los botones siguen a la derecha */
+    .cierre-registro__acciones {
+        grid-column: 2;
+    }
+}
+
+@media (width < 40rem) {
+    .cierre-registro__acciones {
+        flex-direction: column-reverse;
+    }
+
+    .cierre-registro__acciones .boton {
+        justify-content: center;
+        width: 100%;
+    }
+}

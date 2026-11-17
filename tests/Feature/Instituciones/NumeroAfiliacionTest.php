@@ -45,7 +45,7 @@ class NumeroAfiliacionTest extends TestCase
     public function test_el_numero_automatico_es_ano_zona_y_consecutivo(): void
     {
         $this->actingAs($this->admin)->post('/instituciones', $this->afiliada('Facultad Uno', '2026-02-10', 7))
-            ->assertSessionHas('estado', 'Se registró Facultad Uno con el número 2607001.');
+            ->assertSessionHas('estado', 'Se registró Facultad Uno con el número de afiliación 2607001.');
 
         $this->assertSame('2607001', $this->numeroDe('Facultad Uno'));
     }
@@ -99,6 +99,20 @@ class NumeroAfiliacionTest extends TestCase
         $this->actingAs($this->admin)->post('/instituciones', $this->afiliada('Facultad Sin Lugar', '2026-02-10', 7))
             ->assertSessionHasErrors(['numero' => 'Ya no hay consecutivos para ese año y zona. Escribe el número.']);
         $this->assertNull($this->numeroDe('Facultad Sin Lugar'));
+    }
+
+    public function test_registrar_y_capturar_otra_regresa_al_formulario_conservando_lo_que_se_repite(): void
+    {
+        $this->actingAs($this->admin)->post('/instituciones', ['despues' => 'otra'] + $this->afiliada('Facultad Uno', '2026-02-10', 7))
+            ->assertRedirect('/instituciones/create')
+            ->assertSessionHas('estado', 'Se registró Facultad Uno con el número de afiliación 2607001.');
+
+        $this->actingAs($this->admin)->get('/instituciones/create')->assertOk()
+            ->assertSee('Se registró Facultad Uno con el número de afiliación 2607001.')
+            ->assertSee('value="Facultad" required checked', false)
+            ->assertSee('value="Afiliada" required checked', false)
+            ->assertSee('value="2026-02-10"', false)
+            ->assertDontSee('value="Facultad Uno"', false); // la razón social no se conserva
     }
 
     public function test_la_pantalla_muestra_el_numero_automatico_y_la_opcion_de_escribirlo(): void
