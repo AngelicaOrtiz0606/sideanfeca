@@ -430,3 +430,14 @@ a.paginacion__enlace:hover {
         order: 5;
     }
 }
+
+/* Sitio web debajo del nombre: enlace discreto */
+.tabla__enlace-web {
+    color: var(--color-enlace);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.tabla__enlace-web:hover {
+    text-decoration: underline;
+}

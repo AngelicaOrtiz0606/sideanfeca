@@ -428,6 +428,10 @@ fieldset {
         grid-column: span 8;
     }
 
+    .formulario__rejilla > .campo--completo {
+        grid-column: 1 / -1;
+    }
+
     .formulario__rejilla:has(> [hidden]) > .campo--mitad:not([hidden]) {
         grid-column: 1 / -1;
     }

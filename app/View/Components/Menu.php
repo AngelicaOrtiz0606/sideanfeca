@@ -38,6 +38,7 @@ class Menu extends Component
             'enlaces' => [
                 ['etiqueta' => 'Personas', 'ruta' => 'personas.index', 'privilegio' => 'gestionar_personas', 'icono' => 'personas'],
                 ['etiqueta' => 'Instituciones', 'ruta' => 'instituciones.index', 'privilegio' => 'gestionar_instituciones', 'icono' => 'institucion'],
+                ['etiqueta' => 'Organizaciones', 'ruta' => 'organizaciones.index', 'privilegio' => 'gestionar_instituciones', 'icono' => 'edificio'],
             ],
         ],
         [

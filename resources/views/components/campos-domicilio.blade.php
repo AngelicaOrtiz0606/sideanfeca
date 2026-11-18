@@ -10,8 +10,9 @@
       zona        zona elegida
       obligatorio si el domicilio es obligatorio (una matriz no lo necesita)
       enVentana   dentro de una ventana: sin tarjeta propia (la ventana ya tiene título)
+      conTitulo   en una ventana con otros datos: se muestra el subtítulo "Domicilio"
 --}}
-@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true, 'enVentana' => false])
+@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true, 'enVentana' => false, 'conTitulo' => false])
 
 @php
     $cp = old('codigo_postal', $domicilio?->codigo_postal);
@@ -21,7 +22,7 @@
 
 <fieldset @class(['tarjeta seccion-formulario' => ! $enVentana, 'seccion-ventana' => $enVentana]) data-domicilio data-url-codigo-postal="{{ route('codigos-postales.show', ['codigo' => '00000']) }}"
           data-obligatorio="{{ $obligatorio ? 'si' : 'no' }}">
-    <legend @class(['seccion-formulario__titulo' => ! $enVentana, 'solo-lectores' => $enVentana])>Domicilio <span class="seccion-formulario__nota" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></legend>
+    <legend @class(['seccion-formulario__titulo' => ! $enVentana, 'seccion-ventana__titulo' => $enVentana && $conTitulo, 'solo-lectores' => $enVentana && ! $conTitulo])>Domicilio <span class="seccion-formulario__nota" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></legend>
 
     <div class="formulario__rejilla">
         <div class="campo">
@@ -42,12 +43,16 @@
             <output class="campo__salida" data-municipio>{{ $domicilio?->municipio ?? '—' }}</output>
         </div>
 
-        <div class="campo campo--mitad">
+        {{-- Sin zona (por ejemplo, organizaciones), la colonia ocupa toda la fila --}}
+        <div @class(['campo', 'campo--mitad' => $zonas !== null, 'campo--completo' => $zonas === null])>
             <label for="colonia" class="campo__etiqueta">Colonia <x-obligatorio /></label>
             <select id="colonia" name="colonia" class="campo__entrada" data-colonias @required($obligatorio)
                     @if ($errors->has('colonia')) aria-invalid="true" @endif>
                 @if ($domicilio)
                     <option value="{{ $domicilio->colonia_id }}" selected>{{ $domicilio->colonia }}</option>
+                @elseif ($coloniaElegida)
+                    {{-- Reabierto tras un error: se conserva la colonia elegida mientras se recargan las demás --}}
+                    <option value="{{ $coloniaElegida }}" selected>Cargando colonias…</option>
                 @else
                     <option value="">Primero escribe el código postal</option>
                 @endif

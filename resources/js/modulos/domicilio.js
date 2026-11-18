@@ -105,6 +105,21 @@ document.querySelectorAll('[data-domicilio]').forEach((bloque) => {
         }
     });
 
+    // En una ventana compartida (por ejemplo, organizaciones): al abrirse para
+    // editar se cargan las colonias del código postal guardado, conservando la
+    // elegida; al abrirse para registrar queda limpio.
+    bloque.closest('dialog')?.addEventListener('dialogo:preparado', (evento) => {
+        const valores = JSON.parse(evento.detail.boton.dataset.valores ?? '{}');
+        ultimo = '';
+        zonaManual = false;
+        if (/^\d{5}$/.test(cp.value)) {
+            buscar(cp.value, String(valores.colonia ?? ''));
+        } else {
+            limpiar('Primero escribe el código postal');
+            avisar('');
+        }
+    });
+
     // Al editar: se carga la lista completa de colonias, conservando la elegida
     if (/^\d{5}$/.test(cp.value)) {
         zonaManual = true; // la zona guardada se respeta

@@ -10,6 +10,7 @@ use App\Http\Controllers\Catalogos\NivelAcademicoController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
+use App\Http\Controllers\Organizaciones\OrganizacionController;
 use App\Http\Controllers\PantallaPendienteController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,7 @@ Route::pattern('coordinacion', '[0-9]+');
 Route::pattern('cargo', '[0-9]+');
 Route::pattern('grado', '[0-9]+');
 Route::pattern('institucion', '[0-9]+');
+Route::pattern('organizacion', '[0-9]+');
 Route::pattern('codigo', '[0-9]{5}');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -65,6 +67,12 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::resource('instituciones', InstitucionController::class)
             ->parameters(['instituciones' => 'institucion'])
             ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
+
+        // Organizaciones (por ejemplo, CACECA): todo desde la lista, en ventanas
+        Route::patch('/organizaciones/{organizacion}/estado', [OrganizacionController::class, 'cambiarEstado'])->name('organizaciones.estado');
+        Route::resource('organizaciones', OrganizacionController::class)
+            ->parameters(['organizaciones' => 'organizacion'])
+            ->only(['index', 'store', 'update', 'destroy']);
     });
 
     // Catálogos (M3)
