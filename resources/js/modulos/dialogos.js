@@ -11,10 +11,14 @@
  *   data-boton="Guardar"         texto del botón de enviar ([data-dialogo-boton])
  *   data-valores='{"nombre":…}'  valores de los campos, por su atributo name
  *   data-bloqueo="No se puede…"  muestra [data-si-bloqueo] en lugar de [data-sin-bloqueo]
+ *   data-etiqueta="…"            texto de la etiqueta variable ([data-dialogo-etiqueta])
+ *   data-atributos='{"fecha":{"min":"2020-01-01"}}'  atributos de los campos, por su name
  *
  *   <button data-cerrar-dialogo>        la cierra (también la tecla Esc)
  *   <dialog data-abrir-al-cargar>       se abre sola al cargar (el servidor
  *                                       la marca si hubo errores al guardar)
+ *   <dialog data-reiniciar>             al abrirse vuelve a los datos guardados
+ *                                       (lo escrito y cancelado no se queda)
  *
  * Antes de abrirse, la ventana recibe el evento "dialogo:preparado" para
  * que cada pantalla agregue lo suyo (por ejemplo, las entidades de una zona).
@@ -22,6 +26,10 @@
 function preparar(dialogo, boton) {
     const formulario = dialogo.querySelector('form');
     const datos = boton.dataset;
+
+    if (formulario && dialogo.dataset.reiniciar !== undefined) {
+        formulario.reset();
+    }
 
     if (formulario && datos.accion) {
         formulario.action = datos.accion;
@@ -32,7 +40,7 @@ function preparar(dialogo, boton) {
         metodo.value = datos.metodo;
     }
 
-    [['titulo', '[data-dialogo-titulo]'], ['texto', '[data-dialogo-texto]'], ['boton', '[data-dialogo-boton]']].forEach(([clave, selector]) => {
+    [['titulo', '[data-dialogo-titulo]'], ['texto', '[data-dialogo-texto]'], ['boton', '[data-dialogo-boton]'], ['etiqueta', '[data-dialogo-etiqueta]']].forEach(([clave, selector]) => {
         const elemento = dialogo.querySelector(selector);
         if (elemento && datos[clave] !== undefined) {
             elemento.textContent = datos[clave];
@@ -46,6 +54,13 @@ function preparar(dialogo, boton) {
             if (campo && 'value' in campo) {
                 campo.value = valor ?? '';
             }
+        });
+    }
+
+    if (datos.atributos && formulario) {
+        Object.entries(JSON.parse(datos.atributos)).forEach(([nombre, atributos]) => {
+            const campo = formulario.elements.namedItem(nombre);
+            Object.entries(atributos).forEach(([atributo, valor]) => campo?.setAttribute(atributo, valor));
         });
     }
 

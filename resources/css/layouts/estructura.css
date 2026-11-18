@@ -29,10 +29,13 @@
     min-width: 0;
 }
 
+/* En pantallas muy anchas el contenido se centra: queda el mismo espacio
+   junto al menú que junto a la barra de desplazamiento */
 .contenido {
     flex: 1;
     width: 100%;
-    max-width: 80rem;
+    max-width: var(--ancho-contenido);
+    margin-inline: auto;
     padding: 2rem 1rem 3rem;
 }
 

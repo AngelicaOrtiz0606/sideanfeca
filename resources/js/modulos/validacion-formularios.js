@@ -77,7 +77,8 @@ function campoEsValido(campo) {
 }
 
 document.querySelectorAll('form[data-validar]').forEach((formulario) => {
-    const boton = formulario.querySelector('[type="submit"]');
+    // Un formulario puede tener más de un botón de guardar
+    const botones = [...formulario.querySelectorAll('[type="submit"]')];
     const campos = [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
     const escritos = new Set();
 
@@ -93,7 +94,8 @@ document.querySelectorAll('form[data-validar]').forEach((formulario) => {
             return valido;
         });
 
-        boton.disabled = !resultados.every(Boolean);
+        const completo = resultados.every(Boolean);
+        botones.forEach((boton) => { boton.disabled = !completo; });
     };
 
     campos.forEach((campo) => {

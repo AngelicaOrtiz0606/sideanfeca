@@ -50,7 +50,9 @@
                 </thead>
                 <tbody>
                     @foreach ($zonas as $zona)
-                        @php($etiqueta = "Zona {$zona->zore_numero} · {$zona->zore_nombre}")
+                        @php
+                            $etiqueta = "Zona {$zona->zore_numero} · {$zona->zore_nombre}";
+                        @endphp
                         <tr>
                             <td class="tabla__numero" data-etiqueta="Número">
                                 <span class="numero-zona">{{ $zona->zore_numero }}</span>

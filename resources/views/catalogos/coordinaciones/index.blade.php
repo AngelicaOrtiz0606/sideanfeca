@@ -58,7 +58,9 @@
                 </thead>
                 <tbody>
                     @foreach ($coordinaciones as $coordinacion)
-                        @php($id = $coordinacion->cona_id_coordinacion_nacional)
+                        @php
+                            $id = $coordinacion->cona_id_coordinacion_nacional;
+                        @endphp
                         <tr @class(['tabla__fila--inactiva' => ! $coordinacion->cona_activo])>
                             <td class="tabla__numero" data-etiqueta="Orden">
                                 <span class="numero-orden">{{ $coordinacion->cona_orden }}</span>

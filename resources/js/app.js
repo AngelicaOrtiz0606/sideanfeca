@@ -16,6 +16,12 @@
  *   filtro-tabla.js             filtro rápido de una tabla (texto y grupo)
  *   cargo-nivel.js              nivel del cargo en su ventana
  *   nombres-unicos.js           aviso inmediato de nombres repetidos en catálogos
+ *   domicilio.js                código postal → entidad, municipio, colonias y zona
+ *   institucion-formulario.js   formulario de institución: muestra solo lo que aplica
+ *   filtros-servidor.js         filtros de listas largas (se aplican al cambiar)
+ *   buscador-universidad.js     buscar la universidad escribiendo (con zona y entidad)
+ *   numero-sugerido.js          número de afiliación sugerido (año, zona y consecutivo)
+ *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
  */
 import './modulos/menu-movil.js';
@@ -30,3 +36,9 @@ import './modulos/ordenar-lista.js';
 import './modulos/filtro-tabla.js';
 import './modulos/cargo-nivel.js';
 import './modulos/nombres-unicos.js';
+import './modulos/domicilio.js';
+import './modulos/institucion-formulario.js';
+import './modulos/filtros-servidor.js';
+import './modulos/buscador-universidad.js';
+import './modulos/pestanas.js';
+import './modulos/numero-sugerido.js';

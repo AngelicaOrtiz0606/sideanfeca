@@ -1,6 +1,7 @@
 /*
  * Aviso inmediato en los textos de los catálogos, mientras se escribe.
  *
+ * 0. Formato (data-mensaje-formato): número de 7 dígitos, código postal, sitio web.
  * 1. Texto seguro (campos con data-texto-seguro): sin caracteres de control,
  *    sin < ni >, y sin empezar con = + - @ (igual que App\Rules\TextoSeguro).
  * 2. Nombres repetidos:
@@ -67,9 +68,26 @@ function repetidoDe(campo) {
         : null;
 }
 
-function revisar(campo) {
+// Formato (patrón o dirección web mal escrita), con el mensaje de data-mensaje-formato
+// Mientras se escribe un número de 7 dígitos no se regaña desde el primero:
+// el aviso sale al salir del campo o al llegar al largo completo.
+function problemaDeFormato(campo, alEscribir) {
+    if (!campo.dataset.mensajeFormato || campo.value.trim() === '') {
+        return null;
+    }
+    const malo = campo.validity.patternMismatch || campo.validity.typeMismatch;
+    const completo = campo.maxLength > 0 && campo.value.length >= campo.maxLength;
+    return malo && (!alEscribir || completo || campo.type === 'url') ? campo.dataset.mensajeFormato : null;
+}
+
+function revisar(campo, alEscribir = false) {
+    if (campo.disabled) {
+        return;
+    }
+
+    campo.setCustomValidity('');
     const inseguro = campo.hasAttribute('data-texto-seguro') ? problemaDeTexto(campo.value) : null;
-    const mensaje = inseguro ?? repetidoDe(campo);
+    const mensaje = inseguro ?? problemaDeFormato(campo, alEscribir) ?? repetidoDe(campo);
 
     const retro = retroDe(campo);
     if (mensaje) {
@@ -88,10 +106,11 @@ function revisar(campo) {
     }
 }
 
-const CAMPOS = '[data-existentes], [data-texto-seguro]';
+const CAMPOS = '[data-existentes], [data-texto-seguro], [data-mensaje-formato]';
 
 document.querySelectorAll(CAMPOS).forEach((campo) => {
-    campo.addEventListener('input', () => revisar(campo));
+    campo.addEventListener('input', () => revisar(campo, true));
+    campo.addEventListener('change', () => revisar(campo));
 });
 
 // Al abrir una ventana ya llena (Editar), se revisa desde el principio

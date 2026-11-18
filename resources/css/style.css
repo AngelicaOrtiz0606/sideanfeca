@@ -50,6 +50,7 @@
 
 /* ---------- Medidas e imágenes compartidas ---------- */
 :root {
+    --ancho-contenido: 96rem; /* ancho máximo del contenido y del pie, centrados */
     /* Imágenes usadas desde el CSS: si cambian de lugar, solo se corrige aquí */
     --imagen-cintilla: url('/img/cintilla.jpg');
     --imagen-fondo: url('/img/fondo.jpg');

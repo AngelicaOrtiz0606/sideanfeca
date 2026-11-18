@@ -9,6 +9,8 @@ use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\NivelAcademicoController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\InicioController;
+use App\Http\Controllers\Instituciones\InstitucionController;
+use App\Http\Controllers\Organizaciones\OrganizacionController;
 use App\Http\Controllers\PantallaPendienteController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +19,8 @@ Route::pattern('zona', '[0-9]+');
 Route::pattern('coordinacion', '[0-9]+');
 Route::pattern('cargo', '[0-9]+');
 Route::pattern('grado', '[0-9]+');
+Route::pattern('institucion', '[0-9]+');
+Route::pattern('organizacion', '[0-9]+');
 Route::pattern('codigo', '[0-9]{5}');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -54,6 +58,22 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         ->defaults('titulo', 'Bitácora')
         ->middleware(Privilegio::VerBitacora->middleware())
         ->name('bitacora.index');
+
+    // Instituciones (M4): pantalla propia para registrar, consultar y editar
+    Route::middleware(Privilegio::GestionarInstituciones->middleware())->group(function () {
+        Route::patch('/instituciones/{institucion}/estado', [InstitucionController::class, 'cambiarEstado'])->name('instituciones.estado');
+        Route::patch('/instituciones/{institucion}/razon-social', [InstitucionController::class, 'cambiarRazonSocial'])->name('instituciones.razon-social');
+        Route::patch('/instituciones/{institucion}/participacion', [InstitucionController::class, 'cambiarParticipacion'])->name('instituciones.participacion');
+        Route::resource('instituciones', InstitucionController::class)
+            ->parameters(['instituciones' => 'institucion'])
+            ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
+
+        // Organizaciones (por ejemplo, CACECA): todo desde la lista, en ventanas
+        Route::patch('/organizaciones/{organizacion}/estado', [OrganizacionController::class, 'cambiarEstado'])->name('organizaciones.estado');
+        Route::resource('organizaciones', OrganizacionController::class)
+            ->parameters(['organizaciones' => 'organizacion'])
+            ->only(['index', 'store', 'update', 'destroy']);
+    });
 
     // Catálogos (M3)
     // Catálogo de SEPOMEX: solo se lee, para llenar domicilios desde el código postal (M4)

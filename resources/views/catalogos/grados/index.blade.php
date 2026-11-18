@@ -48,7 +48,9 @@
                 </thead>
                 <tbody>
                     @foreach ($grados as $grado)
-                        @php($id = $grado->niac_id_nivel_academico)
+                        @php
+                            $id = $grado->niac_id_nivel_academico;
+                        @endphp
                         <tr @class(['tabla__fila--inactiva' => ! $grado->niac_activo])>
                             <th scope="row" data-etiqueta="Grado"><span class="tabla__principal">{{ $grado->niac_nombre }}</span></th>
                             <td data-etiqueta="Abreviatura">{{ $grado->niac_abr_m }} <span class="tabla__separador">/</span> {{ $grado->niac_abr_f }}</td>

@@ -34,6 +34,7 @@
 @import './paginas/inicio.css';
 @import './paginas/avisos.css';
 @import './paginas/catalogos.css';
+@import './paginas/instituciones.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
