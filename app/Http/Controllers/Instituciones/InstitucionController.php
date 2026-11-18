@@ -58,17 +58,6 @@ class InstitucionController extends Controller
 
         $mensaje = "Se registró {$datos['razon_social']}".($numero ? " con el número de afiliación {$numero}" : '').'.';
 
-        // "Registrar y capturar otra": regresa al formulario vacío, conservando lo que suele repetirse
-        if ($request->input('despues') === 'otra') {
-            return redirect()->route('instituciones.create')->with('estado', $mensaje)->with('conservar', [
-                'tipo' => $datos['tipo'],
-                'universidad' => $datos['universidad'],
-                'participacion' => $datos['participacion'],
-                'desde' => $datos['desde'],
-                'sector' => $datos['sector'],
-            ]);
-        }
-
         return redirect()->route('instituciones.index')->with('estado', $mensaje);
     }
 
@@ -172,7 +161,6 @@ class InstitucionController extends Controller
     private function formulario(): View
     {
         return view('instituciones.formulario', [
-            'conservar' => session('conservar', []),
             'tipos' => InstitucionService::TIPOS,
             'participaciones' => InstitucionService::PARTICIPACIONES,
             'sectores' => InstitucionService::SECTORES,

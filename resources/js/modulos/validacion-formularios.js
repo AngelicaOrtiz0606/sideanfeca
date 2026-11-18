@@ -77,7 +77,7 @@ function campoEsValido(campo) {
 }
 
 document.querySelectorAll('form[data-validar]').forEach((formulario) => {
-    // Puede haber más de un botón de guardar (por ejemplo, "Registrar y capturar otra")
+    // Un formulario puede tener más de un botón de guardar
     const botones = [...formulario.querySelectorAll('[type="submit"]')];
     const campos = [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
     const escritos = new Set();

@@ -5,8 +5,6 @@
     Secciones: tipo y participación (con la fecha) → datos generales → domicilio.
     El número de afiliación se ve al final, junto a los botones: ahí termina
     la captura y ya se conocen la zona y la fecha de las que depende.
-    "Registrar y capturar otra" guarda y regresa aquí conservando tipo,
-    universidad, participación, fecha y sector (para capturar muchas seguidas).
     - Las opciones que no aplican se ocultan solas (institucion-formulario.js):
       la universidad solo para facultad o campus; el número solo para afiliada;
       matriz solo para universidad; el domicilio es opcional para una matriz.
@@ -14,11 +12,10 @@
 @extends('layouts.admin')
 
 @php
-    // Al "Registrar y capturar otra" se conservan tipo, universidad, participación, fecha y sector
-    $tipo = old('tipo', $conservar['tipo'] ?? null);
-    $participacion = old('participacion', $conservar['participacion'] ?? null);
-    $sector = old('sector', $conservar['sector'] ?? null);
-    $desde = $conservar['desde'] ?? now()->toDateString();
+    $tipo = old('tipo');
+    $participacion = old('participacion');
+    $sector = old('sector');
+    $desde = now()->toDateString();
     $esMatriz = $participacion === 'Matriz';
     $descripcionesTipo = ['Universidad' => 'Puede ser matriz o tener facultades y campus.', 'Facultad' => 'Pertenece a una universidad.', 'Campus' => 'Pertenece a una universidad.'];
     $descripcionesParticipacion = ['Matriz' => 'Solo universidades. Sin número.', 'Afiliada' => 'Su número de afiliación se calcula solo; lo verás junto al botón Registrar.', 'Observadora' => 'Sin número de afiliación.'];
@@ -37,8 +34,6 @@
             <h1 class="pagina__titulo">Nueva institución</h1>
         </div>
     </header>
-
-    <x-aviso-estado />
 
     <form method="POST" action="{{ route('instituciones.store') }}"
           class="formulario formulario--pantalla formulario--institucion" novalidate data-validar data-institucion>
@@ -66,7 +61,7 @@
 
             <div class="campo" data-solo-con-universidad @unless (in_array($tipo, ['Facultad', 'Campus'], true)) hidden @endunless>
                 <label for="universidad" class="campo__etiqueta">Universidad a la que pertenece <x-obligatorio /></label>
-                <x-buscador-universidad :universidades="$universidades" :elegida="old('universidad', $conservar['universidad'] ?? null)"
+                <x-buscador-universidad :universidades="$universidades" :elegida="old('universidad')"
                                         :desactivado="! in_array($tipo, ['Facultad', 'Campus'], true)" />
                 @if ($universidades->isEmpty())
                     <p class="campo__ayuda">Todavía no hay universidades registradas. Registra primero la universidad.</p>
@@ -147,10 +142,6 @@
 
             <div class="cierre-registro__acciones">
                 <a href="{{ route('instituciones.index') }}" class="boton boton--secundario">Cancelar</a>
-                <button type="submit" name="despues" value="otra" class="boton boton--secundario">
-                    <x-icono nombre="mas" />
-                    Registrar y capturar otra
-                </button>
                 <button type="submit" class="boton boton--primario">
                     <x-icono nombre="correcto" />
                     Registrar institución
