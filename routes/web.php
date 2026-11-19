@@ -12,6 +12,7 @@ use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
 use App\Http\Controllers\PantallaPendienteController;
+use App\Http\Controllers\Puestos\PuestoController;
 use Illuminate\Support\Facades\Route;
 
 // Los identificadores en las direcciones son siempre números
@@ -21,6 +22,7 @@ Route::pattern('cargo', '[0-9]+');
 Route::pattern('grado', '[0-9]+');
 Route::pattern('institucion', '[0-9]+');
 Route::pattern('organizacion', '[0-9]+');
+Route::pattern('puesto', '[0-9]+');
 Route::pattern('codigo', '[0-9]{5}');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -73,6 +75,12 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::resource('organizaciones', OrganizacionController::class)
             ->parameters(['organizaciones' => 'organizacion'])
             ->only(['index', 'store', 'update', 'destroy']);
+    });
+
+    // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas
+    Route::middleware(Privilegio::GestionarPuestos->middleware())->group(function () {
+        Route::patch('/puestos/{puesto}/estado', [PuestoController::class, 'cambiarEstado'])->name('puestos.estado');
+        Route::resource('puestos', PuestoController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
     // Catálogos (M3)

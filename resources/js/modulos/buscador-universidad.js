@@ -20,7 +20,7 @@ document.querySelectorAll('[data-buscador-universidad]').forEach((buscador) => {
     const visibles = () => opciones.filter((o) => !o.hidden);
 
     const validar = () => {
-        texto.setCustomValidity(texto.required && !texto.disabled && valor.value === '' ? 'Elige una universidad de la lista.' : '');
+        texto.setCustomValidity(texto.required && !texto.disabled && valor.value === '' ? (buscador.dataset.mensaje || 'Elige una de la lista.') : '');
     };
 
     const abrir = (abierta) => {
@@ -100,7 +100,17 @@ document.querySelectorAll('[data-buscador-universidad]').forEach((buscador) => {
 
     texto.addEventListener('blur', () => abrir(false));
 
-    // Al mostrarse u ocultarse (tipo de institución), se revisa otra vez
+    // En una ventana compartida: al abrirse, muestra la elegida (o queda vacío)
+    const sincronizar = () => {
+        const opcion = opciones.find((o) => o.dataset.id === valor.value);
+        texto.value = opcion?.dataset.nombre ?? '';
+        detalle.textContent = opcion?.dataset.detalle ?? '';
+        validar();
+    };
+    buscador.closest('dialog')?.addEventListener('dialogo:preparado', sincronizar);
+    buscador.closest('form')?.addEventListener('reset', () => setTimeout(sincronizar));
+
+        // Al mostrarse u ocultarse (tipo de institución), se revisa otra vez
     new MutationObserver(validar).observe(texto, { attributes: true, attributeFilter: ['disabled'] });
     validar();
 });

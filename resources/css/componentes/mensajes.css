@@ -45,3 +45,13 @@
     padding: 0;
     list-style: none;
 }
+
+/* Un aviso oculto no ocupa lugar */
+.aviso[hidden] {
+    display: none;
+}
+
+/* Dentro de una ventana, la separación la da el formulario */
+.dialogo .aviso {
+    margin-bottom: 0;
+}

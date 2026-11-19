@@ -591,3 +591,17 @@ fieldset {
     font-weight: 500;
     letter-spacing: 0;
 }
+
+/* Casilla en una línea completa (por ejemplo, "Es el titular de la institución") */
+.opcion-en-linea--casilla {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 3rem;
+    padding: 0.625rem 1rem;
+}
+
+/* Campo que no se puede cambiar (por ejemplo, el ámbito de un puesto con historia) */
+.campo--fijo {
+    opacity: 0.65;
+    pointer-events: none;
+}

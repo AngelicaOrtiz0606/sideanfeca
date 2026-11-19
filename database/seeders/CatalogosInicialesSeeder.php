@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Es seguro correrlo varias veces: actualiza en lugar de duplicar.
  * Las zonas de cada entidad se pueden cambiar después desde la pantalla.
- * Los cargos NO se cargan aquí: se capturan desde la pantalla.
+ * Los cargos NO se cargan aquí: los base vienen en CargosBaseSeeder y los demás se capturan desde la pantalla.
  */
 class CatalogosInicialesSeeder extends Seeder
 {

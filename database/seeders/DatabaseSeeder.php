@@ -14,6 +14,7 @@ use Illuminate\Database\Seeder;
  *   1. SeguridadSeeder: privilegios, roles y sus permisos.
  *   2. CatalogosInicialesSeeder: zonas, entidades y coordinaciones.
  *   3. GradosAcademicosSeeder: Licenciatura, Maestría y Doctorado.
+ *   4. CargosBaseSeeder: los cargos base de ANFECA (nacionales, regionales e institucionales).
  *
  * Municipios y colonias no van aquí: se cargan con
  *   php artisan catalogos:importar-correos
@@ -26,6 +27,7 @@ class DatabaseSeeder extends Seeder
             SeguridadSeeder::class,
             CatalogosInicialesSeeder::class,
             GradosAcademicosSeeder::class,
+            CargosBaseSeeder::class,
         ]);
     }
 }

@@ -9,7 +9,7 @@
  *   data-titulo="Editar zona"    texto del título ([data-dialogo-titulo])
  *   data-texto="..."             texto de apoyo ([data-dialogo-texto])
  *   data-boton="Guardar"         texto del botón de enviar ([data-dialogo-boton])
- *   data-valores='{"nombre":…}'  valores de los campos, por su atributo name
+ *   data-valores='{"nombre":…}'  valores de los campos, por su atributo name (casillas: true/false)
  *   data-bloqueo="No se puede…"  muestra [data-si-bloqueo] en lugar de [data-sin-bloqueo]
  *   data-etiqueta="…"            texto de la etiqueta variable ([data-dialogo-etiqueta])
  *   data-atributos='{"fecha":{"min":"2020-01-01"}}'  atributos de los campos, por su name
@@ -51,7 +51,9 @@ function preparar(dialogo, boton) {
         const valores = JSON.parse(datos.valores);
         Object.entries(valores).forEach(([nombre, valor]) => {
             const campo = formulario.elements.namedItem(nombre);
-            if (campo && 'value' in campo) {
+            if (campo?.type === 'checkbox') {
+                campo.checked = Boolean(valor);
+            } else if (campo && 'value' in campo) {
                 campo.value = valor ?? '';
             }
         });

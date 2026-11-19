@@ -20,7 +20,8 @@
         <input type="hidden" name="_id" value="{{ old('_id') }}">
 
         <h2 id="dialogo-borrar-titulo" class="dialogo__titulo" data-dialogo-titulo>{{ $titulo }}</h2>
-        <p class="dialogo__texto">No se puede deshacer. Queda en la bitácora con su motivo.</p>
+        {{-- El botón Borrar puede cambiar este texto con data-texto (por ejemplo, si también se borran sus puestos vacíos) --}}
+        <p class="dialogo__texto" data-dialogo-texto>No se puede deshacer. Queda en la bitácora con su motivo.</p>
 
         @if ($abrir)
             <x-errores-formulario />

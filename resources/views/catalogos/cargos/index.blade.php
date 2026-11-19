@@ -113,6 +113,7 @@
                                             data-accion="{{ route('cargos.destroy', $id) }}"
                                             data-titulo="¿Borrar el cargo {{ $cargo->carg_nombre_m }}?"
                                             data-bloqueo="{{ $cargo->motivo_para_no_borrar }}"
+                                            data-texto="{{ $cargo->texto_al_borrar }}"
                                             data-valores="{{ json_encode(['_id' => $id, 'motivo' => '']) }}">
                                         <x-icono nombre="papelera" />
                                         <span class="accion__texto">Borrar <span class="solo-lectores">{{ $cargo->carg_nombre_m }}</span></span>

@@ -21,6 +21,7 @@
  *   filtros-servidor.js         filtros de listas largas (se aplican al cambiar)
  *   buscador-universidad.js     buscar la universidad escribiendo (con zona y entidad)
  *   numero-sugerido.js          número de afiliación sugerido (año, zona y consecutivo)
+ *   puesto-formulario.js        ventana de puesto: muestra lo que aplica según el nivel del cargo
  *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
  */
@@ -42,3 +43,4 @@ import './modulos/filtros-servidor.js';
 import './modulos/buscador-universidad.js';
 import './modulos/pestanas.js';
 import './modulos/numero-sugerido.js';
+import './modulos/puesto-formulario.js';
