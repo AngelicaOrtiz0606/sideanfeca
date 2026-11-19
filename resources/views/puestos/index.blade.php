@@ -33,24 +33,16 @@
 
     <x-aviso-estado />
 
-    <section class="tarjeta tarjeta--tabla" aria-label="Lista de puestos" data-filtro-tabla>
+    <section class="tarjeta tarjeta--tabla" aria-label="Lista de puestos">
         @if ($puestos->isEmpty())
             <p class="vacio vacio--en-tabla">Todavía no hay puestos. Registra el primero con <strong>Nuevo puesto</strong>.</p>
         @else
-            <div class="filtros">
-                <label for="buscar-puesto" class="solo-lectores">Buscar puesto</label>
-                <input id="buscar-puesto" type="search" class="campo__entrada filtros__buscar" placeholder="Buscar puesto o persona" data-filtro-texto>
-
-                <div class="filtros__grupo" role="group" aria-label="Filtrar por nivel">
-                    <button type="button" class="filtro" aria-pressed="true" data-filtro-valor="">Todos <span class="filtro__cifra">{{ $puestos->count() }}</span></button>
-                    @foreach ($niveles as $nivel)
-                        <button type="button" class="filtro" aria-pressed="false" data-filtro-valor="{{ $nivel }}">
-                            {{ $nivel }} <span class="filtro__cifra">{{ $puestos->where('nivel', $nivel)->count() }}</span>
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-
+            <x-filtros-lista ruta="puestos.index" :filtros="$filtros" id="buscar-puesto" placeholder="Buscar puesto o persona"
+                             :grupos="collect($niveles)->mapWithKeys(fn ($n) => [$n => $puestos->where('nivel', $n)->count()])->all()"
+                             :total="$puestos->count()" />
+            @if ($pagina->isEmpty())
+                <p class="vacio vacio--en-tabla">Ningún puesto coincide con la búsqueda.</p>
+            @else
             <table class="tabla">
                 <thead>
                     <tr>
@@ -62,14 +54,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($puestos as $puesto)
+                    @foreach ($pagina as $puesto)
                         @php
                             $id = $puesto->id;
                             $nombre = $puesto->cargo.' · '.$puesto->ambito;
                         @endphp
-                        <tr @class(['tabla__fila--inactiva' => ! $puesto->activo])
-                            data-filtro-fila data-grupo="{{ $puesto->nivel }}"
-                            data-texto="{{ $puesto->cargo }} {{ $puesto->cargo_f }} {{ $puesto->ambito }} {{ $puesto->ocupante }}">
+                        <tr @class(['tabla__fila--inactiva' => ! $puesto->activo])>
                             <th scope="row" data-etiqueta="Puesto">
                                 <span class="tabla__principal">{{ $puesto->cargo }}</span>
                                 {{-- Un puesto nacional sin coordinación no repite "Nacional" (ya lo dice su nivel) --}}
@@ -140,7 +130,9 @@
                     @endforeach
                 </tbody>
             </table>
-            <p class="vacio vacio--en-tabla" data-filtro-vacio hidden>Ningún puesto coincide con la búsqueda.</p>
+
+            <x-paginacion :paginas="$pagina" />
+            @endif
         @endif
     </section>
 

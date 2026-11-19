@@ -8,6 +8,7 @@ use App\Http\Requests\Catalogos\ZonaRequest;
 use App\Models\EntidadFederativa;
 use App\Models\ZonaRegional;
 use App\Services\Catalogos\ZonaService;
+use App\Support\Paginacion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -23,8 +24,11 @@ class ZonaController extends Controller
 
     public function index(): View
     {
+        $zonas = $this->zonas->listado();
+
         return view('catalogos.zonas.index', [
-            'zonas' => $this->zonas->listado(),
+            'zonas' => $zonas,
+            'pagina' => Paginacion::de($zonas),
             'numerosLibres' => $this->zonas->numerosLibres(),
             'entidades' => $this->entidades(),
             'motivos' => EliminarRequest::MOTIVOS,
@@ -36,7 +40,7 @@ class ZonaController extends Controller
         return view('catalogos.zonas.show', [
             'zona' => $zona,
             'entidades' => $zona->entidades,
-            'instituciones' => $this->zonas->instituciones($zona),
+            'instituciones' => Paginacion::de($this->zonas->instituciones($zona)),
             'todasLasEntidades' => $this->entidades(),
             'todasLasZonas' => $this->zonas->listado(),
         ]);

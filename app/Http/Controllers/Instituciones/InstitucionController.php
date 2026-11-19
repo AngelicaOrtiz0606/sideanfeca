@@ -9,6 +9,7 @@ use App\Http\Requests\Instituciones\InstitucionRequest;
 use App\Http\Requests\Instituciones\ParticipacionRequest;
 use App\Http\Requests\Instituciones\RazonSocialRequest;
 use App\Services\Instituciones\InstitucionService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,7 +81,7 @@ class InstitucionController extends Controller
             'pestana' => $pestana,
             'participaciones' => $this->instituciones->historialParticipacion($institucion),
             'nombres' => $this->instituciones->historialNombres($institucion),
-            'sedes' => $esUniversidad ? $this->instituciones->sedes($institucion) : collect(),
+            'sedes' => Paginacion::de($esUniversidad ? $this->instituciones->sedes($institucion) : collect(), 'pagina_sedes'),
             'inicios' => $this->instituciones->iniciosVigentes($institucion),
             'posibles' => $this->instituciones->participacionesPosibles($encontrada),
             'motivoParticipacion' => $this->instituciones->motivoParaNoCambiarParticipacion($encontrada),

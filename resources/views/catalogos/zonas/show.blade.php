@@ -50,7 +50,7 @@
     <section class="tarjeta" aria-labelledby="instituciones-titulo">
         <div class="tarjeta__encabezado">
             <h2 id="instituciones-titulo" class="seccion__titulo">Instituciones</h2>
-            <span class="cifra">{{ $instituciones->count() }}</span>
+            <span class="cifra">{{ $instituciones->total() }}</span>
         </div>
 
         @if ($instituciones->isEmpty())
@@ -76,6 +76,8 @@
                     @endforeach
                 </tbody>
             </table>
+
+            <x-paginacion :paginas="$instituciones" />
         @endif
     </section>
 

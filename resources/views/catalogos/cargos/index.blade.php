@@ -33,24 +33,16 @@
 
     <x-aviso-estado />
 
-    <section class="tarjeta tarjeta--tabla" aria-label="Lista de cargos" data-filtro-tabla>
+    <section class="tarjeta tarjeta--tabla" aria-label="Lista de cargos">
         @if ($cargos->isEmpty())
             <p class="vacio vacio--en-tabla">Todavía no hay cargos. Registra el primero con <strong>Nuevo cargo</strong>.</p>
         @else
-            <div class="filtros">
-                <label for="buscar-cargo" class="solo-lectores">Buscar cargo</label>
-                <input id="buscar-cargo" type="search" class="campo__entrada filtros__buscar" placeholder="Buscar cargo" data-filtro-texto>
-
-                <div class="filtros__grupo" role="group" aria-label="Filtrar por nivel">
-                    <button type="button" class="filtro" aria-pressed="true" data-filtro-valor="">Todos <span class="filtro__cifra">{{ $cargos->count() }}</span></button>
-                    @foreach ($niveles as $nivel)
-                        <button type="button" class="filtro" aria-pressed="false" data-filtro-valor="{{ $nivel }}">
-                            {{ $nivel }} <span class="filtro__cifra">{{ $cargos->where('carg_nivel', $nivel)->count() }}</span>
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-
+            <x-filtros-lista ruta="cargos.index" :filtros="$filtros" id="buscar-cargo" placeholder="Buscar cargo"
+                             :grupos="collect($niveles)->mapWithKeys(fn ($n) => [$n => $cargos->where('carg_nivel', $n)->count()])->all()"
+                             :total="$cargos->count()" />
+            @if ($pagina->isEmpty())
+                <p class="vacio vacio--en-tabla">Ningún cargo coincide con la búsqueda.</p>
+            @else
             <table class="tabla">
                 <thead>
                     <tr>
@@ -63,13 +55,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($cargos as $cargo)
+                    @foreach ($pagina as $cargo)
                         @php
                             $id = $cargo->carg_id_cargo;
                         @endphp
-                        <tr @class(['tabla__fila--inactiva' => ! $cargo->carg_activo])
-                            data-filtro-fila data-grupo="{{ $cargo->carg_nivel }}"
-                            data-texto="{{ $cargo->carg_nombre_m }} {{ $cargo->carg_nombre_f }}">
+                        <tr @class(['tabla__fila--inactiva' => ! $cargo->carg_activo])>
                             <th scope="row" data-etiqueta="Masculino"><span class="tabla__principal">{{ $cargo->carg_nombre_m }}</span></th>
                             <td data-etiqueta="Femenino">{{ $cargo->carg_nombre_f }}</td>
                             <td data-etiqueta="Nivel"><span class="nivel-cargo nivel-cargo--{{ strtolower($cargo->carg_nivel) }}">{{ $cargo->carg_nivel }}</span></td>
@@ -125,7 +115,8 @@
                 </tbody>
             </table>
 
-            <p class="vacio vacio--en-tabla" data-filtro-vacio hidden>Ningún cargo coincide con la búsqueda.</p>
+            <x-paginacion :paginas="$pagina" />
+            @endif
         @endif
     </section>
 

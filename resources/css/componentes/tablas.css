@@ -204,6 +204,7 @@
 }
 
 .filtro {
+    text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -222,7 +223,8 @@
     border-color: var(--color-borde-control);
 }
 
-.filtro[aria-pressed='true'] {
+.filtro[aria-pressed='true'],
+.filtro[aria-current='true'] {
     border-color: var(--color-secundario);
     background: var(--color-secundario);
     color: #fff;

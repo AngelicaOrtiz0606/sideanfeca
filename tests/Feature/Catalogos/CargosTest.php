@@ -36,8 +36,13 @@ class CargosTest extends TestCase
             ->assertOk()
             ->assertSeeText('Presidenta')
             ->assertSee('nivel-cargo--institucional', false)
-            ->assertSee('data-filtro-valor="Regional"', false)
-            ->assertSee('data-grupo="Nacional"', false);
+            ->assertSee('href="'.route('cargos.index', ['nivel' => 'Regional']).'"', false);
+
+        // Filtros en el servidor: por nivel y por texto (sin importar acentos ni mayúsculas).
+        // Se revisan solo las filas: el aviso de nombre repetido conoce todos los cargos a propósito.
+        $this->assertSame(['Director'], $this->filas('/cargos?nivel=Institucional'));
+        $this->assertSame(['Presidente'], $this->filas(route('cargos.index', ['texto' => 'PRESIDÉNTA'])));
+        $this->actingAs($this->admin)->get('/cargos?texto=tesorero')->assertSee('Ningún cargo coincide con la búsqueda.');
     }
 
     public function test_sin_el_privilegio_responde_403(): void
@@ -193,6 +198,18 @@ class CargosTest extends TestCase
             ->post('/cargos', ['masculino' => 'Presidente', 'femenino' => 'Otra', 'nivel' => 'Nacional', '_dialogo' => 'cargo', '_id' => ''])
             ->assertSeeText('Ya existe el cargo «Presidente».')
             ->assertSee('id="dialogo-cargo" class="dialogo dialogo--mediano" aria-labelledby="dialogo-cargo-titulo"  data-abrir-al-cargar', false);
+    }
+
+    /**
+     * Cargos (en masculino) que aparecen en las filas de la tabla.
+     *
+     * @return array<int, string>
+     */
+    private function filas(string $direccion): array
+    {
+        preg_match_all('/class="tabla__principal">([^<]*)</', $this->actingAs($this->admin)->get($direccion)->assertOk()->getContent(), $coincidencias);
+
+        return array_map('trim', $coincidencias[1]);
     }
 
     private function cargo(string $masculino, string $femenino, string $nivel): int

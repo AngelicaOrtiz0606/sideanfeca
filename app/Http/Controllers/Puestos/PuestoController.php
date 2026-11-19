@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Puestos\PuestoRequest;
 use App\Services\Puestos\PuestoService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -19,10 +20,20 @@ class PuestoController extends Controller
 {
     public function __construct(private readonly PuestoService $puestos) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
+        $puestos = $this->puestos->listado();
+        $filtros = [
+            'texto' => trim((string) $request->query('texto')) ?: null,
+            'nivel' => in_array($request->query('nivel'), PuestoService::NIVELES, true) ? $request->query('nivel') : null,
+        ];
+        $filtrados = Paginacion::buscar($puestos, $filtros['texto'], fn ($p) => "{$p->cargo} {$p->cargo_f} {$p->ambito} {$p->ocupante}")
+            ->when($filtros['nivel'], fn ($lista, $nivel) => $lista->where('nivel', $nivel)->values());
+
         return view('puestos.index', [
-            'puestos' => $this->puestos->listado(),
+            'puestos' => $puestos,
+            'pagina' => Paginacion::de($filtrados),
+            'filtros' => $filtros,
             'niveles' => PuestoService::NIVELES,
             'cargos' => $this->puestos->cargos(),
             'zonas' => $this->puestos->zonas(),

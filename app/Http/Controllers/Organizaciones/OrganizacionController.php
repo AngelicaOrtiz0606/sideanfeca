@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Organizaciones\OrganizacionRequest;
 use App\Services\Organizaciones\OrganizacionService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -19,10 +20,15 @@ class OrganizacionController extends Controller
 {
     public function __construct(private readonly OrganizacionService $organizaciones) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
+        $organizaciones = $this->organizaciones->listado();
+        $texto = trim((string) $request->query('texto')) ?: null;
+
         return view('organizaciones.index', [
-            'organizaciones' => $this->organizaciones->listado(),
+            'organizaciones' => $organizaciones,
+            'pagina' => Paginacion::de(Paginacion::buscar($organizaciones, $texto, fn ($o) => "{$o->nombre} {$o->municipio} {$o->entidad}")),
+            'filtros' => ['texto' => $texto],
             'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }

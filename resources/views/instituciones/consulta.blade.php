@@ -51,7 +51,7 @@
                    @if ($pestana !== $clave) tabindex="-1" @endif data-pestana="{{ $clave }}">
                     {{ $titulo }}
                     @if ($clave === 'sedes')
-                        <span class="pestanas__cifra">{{ $sedes->count() }}</span>
+                        <span class="pestanas__cifra">{{ $sedes->total() }}</span>
                     @endif
                 </a>
             @endforeach
@@ -231,6 +231,8 @@
                                 @endforeach
                             </tbody>
                         </table>
+
+                        <x-paginacion :paginas="$sedes" />
                     @endif
                 </div>
             </section>

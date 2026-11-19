@@ -57,7 +57,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($coordinaciones as $coordinacion)
+                    @foreach ($pagina as $coordinacion)
                         @php
                             $id = $coordinacion->cona_id_coordinacion_nacional;
                         @endphp
@@ -121,6 +121,8 @@
                     @endforeach
                 </tbody>
             </table>
+
+            <x-paginacion :paginas="$pagina" />
         @endif
     </section>
 

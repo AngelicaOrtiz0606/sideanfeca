@@ -49,7 +49,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($zonas as $zona)
+                    @foreach ($pagina as $zona)
                         @php
                             $etiqueta = "Zona {$zona->zore_numero} · {$zona->zore_nombre}";
                         @endphp
@@ -88,6 +88,8 @@
                     @endforeach
                 </tbody>
             </table>
+
+            <x-paginacion :paginas="$pagina" />
         @endif
     </section>
 

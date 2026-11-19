@@ -47,7 +47,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($grados as $grado)
+                    @foreach ($pagina as $grado)
                         @php
                             $id = $grado->niac_id_nivel_academico;
                         @endphp
@@ -104,6 +104,8 @@
                     @endforeach
                 </tbody>
             </table>
+
+            <x-paginacion :paginas="$pagina" />
         @endif
     </section>
 

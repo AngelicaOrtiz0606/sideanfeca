@@ -8,6 +8,7 @@ use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Catalogos\OrdenCoordinacionesRequest;
 use App\Models\CoordinacionNacional;
 use App\Services\Catalogos\CoordinacionService;
+use App\Support\Paginacion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,8 +25,11 @@ class CoordinacionController extends Controller
 
     public function index(): View
     {
+        $coordinaciones = $this->coordinaciones->listado();
+
         return view('catalogos.coordinaciones.index', [
-            'coordinaciones' => $this->coordinaciones->listado(),
+            'coordinaciones' => $coordinaciones,
+            'pagina' => Paginacion::de($coordinaciones),
             'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }
@@ -34,7 +38,7 @@ class CoordinacionController extends Controller
     {
         return view('catalogos.coordinaciones.show', [
             'coordinacion' => $coordinacion,
-            'puestos' => $this->coordinaciones->puestos($coordinacion),
+            'puestos' => Paginacion::de($this->coordinaciones->puestos($coordinacion)),
             'coordinaciones' => $this->coordinaciones->listado(),
         ]);
     }
