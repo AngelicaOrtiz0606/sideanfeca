@@ -84,7 +84,7 @@ class CambiosConHistorialTest extends TestCase
         $unam = $this->registrarMatriz();
 
         $this->actingAs($this->admin)->patch("/instituciones/{$unam}/razon-social", ['razon_social' => '  Universidad   Nacional de México ', 'desde' => '2001-05-10'])
-            ->assertRedirect("/instituciones/{$unam}?pestana=razon-social")
+            ->assertRedirect("/instituciones/{$unam}/edit")
             ->assertSessionHasNoErrors();
 
         $periodos = DB::table('institucion_nombre')->where('instn_id_institucion', $unam)->orderBy('instn_fecha_inicio')
@@ -162,7 +162,7 @@ class CambiosConHistorialTest extends TestCase
         $udg = $this->registrarObservadora();
 
         $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero' => '1400001', 'desde' => '2020-02-01'])
-            ->assertRedirect("/instituciones/{$udg}?pestana=participacion")
+            ->assertRedirect("/instituciones/{$udg}/edit")
             ->assertSessionHasNoErrors()
             ->assertSessionHas('estado', 'Ahora es afiliada desde el 01/02/2020, con el número de afiliación 1400001.');
 
@@ -202,7 +202,7 @@ class CambiosConHistorialTest extends TestCase
         $this->assertSame('2607002', DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $fca)->value('ined_num_afiliacion'));
 
         // Ni siquiera se ofrece el botón
-        $this->actingAs($this->admin)->get("/instituciones/{$fca}?pestana=participacion")->assertDontSee('Pasar a afiliada');
+        $this->actingAs($this->admin)->get("/instituciones/{$fca}/edit")->assertDontSee('Pasar a afiliada');
     }
 
     public function test_una_observadora_no_puede_volverse_matriz(): void
@@ -246,8 +246,8 @@ class CambiosConHistorialTest extends TestCase
         $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero' => '1400001', 'desde' => '2020-01-01'])
             ->assertSessionHasErrors(['participacion' => 'Está desactivada. Actívala primero; después podrás hacerla afiliada.']);
 
-        // La consulta lo explica con el botón gris
-        $this->actingAs($this->admin)->get("/instituciones/{$udg}?pestana=participacion")
+        // Editar lo explica con el botón gris
+        $this->actingAs($this->admin)->get("/instituciones/{$udg}/edit")
             ->assertSee('boton--bloqueado', false)
             ->assertSee('Está desactivada. Actívala primero; después podrás hacerla afiliada.');
     }
@@ -271,51 +271,49 @@ class CambiosConHistorialTest extends TestCase
             ->assertSessionHas('estado', 'Ahora es afiliada desde el 01/03/2022, con el número de afiliación 2204001.');
     }
 
-    // ---- Edición por secciones desde la consulta ----
+    // ---- Consultar (solo lectura) y Editar (el formulario completo) ----
 
-    public function test_ya_no_hay_pantalla_de_edicion(): void
+    public function test_la_consulta_es_de_solo_lectura_y_editar_abre_el_formulario_lleno(): void
     {
         $udg = $this->registrarObservadora();
 
-        $this->actingAs($this->admin)->get("/instituciones/{$udg}/edit")->assertNotFound();
+        $this->actingAs($this->admin)->get("/instituciones/{$udg}")->assertOk()
+            ->assertSee('href="'.route('instituciones.edit', $udg).'"', false)
+            ->assertDontSee('<dialog', false)
+            ->assertDontSee('Pasar a afiliada');
+
+        $this->actingAs($this->admin)->get("/instituciones/{$udg}/edit")->assertOk()
+            ->assertSee('value="Universidad de Guadalajara"', false)
+            ->assertSee('Registrar cambio de nombre')
+            ->assertSee('Pasar a afiliada');
     }
 
-    public function test_cada_seccion_solo_cambia_sus_propios_datos(): void
+    public function test_editar_guarda_el_formulario_completo_y_regresa_a_la_consulta(): void
     {
         $udg = $this->registrarObservadora();
 
-        // Sitio web: aunque se envíen otros campos, solo cambia el sitio web
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", ['_seccion' => 'web', 'sitio_web' => 'https://www.udg.mx', 'razon_social' => 'Otro nombre', 'sector' => 'Privada', 'calle' => 'Otra'])
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['sitio_web' => 'https://www.udg.mx', 'num_ext' => '975', 'zona' => $this->zona(7)]))
             ->assertRedirect("/instituciones/{$udg}")
-            ->assertSessionHasNoErrors();
+            ->assertSessionHas('estado', 'Se guardaron los cambios.');
 
-        $institucion = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->first();
-        $this->assertSame(['https://www.udg.mx', 'Publica'], [$institucion->ined_sitio_web, $institucion->ined_sector]);
-        $this->assertSame('Av. Juárez', DB::table('domicilio')->where('domi_id_domicilio', $institucion->ined_id_domicilio)->value('domi_calle'));
-        $this->assertSame([['Sitio web', null, 'https://www.udg.mx']], $this->detalles((int) $this->ultimaBitacora()->bita_id_bitacora));
-
-        // Ubicación: solo domicilio y zona
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", ['_seccion' => 'ubicacion', 'colonia' => $this->colonia, 'calle' => 'Av. Juárez', 'num_ext' => '975', 'zona' => $this->zona(7), 'sitio_web' => ''])
-            ->assertSessionHasNoErrors();
         $institucion = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->first();
         $this->assertSame(['https://www.udg.mx', $this->zona(7)], [$institucion->ined_sitio_web, (int) $institucion->ined_id_zona_regional]);
         $this->assertSame('975', DB::table('domicilio')->where('domi_id_domicilio', $institucion->ined_id_domicilio)->value('domi_num_ext'));
 
-        // Sitio web vacío: se quita
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", ['_seccion' => 'web', 'sitio_web' => ''])->assertSessionHasNoErrors();
-        $this->assertNull(DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->value('ined_sitio_web'));
+        // La razón social se corrige en su campo, sin historial
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['razon_social' => 'Universidad de Guadalajara (UdeG)']))->assertSessionHasNoErrors();
+        $this->assertSame([['Universidad de Guadalajara (UdeG)', '2010-08-15', null]], DB::table('institucion_nombre')->where('instn_id_institucion', $udg)
+            ->get()->map(fn ($n) => [$n->instn_nombre, $n->instn_fecha_inicio, $n->instn_fecha_fin])->all());
     }
 
-    public function test_corregir_la_razon_social_regresa_a_su_pestana_sin_historial(): void
+    public function test_los_cambios_con_historial_regresan_a_editar(): void
     {
         $udg = $this->registrarObservadora();
 
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", ['_seccion' => 'razon', 'razon_social' => 'Universidad de Guadalajara (UdeG)'])
-            ->assertRedirect("/instituciones/{$udg}?pestana=razon-social")
-            ->assertSessionHas('estado', 'Se corrigió la razón social.');
-
-        $this->assertSame([['Universidad de Guadalajara (UdeG)', '2010-08-15', null]], DB::table('institucion_nombre')->where('instn_id_institucion', $udg)
-            ->get()->map(fn ($n) => [$n->instn_nombre, $n->instn_fecha_inicio, $n->instn_fecha_fin])->all());
+        $this->actingAs($this->admin)->patch("/instituciones/{$udg}/razon-social", ['razon_social' => 'Universidad de Guadalajara (UdeG)', 'desde' => '2020-01-01'])
+            ->assertRedirect("/instituciones/{$udg}/edit");
+        $this->actingAs($this->admin)->patch("/instituciones/{$udg}/participacion", ['participacion' => 'Afiliada', 'numero_modo' => 'automatico', 'desde' => '2021-01-01'])
+            ->assertRedirect("/instituciones/{$udg}/edit");
     }
 
     public function test_una_universidad_con_sedes_o_matriz_no_cambia_de_tipo(): void
@@ -326,13 +324,25 @@ class CambiosConHistorialTest extends TestCase
         $this->registrar(['tipo' => 'Campus', 'universidad' => $udg, 'participacion' => 'Observadora', 'desde' => '2015-01-01', 'razon_social' => 'Campus Norte', 'sector' => 'Publica',
             'colonia' => $this->colonia, 'calle' => 'Calle 1', 'num_ext' => '1', 'zona' => $this->zona(4)]);
 
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", ['_seccion' => 'identificacion', 'tipo' => 'Campus', 'universidad' => $unam, 'sector' => 'Publica'])
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['tipo' => 'Campus', 'universidad' => $unam]))
             ->assertSessionHasErrors(['tipo' => 'Tiene facultades o campus, así que sigue siendo universidad.']);
-        $this->actingAs($this->admin)->put("/instituciones/{$unam}", ['_seccion' => 'identificacion', 'tipo' => 'Facultad', 'universidad' => $udg, 'sector' => 'Publica'])
+        $this->actingAs($this->admin)->put("/instituciones/{$unam}", ['tipo' => 'Facultad', 'universidad' => $udg, 'razon_social' => 'Universidad Nacional Autónoma de México', 'sector' => 'Publica'])
             ->assertSessionHasErrors('tipo');
 
         $this->assertSame('Universidad', DB::table('institucion_educativa as i')->join('tipo_institucion_educativa as t', 't.tiie_id_tipo_institucion', '=', 'i.ined_id_tipo_institucion')
             ->where('i.ined_id_institucion_educativa', $udg)->value('t.tiie_nombre'));
+    }
+
+    /**
+     * El formulario de edición de la observadora, como lo envía la pantalla, con estos cambios.
+     *
+     * @param  array<string, mixed>  $cambios
+     * @return array<string, mixed>
+     */
+    private function observadoraEditada(array $cambios = []): array
+    {
+        return $cambios + ['tipo' => 'Universidad', 'razon_social' => 'Universidad de Guadalajara', 'sector' => 'Publica',
+            'colonia' => $this->colonia, 'calle' => 'Av. Juárez', 'num_ext' => '976', 'zona' => $this->zona(4)];
     }
 
     // ---- Ayudas ----

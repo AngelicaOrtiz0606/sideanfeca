@@ -1,0 +1,152 @@
+/*
+ * Formulario de una persona ([data-persona]):
+ * - Pertenencia: según la opción (institución, organización o ninguna) se
+ *   muestra el buscador o la lista que aplica; lo oculto se desactiva para
+ *   que no se envíe ni se valide.
+ * - CURP: se escribe en mayúsculas; si su letra de sexo (H o M, posición 11)
+ *   no coincide con el género, avisa en amarillo sin bloquear.
+ * - Grados: la abreviatura cambia con el género (Mtro. / Mtra.).
+ * - Contactos: el correo y el teléfono obligatorios son campos fijos; los
+ *   otros contactos son filas que se agregan (desde la plantilla) y se quitan;
+ *   según el tipo aparecen la lada y la extensión, y el campo pide número o
+ *   correo. En los números solo quedan dígitos ("5622 8300" → "56228300").
+ */
+const mostrar = (bloque, visible) => {
+    if (!bloque) {
+        return;
+    }
+    bloque.hidden = !visible;
+    bloque.querySelectorAll('input, select').forEach((campo) => { campo.disabled = !visible; });
+};
+
+const avisarCambio = (formulario) => formulario.dispatchEvent(new Event('change', { bubbles: true }));
+
+document.querySelectorAll('form[data-persona]').forEach((formulario) => {
+    // ---- Pertenencia ----
+    const pertenencia = () => {
+        const tipo = formulario.querySelector('[data-pertenencia-tipo]:checked')?.value ?? '';
+        formulario.querySelectorAll('[data-solo-pertenencia]').forEach((bloque) => mostrar(bloque, bloque.dataset.soloPertenencia === tipo));
+        avisarCambio(formulario);
+    };
+    formulario.querySelectorAll('[data-pertenencia-tipo]').forEach((radio) => radio.addEventListener('change', pertenencia));
+    pertenencia();
+
+    // ---- CURP y género ----
+    const curp = formulario.querySelector('[data-curp]');
+    const aviso = formulario.querySelector('[data-curp-aviso]');
+    const genero = () => formulario.querySelector('[data-genero]:checked')?.value ?? '';
+
+    const revisar = () => {
+        const sexo = /^[A-Z]{4}[0-9]{6}[HM]/.test(curp.value) ? curp.value[10] : '';
+        const esperado = { F: 'M', M: 'H' }[genero()];
+        const distinto = sexo !== '' && esperado !== undefined && sexo !== esperado;
+        aviso.textContent = distinto
+            ? `La CURP indica ${sexo === 'H' ? 'hombre (H)' : 'mujer (M)'}, pero el género elegido es ${genero() === 'F' ? 'femenino' : 'masculino'}. Revisa que sea correcto.`
+            : '';
+        aviso.hidden = !distinto;
+
+        formulario.querySelectorAll('[data-abreviatura]').forEach((abreviatura) => {
+            abreviatura.textContent = genero() === 'F' ? abreviatura.dataset.f : abreviatura.dataset.m;
+        });
+    };
+
+    curp.addEventListener('input', () => {
+        const posicion = curp.selectionStart;
+        curp.value = curp.value.toUpperCase().replace(/\s/g, '');
+        curp.setSelectionRange(posicion, posicion);
+        revisar();
+    });
+    formulario.querySelectorAll('[data-genero]').forEach((radio) => radio.addEventListener('change', revisar));
+    revisar();
+
+    // ---- Contactos ----
+    formulario.querySelectorAll('[data-solo-digitos]').forEach((campo) => campo.addEventListener('input', () => {
+        campo.value = campo.value.replace(/\D/g, '').slice(0, campo.maxLength > 0 ? campo.maxLength : undefined);
+    }));
+
+    const contenedor = formulario.querySelector('[data-contactos]');
+    const lista = contenedor.querySelector('[data-contactos-lista]');
+    const plantilla = contenedor.querySelector('[data-contacto-plantilla]');
+    const agregar = contenedor.querySelector('[data-contacto-agregar]');
+    const maximo = Number(contenedor.dataset.maximo);
+    let siguiente = lista.querySelectorAll('[data-contacto]').length;
+
+    const prepararFila = (fila) => {
+        const tipo = fila.querySelector('[data-contacto-tipo]');
+        const valor = fila.querySelector('[data-contacto-valor]');
+        const etiqueta = fila.querySelector('[data-contacto-etiqueta]');
+
+        const esCorreo = () => tipo.selectedOptions[0]?.dataset.correo === 'si';
+
+        const ajustar = () => {
+            const opcion = tipo.selectedOptions[0];
+            mostrar(fila.querySelector('[data-solo-lada]'), opcion?.dataset.lada === 'si');
+            mostrar(fila.querySelector('[data-solo-extension]'), opcion?.dataset.extension === 'si');
+            fila.classList.toggle('fila-contacto--correo', esCorreo());
+            etiqueta.textContent = esCorreo() ? 'Correo' : 'Número';
+            valor.type = esCorreo() ? 'email' : 'text';
+            valor.inputMode = esCorreo() ? 'email' : 'numeric';
+            if (esCorreo()) {
+                valor.removeAttribute('pattern');
+                valor.maxLength = 120;
+                valor.dataset.mensajeFormato = 'Escribe un correo válido, por ejemplo nombre@dominio.mx.';
+            } else {
+                valor.pattern = '[0-9]{7,10}';
+                valor.maxLength = 10;
+                valor.dataset.mensajeFormato = 'El número lleva de 7 a 10 dígitos (sin la lada).';
+            }
+            avisarCambio(formulario);
+        };
+
+        const soloDigitos = (campo, siempre) => campo?.addEventListener('input', () => {
+            if (siempre || !esCorreo()) {
+                campo.value = campo.value.replace(/\D/g, '').slice(0, campo.maxLength > 0 ? campo.maxLength : undefined);
+            }
+        });
+        soloDigitos(valor, false);
+        soloDigitos(fila.querySelector('[name$="[lada]"]'), true);
+        soloDigitos(fila.querySelector('[name$="[extension]"]'), true);
+
+        tipo.addEventListener('change', ajustar);
+        fila.querySelector('[data-contacto-quitar]').addEventListener('click', () => {
+            // El foco pasa a la fila siguiente (o a "Agregar contacto"), para no perderse
+            const siguienteFila = fila.nextElementSibling ?? fila.previousElementSibling;
+            fila.remove();
+            actualizarLista();
+            (siguienteFila?.querySelector('[data-contacto-tipo]') ?? agregar).focus();
+        });
+        ajustar();
+    };
+
+    const actualizarLista = () => {
+        const filas = [...lista.querySelectorAll('[data-contacto]')];
+        const cuantos = filas.length;
+        // Cada fila se nombra por su lugar ("Contacto 2"), para los lectores de pantalla
+        filas.forEach((fila, indice) => {
+            fila.setAttribute('aria-label', `Contacto ${indice + 1}`);
+            fila.querySelector('[data-contacto-quitar] .accion__texto').textContent = `Quitar contacto ${indice + 1}`;
+        });
+        agregar.disabled = cuantos >= maximo;
+        avisarCambio(formulario);
+    };
+
+    agregar.addEventListener('click', () => {
+        const fila = plantilla.content.firstElementChild.cloneNode(true);
+        // Cada fila nueva lleva su propio número en los nombres y los id
+        fila.querySelectorAll('[name], [id], [for]').forEach((elemento) => {
+            ['name', 'id', 'for'].forEach((atributo) => {
+                if (elemento.hasAttribute(atributo)) {
+                    elemento.setAttribute(atributo, elemento.getAttribute(atributo).replaceAll('__i__', String(siguiente)));
+                }
+            });
+        });
+        siguiente += 1;
+        lista.append(fila);
+        prepararFila(fila);
+        actualizarLista();
+        fila.querySelector('[data-contacto-tipo]').focus();
+    });
+
+    lista.querySelectorAll('[data-contacto]').forEach(prepararFila);
+    actualizarLista();
+});

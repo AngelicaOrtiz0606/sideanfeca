@@ -106,12 +106,12 @@ class PuestoService
     }
 
     /**
-     * Instituciones activas para un puesto institucional, con su tipo,
+     * Instituciones activas (para un puesto institucional o la pertenencia de una persona), con su tipo,
      * universidad, zona y entidad (para distinguir nombres iguales).
      *
      * @return Collection<int, object>
      */
-    public function instituciones(): Collection
+    public function instituciones(?int $incluir = null): Collection
     {
         return DB::table('institucion_educativa as i')
             ->join('tipo_institucion_educativa as t', 't.tiie_id_tipo_institucion', '=', 'i.ined_id_tipo_institucion')
@@ -122,7 +122,8 @@ class PuestoService
             ->leftJoin('colonia as c', 'c.colo_id_colonia', '=', 'd.domi_id_colonia')
             ->leftJoin('alcaldia_municipio as m', 'm.almu_id_alcaldia_municipio', '=', 'c.colo_id_alcaldia_municipio')
             ->leftJoin('entidad_federativa as e', 'e.enfe_id_entidad_federativa', '=', 'm.almu_id_entidad_federativa')
-            ->where('i.ined_activo', true)
+            // Activas, más la que ya tiene el registro que se edita (aunque esté desactivada)
+            ->where(fn (Builder $q) => $q->where('i.ined_activo', true)->when($incluir, fn (Builder $w, int $id) => $w->orWhere('i.ined_id_institucion_educativa', $id)))
             ->orderBy('n.instn_nombre')
             ->get([
                 'i.ined_id_institucion_educativa as id', 'n.instn_nombre as nombre', 't.tiie_nombre as tipo', 'np.instn_nombre as universidad',

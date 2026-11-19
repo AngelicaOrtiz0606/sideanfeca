@@ -79,11 +79,12 @@ function campoEsValido(campo) {
 document.querySelectorAll('form[data-validar]').forEach((formulario) => {
     // Un formulario puede tener más de un botón de guardar
     const botones = [...formulario.querySelectorAll('[type="submit"]')];
-    const campos = [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
-    const escritos = new Set();
+    // Los campos se buscan cada vez: algunos formularios agregan o quitan filas (por ejemplo, contactos)
+    const campos = () => [...formulario.querySelectorAll('input:not([type="hidden"]), select, textarea')];
+    const escritos = new WeakSet();
 
     const actualizar = () => {
-        const resultados = campos.map((campo) => {
+        const resultados = campos().map((campo) => {
             const valido = campoEsValido(campo);
 
             // Solo se delinea en rojo un campo en el que la persona ya empezó a escribir
@@ -98,13 +99,17 @@ document.querySelectorAll('form[data-validar]').forEach((formulario) => {
         botones.forEach((boton) => { boton.disabled = !completo; });
     };
 
-    campos.forEach((campo) => {
-        campo.addEventListener('input', () => {
-            escritos.add(campo);
+    formulario.addEventListener('input', (evento) => {
+        const campo = evento.target;
+        if (!(campo instanceof HTMLElement) || !campo.matches('input, select, textarea')) {
+            return;
+        }
+        escritos.add(campo);
 
-            // Al corregir, el mensaje que mandó el servidor para este campo ya no aplica
+        // Al corregir, el mensaje que mandó el servidor para este campo ya no aplica
+        if (campo.id) {
             document.getElementById(`${campo.id}-error`)?.setAttribute('hidden', '');
-        });
+        }
     });
 
     formulario.addEventListener('input', actualizar);

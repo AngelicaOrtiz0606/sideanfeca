@@ -64,6 +64,10 @@
                             <td class="tabla__cifra" data-etiqueta="Instituciones">{{ $zona->instituciones }}</td>
                             <td class="tabla__acciones">
                                 <div class="acciones-fila">
+                                    <a href="{{ route('zonas.show', $zona->zore_id_zona_regional) }}" class="accion accion--consultar">
+                                        <x-icono nombre="ojo" />
+                                        <span class="accion__texto">Consultar <span class="solo-lectores">{{ $zona->zore_nombre }}</span></span>
+                                    </a>
                                     <button type="button" class="accion accion--editar"
                                             data-abrir-dialogo="dialogo-zona"
                                             data-accion="{{ route('zonas.update', $zona->zore_id_zona_regional) }}" data-metodo="PUT"

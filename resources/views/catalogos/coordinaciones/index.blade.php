@@ -77,6 +77,10 @@
                             </td>
                             <td class="tabla__acciones">
                                 <div class="acciones-fila">
+                                    <a href="{{ route('coordinaciones.show', $id) }}" class="accion accion--consultar">
+                                        <x-icono nombre="ojo" />
+                                        <span class="accion__texto">Consultar <span class="solo-lectores">{{ $coordinacion->cona_nombre }}</span></span>
+                                    </a>
                                     <button type="button" class="accion accion--editar"
                                             data-abrir-dialogo="dialogo-coordinacion"
                                             data-accion="{{ route('coordinaciones.update', $id) }}" data-metodo="PUT"

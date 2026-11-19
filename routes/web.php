@@ -12,6 +12,7 @@ use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
 use App\Http\Controllers\PantallaPendienteController;
+use App\Http\Controllers\Personas\PersonaController;
 use App\Http\Controllers\Puestos\PuestoController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,7 @@ Route::pattern('grado', '[0-9]+');
 Route::pattern('institucion', '[0-9]+');
 Route::pattern('organizacion', '[0-9]+');
 Route::pattern('puesto', '[0-9]+');
+Route::pattern('persona', '[0-9]+');
 Route::pattern('codigo', '[0-9]{5}');
 
 // Hasta que exista el sitio público (M10), la raíz lleva al inicio de sesión
@@ -68,13 +70,21 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::patch('/instituciones/{institucion}/participacion', [InstitucionController::class, 'cambiarParticipacion'])->name('instituciones.participacion');
         Route::resource('instituciones', InstitucionController::class)
             ->parameters(['instituciones' => 'institucion'])
-            ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
 
         // Organizaciones (por ejemplo, CACECA): todo desde la lista, en ventanas
         Route::patch('/organizaciones/{organizacion}/estado', [OrganizacionController::class, 'cambiarEstado'])->name('organizaciones.estado');
         Route::resource('organizaciones', OrganizacionController::class)
             ->parameters(['organizaciones' => 'organizacion'])
             ->only(['index', 'store', 'update', 'destroy']);
+    });
+
+    // Personas (M5): lista, consulta (solo lectura) y edición con el formulario completo
+    Route::middleware(Privilegio::GestionarPersonas->middleware())->group(function () {
+        Route::get('/personas', [PersonaController::class, 'index'])->name('personas.index');
+        Route::get('/personas/{persona}', [PersonaController::class, 'show'])->name('personas.show');
+        Route::get('/personas/{persona}/edit', [PersonaController::class, 'edit'])->name('personas.edit');
+        Route::put('/personas/{persona}', [PersonaController::class, 'update'])->name('personas.update');
     });
 
     // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas

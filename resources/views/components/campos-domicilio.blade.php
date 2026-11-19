@@ -11,8 +11,9 @@
       obligatorio si el domicilio es obligatorio (una matriz no lo necesita)
       enVentana   dentro de una ventana: sin tarjeta propia (la ventana ya tiene título)
       conTitulo   en una ventana con otros datos: se muestra el subtítulo "Domicilio"
+      numero      en un formulario por secciones: se muestra como sección numerada (x-seccion-formulario)
 --}}
-@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true, 'enVentana' => false, 'conTitulo' => false])
+@props(['domicilio' => null, 'zonas' => null, 'zona' => null, 'obligatorio' => true, 'enVentana' => false, 'conTitulo' => false, 'numero' => null])
 
 @php
     $cp = old('codigo_postal', $domicilio?->codigo_postal);
@@ -20,9 +21,21 @@
     $zonaElegida = (int) old('zona', $zona);
 @endphp
 
+@if ($numero)
+<section class="tarjeta bloque" id="seccion-domicilio" aria-labelledby="seccion-domicilio-titulo" data-seccion data-domicilio
+         data-url-codigo-postal="{{ route('codigos-postales.show', ['codigo' => '00000']) }}" data-obligatorio="{{ $obligatorio ? 'si' : 'no' }}">
+    <header class="bloque__cabecera">
+        <span class="bloque__numero" aria-hidden="true">{{ $numero }}</span>
+        <div class="bloque__leyenda">
+            <h2 id="seccion-domicilio-titulo" class="bloque__nombre">Domicilio <span class="campo__opcional" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></h2>
+            <p class="bloque__descripcion">Con el código postal se llenan la entidad, el municipio y las colonias.</p>
+        </div>
+    </header>
+@else
 <fieldset @class(['tarjeta seccion-formulario' => ! $enVentana, 'seccion-ventana' => $enVentana]) data-domicilio data-url-codigo-postal="{{ route('codigos-postales.show', ['codigo' => '00000']) }}"
           data-obligatorio="{{ $obligatorio ? 'si' : 'no' }}">
     <legend @class(['seccion-formulario__titulo' => ! $enVentana, 'seccion-ventana__titulo' => $enVentana && $conTitulo, 'solo-lectores' => $enVentana && ! $conTitulo])>Domicilio <span class="seccion-formulario__nota" data-domicilio-opcional @if ($obligatorio) hidden @endif>(opcional para una matriz)</span></legend>
+@endif
 
     <div class="formulario__rejilla">
         <div class="campo">
@@ -95,4 +108,8 @@
         </div>
 
     </div>
+@if ($numero)
+</section>
+@else
 </fieldset>
+@endif

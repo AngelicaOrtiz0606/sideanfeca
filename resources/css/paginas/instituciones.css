@@ -268,3 +268,47 @@
         width: 100%;
     }
 }
+
+/* ---------- Consulta de una persona ---------- */
+
+/* Lista dentro de una tarjeta de la ficha (por ejemplo, los grados) */
+.ficha__lista {
+    display: grid;
+    gap: 0.5rem;
+    list-style: none;
+}
+
+.ficha__abreviatura {
+    margin-left: 0.375rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}
+
+/* Texto y botón arriba de una tabla (por ejemplo, "Agregar contacto") */
+.tarjeta__barra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.tarjeta__barra .tarjeta__texto {
+    margin: 0;
+}
+
+@media (width < 40rem) {
+    .tarjeta__barra .boton {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Nota arriba de una tabla dentro de una tarjeta */
+.tarjeta__nota {
+    padding: 1rem 1.5rem 0.25rem;
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}

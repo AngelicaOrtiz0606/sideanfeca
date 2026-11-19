@@ -605,3 +605,31 @@ fieldset {
     opacity: 0.65;
     pointer-events: none;
 }
+
+/* Opciones una debajo de otra (por ejemplo, los grados de una persona) */
+.opciones-columna {
+    display: grid;
+    gap: 0.5rem;
+}
+
+/* La CURP se escribe y se ve en mayúsculas */
+.campo__entrada--mayusculas {
+    text-transform: uppercase;
+}
+
+/* Campo con su botón al lado (por ejemplo, la razón social y "Registrar cambio de nombre") */
+.campo__con-accion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 0.75rem;
+}
+
+.campo__con-accion > .campo__entrada {
+    flex: 1 1 18rem;
+}
+
+.campo__con-accion > .campo__salida {
+    flex: 1 1 auto;
+    margin: 0;
+}

@@ -2,8 +2,8 @@
     Instituciones: lista con filtros (en el servidor, porque pueden ser cientos).
     Los filtros se aplican solos al elegir o al dejar de escribir; "Borrar
     filtros" aparece cuando hay alguno activo.
-    El nombre y "Editar" llevan a su consulta, donde cada sección se edita en
-    su ventana. "Nueva institución" lleva a su pantalla. Desactivar y Activar
+    Cada fila: Consultar (ficha de solo lectura), Editar (el formulario del
+    registro, ya lleno), Desactivar o Activar y Borrar. Desactivar y Activar
     piden la fecha (cierran o abren su periodo de participación). Borrar solo
     si no tiene personas, sedes ni puestos.
 --}}
@@ -144,7 +144,11 @@
                             </td>
                             <td class="tabla__acciones">
                                 <div class="acciones-fila">
-                                    <a href="{{ route('instituciones.show', $institucion->id) }}" class="accion accion--editar">
+                                    <a href="{{ route('instituciones.show', $institucion->id) }}" class="accion accion--consultar">
+                                        <x-icono nombre="ojo" />
+                                        <span class="accion__texto">Consultar <span class="solo-lectores">{{ $institucion->nombre }}</span></span>
+                                    </a>
+                                    <a href="{{ route('instituciones.edit', $institucion->id) }}" class="accion accion--editar">
                                         <x-icono nombre="lapiz" />
                                         <span class="accion__texto">Editar <span class="solo-lectores">{{ $institucion->nombre }}</span></span>
                                     </a>

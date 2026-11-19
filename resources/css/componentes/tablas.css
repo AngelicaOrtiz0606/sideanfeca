@@ -443,3 +443,12 @@ a.paginacion__enlace:hover {
 .tabla__enlace-web:hover {
     text-decoration: underline;
 }
+
+/* Varias líneas en una celda (por ejemplo, dos cargos vigentes) */
+.tabla__linea {
+    display: block;
+}
+
+.tabla__linea + .tabla__linea {
+    margin-top: 0.25rem;
+}
