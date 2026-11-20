@@ -5,6 +5,7 @@ namespace Tests\Feature\Personas;
 use App\Enums\Privilegio;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\BitacoraService;
 use Database\Seeders\CatalogosInicialesSeeder;
 use Database\Seeders\GradosAcademicosSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -29,6 +30,9 @@ class NuevaPersonaTest extends TestCase
 
     private int $organizacion;
 
+    /** Último movimiento de la bitácora antes de cada prueba. */
+    private int $antes;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -41,6 +45,7 @@ class NuevaPersonaTest extends TestCase
             'orga_id_domicilio' => DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $this->crearInstitucion('Observadora'))->value('ined_id_domicilio'),
             'orga_activo' => true,
         ], 'orga_id_organizacion');
+        $this->antes = (int) DB::table('bitacora')->max('bita_id_bitacora');
     }
 
     public function test_la_lista_ofrece_nueva_persona_y_el_formulario_pide_el_cargo(): void
@@ -58,12 +63,19 @@ class NuevaPersonaTest extends TestCase
         $respuesta = $this->registrar(['cargo' => $presidente, 'fecha_inicio' => '2025-01-15']);
 
         $persona = (int) DB::table('persona')->where('pers_nombre', 'Anaís')->value('pers_id_persona');
-        $respuesta->assertRedirect("/personas/{$persona}")->assertSessionHas('estado', 'Se registró Anaís Pérez López con su cargo.');
+        $respuesta->assertRedirect("/personas/{$persona}")->assertSessionHas('estado', 'Se registró Anaís Pérez López con su designación.');
 
         $puesto = (int) DB::table('puesto')->where('pues_id_cargo', $presidente)->value('pues_id_puesto');
         $this->assertDatabaseHas('designacion', ['desi_id_puesto' => $puesto, 'desi_id_persona' => $persona, 'desi_fecha_inicio' => '2025-01-15', 'desi_fecha_fin' => null]);
         $this->assertDatabaseHas('contacto', ['cont_id_persona' => $persona, 'cont_valor' => 'ana@caceca.org', 'cont_visible' => true]);
-        $this->assertSame(['PERSONA', 'PUESTO', 'DESIGNACION'], DB::table('bitacora')->where('bita_accion', 'Registro')->orderBy('bita_id_bitacora')->pluck('bita_tabla')->take(-3)->values()->all());
+        // En la bitácora, una sola línea: la persona, con su designación y el puesto creado como detalles
+        $ultima = DB::table('bitacora')->orderByDesc('bita_id_bitacora')->first();
+        $this->assertSame(['Registro', 'PERSONA', $persona], [$ultima->bita_accion, $ultima->bita_tabla, (int) $ultima->bita_referencia]);
+        $this->assertSame(0, DB::table('bitacora')->whereIn('bita_tabla', ['PUESTO', 'DESIGNACION'])->where('bita_id_bitacora', '>', $this->antes)->count());
+
+        $linea = app(BitacoraService::class)->recientes(1)->first();
+        $this->assertSame('a la persona Anaís Pérez López, de CACECA', $linea['objeto']);
+        $this->assertSame(['Designación: Presidentea · Nacional, desde 15/01/2025', 'Puesto creado: Presidente · Nacional'], $linea['detalles']);
 
         // Ya aparece en Personas
         $this->actingAs($this->admin)->get('/personas')->assertSee('Anaís Pérez López');
@@ -112,7 +124,7 @@ class NuevaPersonaTest extends TestCase
             ['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'],
             ['cargo' => $consejero, 'zona' => $zona, 'fecha_inicio' => '2024-06-01'],
             ['cargo' => '', 'fecha_inicio' => '2025-01-15'],
-        ]])->assertSessionHasNoErrors()->assertSessionHas('estado', 'Se registró Anaís Pérez López con sus cargos.');
+        ]])->assertSessionHasNoErrors()->assertSessionHas('estado', 'Se registró Anaís Pérez López con sus designaciones.');
 
         $persona = (int) DB::table('persona')->where('pers_nombre', 'Anaís')->value('pers_id_persona');
         $this->assertSame(2, DB::table('designacion')->where('desi_id_persona', $persona)->count());

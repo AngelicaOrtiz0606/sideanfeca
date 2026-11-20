@@ -251,6 +251,20 @@ class PuestoService
         return implode(' · ', array_filter([$conCargo ? $puesto->cargo : null, ...$partes]));
     }
 
+    /**
+     * El puesto dicho completo, para la bitácora y las fichas: "Presidenta · Nacional",
+     * "Coordinador Regional · Zona 2 · Noreste". Con género, el cargo va en ese género.
+     */
+    public function nombre(object $puesto, ?string $genero = null): string
+    {
+        $conGenero = clone $puesto;
+        if ($genero === 'F' && filled($puesto->cargo_f ?? null)) {
+            $conGenero->cargo = $puesto->cargo_f;
+        }
+
+        return $this->ambito($conGenero, true);
+    }
+
     private function consulta(): Builder
     {
         return DB::table('puesto as p')

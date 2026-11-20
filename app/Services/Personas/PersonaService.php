@@ -4,10 +4,12 @@ namespace App\Services\Personas;
 
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
+use App\Services\Puestos\PuestoService;
 use App\Support\Paginacion;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -213,72 +215,7 @@ class PersonaService
     public function actualizar(Usuario $actor, int $id, array $datos): void
     {
         DB::transaction(function () use ($actor, $id, $datos): void {
-            $actual = DB::table('persona')->where('pers_id_persona', $id)->lockForUpdate()->first();
-            $cambios = [];
-
-            // Datos personales y pertenencia
-            $nuevos = [
-                'pers_nombre' => $datos['nombre'],
-                'pers_primer_apellido' => $datos['primer_apellido'],
-                'pers_segundo_apellido' => $datos['segundo_apellido'],
-                'pers_curp' => $datos['curp'],
-                'pers_genero' => $datos['genero'],
-                'pers_id_institucion_educativa' => $datos['institucion'],
-                'pers_id_organizacion' => $datos['organizacion'],
-            ];
-            $campos = [
-                'pers_nombre' => 'Nombre', 'pers_primer_apellido' => 'Primer apellido', 'pers_segundo_apellido' => 'Segundo apellido',
-                'pers_curp' => 'CURP', 'pers_genero' => 'Género', 'pers_id_institucion_educativa' => 'Pertenencia', 'pers_id_organizacion' => 'Pertenencia',
-            ];
-            foreach ($nuevos as $columna => $valor) {
-                if ((string) $actual->{$columna} !== (string) $valor) {
-                    $cambios[] = $campos[$columna];
-                }
-            }
-            DB::table('persona')->where('pers_id_persona', $id)->update($nuevos);
-
-            // Grados
-            $antes = DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->pluck('pena_id_nivel_academico')->map(fn ($g) => (int) $g)->sort()->values()->all();
-            $despues = collect($datos['grados'])->unique()->sort()->values()->all();
-            if ($antes !== $despues) {
-                DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->delete();
-                DB::table('persona_nivel_academico')->insert(array_map(fn (int $g) => ['pena_id_persona' => $id, 'pena_id_nivel_academico' => $g], $despues));
-                $cambios[] = 'Grado académico';
-            }
-
-            // Contactos: si cambiaron, se reemplazan (la bitácora dice si fueron correos u otros).
-            // El primero de cada tipo es el obligatorio: cuenta cuál es; el orden de los demás, no.
-            $correo = $this->idTipoCorreo();
-            $firma = function (iterable $lista, bool $correos) use ($correo): array {
-                $texto = fn ($c) => implode('|', [$c['tipo'], $c['valor'], $c['lada'] ?? '', $c['extension'] ?? '', $c['visible'] ? 1 : 0]);
-                $grupo = collect($lista)->filter(fn ($c) => ((int) $c['tipo'] === $correo) === $correos)->values();
-                $primero = $grupo->first();
-
-                return [$primero === null ? '' : $texto($primero), ...$grupo->slice(1)->map($texto)->sort()->values()->all()];
-            };
-            $previos = DB::table('contacto')->where('cont_id_persona', $id)->orderBy('cont_id_contacto')->get()
-                ->map(fn ($c) => ['tipo' => $c->cont_id_tipo_contacto, 'valor' => $c->cont_valor, 'lada' => $c->cont_lada, 'extension' => $c->cont_extension, 'visible' => (bool) $c->cont_visible]);
-            $cambioCorreo = $firma($previos, true) !== $firma($datos['contactos'], true);
-            $cambioOtros = $firma($previos, false) !== $firma($datos['contactos'], false);
-            if ($cambioCorreo || $cambioOtros) {
-                DB::table('contacto')->where('cont_id_persona', $id)->delete();
-                DB::table('contacto')->insert(array_map(fn (array $c) => [
-                    'cont_id_persona' => $id,
-                    'cont_id_tipo_contacto' => $c['tipo'],
-                    'cont_valor' => $c['valor'],
-                    'cont_lada' => $c['lada'],
-                    'cont_extension' => $c['extension'],
-                    'cont_visible' => $c['visible'],
-                ], $datos['contactos']));
-                if ($cambioCorreo) {
-                    $cambios[] = 'Correo';
-                }
-                if ($cambioOtros) {
-                    $cambios[] = 'Contacto';
-                }
-            }
-
-            $cambios = array_values(array_unique($cambios));
+            $cambios = $this->guardarDatos($id, $datos);
             if ($cambios === []) {
                 return;
             }
@@ -288,6 +225,84 @@ class PersonaService
                 $this->detalle($idBitacora, $id, $campo, null, null);
             }
         });
+    }
+
+    /**
+     * Guarda datos personales, pertenencia, grados y contactos, y dice qué
+     * campos cambiaron (sin valores: son datos personales). No escribe en la
+     * bitácora: quien la llama decide en qué movimiento van.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array<int, string>
+     */
+    private function guardarDatos(int $id, array $datos): array
+    {
+        $actual = DB::table('persona')->where('pers_id_persona', $id)->lockForUpdate()->first();
+        $cambios = [];
+
+        // Datos personales y pertenencia
+        $nuevos = [
+            'pers_nombre' => $datos['nombre'],
+            'pers_primer_apellido' => $datos['primer_apellido'],
+            'pers_segundo_apellido' => $datos['segundo_apellido'],
+            'pers_curp' => $datos['curp'],
+            'pers_genero' => $datos['genero'],
+            'pers_id_institucion_educativa' => $datos['institucion'],
+            'pers_id_organizacion' => $datos['organizacion'],
+        ];
+        $campos = [
+            'pers_nombre' => 'Nombre', 'pers_primer_apellido' => 'Primer apellido', 'pers_segundo_apellido' => 'Segundo apellido',
+            'pers_curp' => 'CURP', 'pers_genero' => 'Género', 'pers_id_institucion_educativa' => 'Pertenencia', 'pers_id_organizacion' => 'Pertenencia',
+        ];
+        foreach ($nuevos as $columna => $valor) {
+            if ((string) $actual->{$columna} !== (string) $valor) {
+                $cambios[] = $campos[$columna];
+            }
+        }
+        DB::table('persona')->where('pers_id_persona', $id)->update($nuevos);
+
+        // Grados
+        $antes = DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->pluck('pena_id_nivel_academico')->map(fn ($g) => (int) $g)->sort()->values()->all();
+        $despues = collect($datos['grados'])->unique()->sort()->values()->all();
+        if ($antes !== $despues) {
+            DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->delete();
+            DB::table('persona_nivel_academico')->insert(array_map(fn (int $g) => ['pena_id_persona' => $id, 'pena_id_nivel_academico' => $g], $despues));
+            $cambios[] = 'Grado académico';
+        }
+
+        // Contactos: si cambiaron, se reemplazan (la bitácora dice si fueron correos u otros).
+        // El primero de cada tipo es el obligatorio: cuenta cuál es; el orden de los demás, no.
+        $correo = $this->idTipoCorreo();
+        $firma = function (iterable $lista, bool $correos) use ($correo): array {
+            $texto = fn ($c) => implode('|', [$c['tipo'], $c['valor'], $c['lada'] ?? '', $c['extension'] ?? '', $c['visible'] ? 1 : 0]);
+            $grupo = collect($lista)->filter(fn ($c) => ((int) $c['tipo'] === $correo) === $correos)->values();
+            $primero = $grupo->first();
+
+            return [$primero === null ? '' : $texto($primero), ...$grupo->slice(1)->map($texto)->sort()->values()->all()];
+        };
+        $previos = DB::table('contacto')->where('cont_id_persona', $id)->orderBy('cont_id_contacto')->get()
+            ->map(fn ($c) => ['tipo' => $c->cont_id_tipo_contacto, 'valor' => $c->cont_valor, 'lada' => $c->cont_lada, 'extension' => $c->cont_extension, 'visible' => (bool) $c->cont_visible]);
+        $cambioCorreo = $firma($previos, true) !== $firma($datos['contactos'], true);
+        $cambioOtros = $firma($previos, false) !== $firma($datos['contactos'], false);
+        if ($cambioCorreo || $cambioOtros) {
+            DB::table('contacto')->where('cont_id_persona', $id)->delete();
+            DB::table('contacto')->insert(array_map(fn (array $c) => [
+                'cont_id_persona' => $id,
+                'cont_id_tipo_contacto' => $c['tipo'],
+                'cont_valor' => $c['valor'],
+                'cont_lada' => $c['lada'],
+                'cont_extension' => $c['extension'],
+                'cont_visible' => $c['visible'],
+            ], $datos['contactos']));
+            if ($cambioCorreo) {
+                $cambios[] = 'Correo';
+            }
+            if ($cambioOtros) {
+                $cambios[] = 'Contacto';
+            }
+        }
+
+        return array_values(array_unique($cambios));
     }
 
     /**
@@ -347,9 +362,15 @@ class PersonaService
     public function registrar(Usuario $actor, array $datos, ?int $existente = null): int
     {
         return DB::transaction(function () use ($actor, $datos, $existente): int {
+            // Un solo movimiento en la bitácora: la persona (registrada, o modificada si
+            // ya tenía cuenta) y, como detalles, sus designaciones y los puestos creados
             if ($existente !== null) {
-                $this->actualizar($actor, $existente, $datos);
                 $id = $existente;
+                $cambios = $this->guardarDatos($id, $datos);
+                $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
+                foreach ($cambios as $campo) {
+                    $this->detalle($idBitacora, $id, $campo, null, null);
+                }
             } else {
                 $id = (int) DB::table('persona')->insertGetId([
                     'pers_nombre' => $datos['nombre'],
@@ -369,10 +390,12 @@ class PersonaService
                     'cont_extension' => $c['extension'],
                     'cont_visible' => $c['visible'],
                 ], $datos['contactos']));
-                $this->bitacora($actor, 'Registro', 'PERSONA', $id);
+                $idBitacora = $this->bitacora($actor, 'Registro', 'PERSONA', $id);
             }
 
+            $puestos = app(PuestoService::class);
             foreach ($datos['cargos'] as $cargo) {
+                $creado = false;
                 $puesto = $this->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
                 if ($puesto === null) {
                     $puesto = (int) DB::table('puesto')->insertGetId([
@@ -383,7 +406,7 @@ class PersonaService
                         'pues_titularidad' => false,
                         'pues_activo' => true,
                     ], 'pues_id_puesto');
-                    $this->bitacora($actor, 'Registro', 'PUESTO', $puesto);
+                    $creado = true;
                 }
 
                 $designacion = (int) DB::table('designacion')->insertGetId([
@@ -391,7 +414,14 @@ class PersonaService
                     'desi_id_persona' => $id,
                     'desi_fecha_inicio' => $cargo['fecha_inicio'],
                 ], 'desi_id_designacion');
-                $this->bitacora($actor, 'Registro', 'DESIGNACION', $designacion);
+
+                // "Presidenta · Nacional, desde 20/11/2026" (el cargo en el género de la persona)
+                $nombrePuesto = $puestos->nombre($puestos->buscar($puesto), $datos['genero']);
+                $this->detalle($idBitacora, $designacion, 'Designación', null,
+                    $nombrePuesto.', desde '.Carbon::parse($cargo['fecha_inicio'])->format('d/m/Y'));
+                if ($creado) {
+                    $this->detalle($idBitacora, $puesto, 'Puesto creado', null, $puestos->nombre($puestos->buscar($puesto)));
+                }
             }
 
             return $id;

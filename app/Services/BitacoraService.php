@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Puestos\PuestoService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,18 @@ class BitacoraService
         'Restauracion' => 'restauró',
         'Eliminacion' => 'eliminó',
         'Anonimizacion' => 'anonimizó',
+    ];
+
+    /**
+     * Detalles que nombran un registro de otra tabla (su número va en
+     * BIDE_REFERENCIA): al registrar a una persona, cada designación y cada
+     * puesto creado; al borrar una designación, su persona y su puesto.
+     */
+    private const CAMPOS_DE_OTRA_TABLA = [
+        'Designación' => 'DESIGNACION',
+        'Puesto creado' => 'PUESTO',
+        'Persona' => 'PERSONA',
+        'Puesto' => 'PUESTO',
     ];
 
     /**
@@ -166,10 +179,6 @@ class BitacoraService
     }
 
     /**
-     * @param  Collection<int, string>  $cuentas
-     * @param  Collection<int, string>  $personas
-     */
-    /**
      * Lo que se nombra después del verbo: "la cuenta de Luis Ramírez (Administrador)",
      * "a la persona Ana López, de la FCA UNAM", "la zona regional Ciudad de México".
      *
@@ -219,6 +228,20 @@ class BitacoraService
     {
         $campo = $detalle->bide_campo;
 
+        // Un detalle que nombra otro registro: "Designación: Presidenta · Nacional, desde 20/11/2026".
+        // Si guardó su texto se usa ese (no cambia aunque el registro se borre después)
+        if (isset(self::CAMPOS_DE_OTRA_TABLA[$campo])) {
+            $nombre = $detalle->bide_nuevo ?? $detalle->bide_anterior
+                ?? $nombres[self::CAMPOS_DE_OTRA_TABLA[$campo]][$detalle->bide_referencia] ?? null;
+
+            return $nombre !== null ? "{$campo}: {$nombre}" : $campo;
+        }
+
+        // Al registrar, el valor es solo el nuevo: "Campo: valor"
+        if ($movimiento->bita_accion === 'Registro' && $detalle->bide_anterior === null && $detalle->bide_nuevo !== null) {
+            return "{$campo}: {$detalle->bide_nuevo}";
+        }
+
         // Si el cambio es de otro registro (por ejemplo, cada coordinación reordenada), se dice cuál
         $esDeOtro = $detalle->bide_referencia !== $movimiento->bita_referencia || $movimiento->bita_accion === 'Reordenamiento';
         if ($detalle->bide_referencia !== null && $esDeOtro) {
@@ -262,21 +285,41 @@ class BitacoraService
             // La razón social vigente (la que no tiene fecha de fin)
             'INSTITUCION_EDUCATIVA' => fn (Collection $ids) => DB::table('institucion_nombre')
                 ->whereIn('instn_id_institucion', $ids)->whereNull('instn_fecha_fin')->pluck('instn_nombre', 'instn_id_institucion'),
+            'PERSONA' => fn (Collection $ids) => $this->nombresDePersonas($ids),
+            // "Presidente · Nacional", "Coordinador Regional · Zona 2 · Noreste"
+            'PUESTO' => fn (Collection $ids) => $ids->mapWithKeys(function (int $id): array {
+                $puesto = app(PuestoService::class)->buscar($id);
+
+                return $puesto === null ? [] : [$id => app(PuestoService::class)->nombre($puesto)];
+            }),
+            // "de Ana López como Presidenta · Nacional" (el cargo en el género de la persona)
+            'DESIGNACION' => fn (Collection $ids) => DB::table('designacion as d')
+                ->join('persona as p', 'p.pers_id_persona', '=', 'd.desi_id_persona')
+                ->whereIn('d.desi_id_designacion', $ids)
+                ->get(['d.desi_id_designacion', 'd.desi_id_puesto', 'p.pers_genero', 'p.pers_nombre', 'p.pers_primer_apellido', 'p.pers_segundo_apellido'])
+                ->mapWithKeys(function (object $d): array {
+                    $puesto = app(PuestoService::class)->buscar((int) $d->desi_id_puesto);
+                    $cargo = $puesto === null ? '' : ' como '.app(PuestoService::class)->nombre($puesto, $d->pers_genero);
+
+                    return [$d->desi_id_designacion => 'de '.$this->nombre($d).$cargo];
+                }),
         ];
 
-        $nombres = [];
-
-        foreach ($movimientos->groupBy('bita_tabla') as $tabla => $deLaTabla) {
-            if (! isset($fuentes[$tabla])) {
-                continue;
+        // Qué números buscar en cada tabla: los de los movimientos y los de sus detalles
+        // (un detalle que nombra otro registro, como "Designación", va a la tabla de ese registro)
+        $ids = [];
+        foreach ($movimientos as $movimiento) {
+            $ids[$movimiento->bita_tabla][] = $movimiento->bita_referencia;
+            foreach ($detalles[$movimiento->bita_id_bitacora] ?? [] as $detalle) {
+                $ids[self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo] ?? $movimiento->bita_tabla][] = $detalle->bide_referencia;
             }
+        }
 
-            $ids = $deLaTabla->pluck('bita_referencia')
-                ->merge($deLaTabla->flatMap(fn (object $m) => ($detalles[$m->bita_id_bitacora] ?? collect())->pluck('bide_referencia')))
-                ->filter()->unique()->values();
-
-            if ($ids->isNotEmpty()) {
-                $nombres[$tabla] = $fuentes[$tabla]($ids)->all();
+        $nombres = [];
+        foreach ($ids as $tabla => $deLaTabla) {
+            $deLaTabla = collect($deLaTabla)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+            if (isset($fuentes[$tabla]) && $deLaTabla->isNotEmpty()) {
+                $nombres[$tabla] = collect($fuentes[$tabla]($deLaTabla))->all();
             }
         }
 
