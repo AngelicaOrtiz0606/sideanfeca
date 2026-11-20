@@ -87,23 +87,23 @@
             </div>
         @endif
 
-        <div class="campo campo--mitad">
+        <div class="campo campo--ancho">
             <label for="calle" class="campo__etiqueta">Calle <x-obligatorio /></label>
-            <input id="calle" name="calle" type="text" maxlength="60" autocomplete="address-line1" data-texto-seguro
+            <input id="calle" name="calle" type="text" maxlength="100" autocomplete="address-line1" data-texto-seguro
                    class="campo__entrada" value="{{ old('calle', $domicilio?->calle) }}" @required($obligatorio)
                    @if ($errors->has('calle')) aria-invalid="true" @endif>
         </div>
 
-        <div class="campo campo--cuarto">
+        <div class="campo">
             <label for="num_ext" class="campo__etiqueta">Número exterior <x-obligatorio /></label>
-            <input id="num_ext" name="num_ext" type="text" maxlength="10" data-texto-seguro
+            <input id="num_ext" name="num_ext" type="text" maxlength="20" data-texto-seguro
                    class="campo__entrada" value="{{ old('num_ext', $domicilio?->num_ext) }}" @required($obligatorio)
                    @if ($errors->has('num_ext')) aria-invalid="true" @endif>
         </div>
 
-        <div class="campo campo--cuarto">
+        <div class="campo campo--ancho">
             <label for="num_int" class="campo__etiqueta">Número interior <span class="campo__opcional">(opcional)</span></label>
-            <input id="num_int" name="num_int" type="text" maxlength="10" data-texto-seguro
+            <input id="num_int" name="num_int" type="text" maxlength="60" placeholder="Torre, piso, suite..." data-texto-seguro
                    class="campo__entrada" value="{{ old('num_int', $domicilio?->num_int) }}">
         </div>
 

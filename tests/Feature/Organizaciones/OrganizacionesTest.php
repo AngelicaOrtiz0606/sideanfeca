@@ -51,6 +51,18 @@ class OrganizacionesTest extends TestCase
         $this->assertSame(['Registro', 'ORGANIZACION', (int) $organizacion->orga_id_organizacion], [$bitacora->bita_accion, $bitacora->bita_tabla, (int) $bitacora->bita_referencia]);
     }
 
+    public function test_un_domicilio_de_oficina_largo_cabe_completo(): void
+    {
+        $datos = ['calle' => 'Blvd. Manuel Ávila Camacho', 'num_ext' => '5', 'num_int' => 'Torre B, Piso 10, Suite 1000'] + $this->caceca();
+        $this->actingAs($this->admin)->post('/organizaciones', $datos)->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('domicilio', ['domi_calle' => 'Blvd. Manuel Ávila Camacho', 'domi_num_ext' => '5', 'domi_num_int' => 'Torre B, Piso 10, Suite 1000']);
+
+        // Los nuevos límites: calle 100, exterior 20, interior 60
+        $largo = ['calle' => str_repeat('a', 101), 'num_ext' => str_repeat('1', 21), 'num_int' => str_repeat('b', 61), 'nombre' => 'Otra'] + $this->caceca();
+        $this->actingAs($this->admin)->post('/organizaciones', $largo)->assertSessionHasErrors(['calle', 'num_ext', 'num_int']);
+    }
+
     public function test_la_lista_muestra_su_ubicacion_y_el_menu_la_ofrece(): void
     {
         $this->registrar($this->caceca());

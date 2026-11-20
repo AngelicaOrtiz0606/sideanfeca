@@ -31,9 +31,9 @@ class OrganizacionRequest extends FormRequest
                 new NoRepetidoEnCatalogo('organizacion', 'orga_nombre', 'orga_id_organizacion', $id === null ? null : (int) $id, 'Ya existe la organización «:existente».')],
             'sitio_web' => ['nullable', 'string', 'max:200', 'url:http,https'],
             'colonia' => ['required', 'integer', Rule::exists('colonia', 'colo_id_colonia')],
-            'calle' => ['required', 'string', new TextoSeguro, 'max:60'],
-            'num_ext' => ['required', 'string', new TextoSeguro, 'max:10'],
-            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:10'],
+            'calle' => ['required', 'string', new TextoSeguro, 'max:100'],
+            'num_ext' => ['required', 'string', new TextoSeguro, 'max:20'],
+            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:60'],
         ];
     }
 

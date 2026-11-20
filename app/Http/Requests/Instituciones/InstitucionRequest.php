@@ -68,9 +68,9 @@ class InstitucionRequest extends FormRequest
             'sitio_web' => ['nullable', 'string', 'max:200', 'url:http,https'],
             'zona' => [Rule::requiredIf($participacion !== 'Matriz'), 'nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
             'colonia' => [Rule::requiredIf($conDomicilio), 'nullable', 'integer', Rule::exists('colonia', 'colo_id_colonia')],
-            'calle' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:60'],
-            'num_ext' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:10'],
-            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:10'],
+            'calle' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:100'],
+            'num_ext' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:20'],
+            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:60'],
         ];
     }
 
