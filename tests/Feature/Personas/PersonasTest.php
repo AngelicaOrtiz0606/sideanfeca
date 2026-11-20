@@ -41,6 +41,8 @@ class PersonasTest extends TestCase
         $this->admin = $this->crearCuenta(Rol::ADMINISTRADOR);
         // La persona que se edita: tiene cuenta, así la base la acepta sin designación
         $this->persona = (int) $this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => 'María José', 'pers_primer_apellido' => 'Núñez', 'pers_segundo_apellido' => 'Álvarez', 'pers_genero' => 'F'])->usua_id_persona;
+        // Es de los directorios: tuvo un cargo (ya terminó, así hoy no pertenece a nada)
+        $this->enDirectorio($this->persona);
         // Con su correo y su teléfono obligatorios, como los deja el formulario
         DB::table('contacto')->insert([
             ['cont_id_persona' => $this->persona, 'cont_id_tipo_contacto' => $this->tipo('Correo'), 'cont_valor' => 'maria@unam.mx', 'cont_lada' => null, 'cont_extension' => null, 'cont_visible' => true],
@@ -70,10 +72,23 @@ class PersonasTest extends TestCase
         $this->assertContains('María José Núñez Álvarez', $this->filas('/personas?situacion=sin-cargo'));
         $this->assertSame([], $this->filas('/personas?situacion=con-cargo'));
 
-        foreach (range(1, 10) as $n) {
-            $this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => "Persona {$n}", 'pers_primer_apellido' => 'Zeta']);
+        foreach (range(1, 11) as $n) {
+            $this->enDirectorio($this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => "Persona {$n}", 'pers_primer_apellido' => 'Zeta'])->usua_id_persona);
         }
         $this->actingAs($this->admin)->get('/personas')->assertSee('Mostrando 1–10 de 12');
+    }
+
+    public function test_quien_solo_tiene_cuenta_no_esta_en_personas(): void
+    {
+        // El administrador que entra solo tiene cuenta: se ve en Usuarios, no aquí
+        $soloCuenta = (int) $this->admin->usua_id_persona;
+        $this->assertNotContains($this->nombreDe($soloCuenta), $this->filas('/personas'));
+        $this->actingAs($this->admin)->get("/personas/{$soloCuenta}")->assertNotFound();
+        $this->actingAs($this->admin)->get("/personas/{$soloCuenta}/edit")->assertNotFound();
+        $this->guardar([], $soloCuenta)->assertNotFound();
+
+        // Con cuenta y con un cargo (aunque ya terminó): sí está
+        $this->assertContains('María José Núñez Álvarez', $this->filas('/personas'));
     }
 
     // ---- Datos personales ----
@@ -316,10 +331,40 @@ class PersonasTest extends TestCase
         return $id;
     }
 
+    /**
+     * La deja en los directorios con un cargo que ya terminó: para designarla
+     * pertenece un momento a una organización y luego se le regresa la suya.
+     */
+    private function enDirectorio(int $persona): void
+    {
+        $antes = DB::table('persona')->where('pers_id_persona', $persona)->first(['pers_id_institucion_educativa', 'pers_id_organizacion']);
+        $organizacion = DB::table('organizacion')->value('orga_id_organizacion') ?? DB::table('organizacion')->insertGetId([
+            'orga_nombre' => 'Organización de prueba',
+            'orga_id_domicilio' => DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $this->crearInstitucion('Observadora'))->value('ined_id_domicilio'),
+            'orga_activo' => true,
+        ], 'orga_id_organizacion');
+
+        DB::table('persona')->where('pers_id_persona', $persona)->update(['pers_id_institucion_educativa' => null, 'pers_id_organizacion' => $organizacion]);
+        // Un año distinto para cada una: un puesto no tiene dos titulares a la vez
+        $puesto = $this->puestoNacional();
+        $anio = 1980 + DB::table('designacion')->where('desi_id_puesto', $puesto)->count();
+        DB::table('designacion')->insert(['desi_id_puesto' => $puesto, 'desi_id_persona' => $persona, 'desi_fecha_inicio' => "{$anio}-01-01", 'desi_fecha_fin' => "{$anio}-12-31"]);
+        DB::table('persona')->where('pers_id_persona', $persona)->update(['pers_id_institucion_educativa' => $antes->pers_id_institucion_educativa, 'pers_id_organizacion' => $antes->pers_id_organizacion]);
+    }
+
+    private function nombreDe(int $persona): string
+    {
+        $p = DB::table('persona')->where('pers_id_persona', $persona)->first();
+
+        return trim("{$p->pers_nombre} {$p->pers_primer_apellido} ".($p->pers_segundo_apellido ?? ''));
+    }
+
     private function puestoNacional(): int
     {
-        $cargo = (int) DB::table('cargo')->insertGetId(['carg_nombre_m' => 'Presidente', 'carg_nombre_f' => 'Presidenta', 'carg_nivel' => 'Nacional', 'carg_activo' => true], 'carg_id_cargo');
+        $cargo = (int) (DB::table('cargo')->where('carg_nombre_m', 'Presidente')->value('carg_id_cargo')
+            ?? DB::table('cargo')->insertGetId(['carg_nombre_m' => 'Presidente', 'carg_nombre_f' => 'Presidenta', 'carg_nivel' => 'Nacional', 'carg_activo' => true], 'carg_id_cargo'));
 
-        return (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $cargo], 'pues_id_puesto');
+        return (int) (DB::table('puesto')->where('pues_id_cargo', $cargo)->whereNull('pues_id_institucion_educativa')->value('pues_id_puesto')
+            ?? DB::table('puesto')->insertGetId(['pues_id_cargo' => $cargo], 'pues_id_puesto'));
     }
 }

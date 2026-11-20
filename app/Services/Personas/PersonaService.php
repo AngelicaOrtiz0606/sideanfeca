@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
  * (institución u organización, opcional), grados académicos y contactos.
  *
  * - Las personas ocultas (PERS_OCULTA_ADMIN) no aparecen aquí (M8).
+ * - Aquí solo están las personas de los directorios (con al menos una
+ *   designación, vigente o pasada). Quien solo tiene cuenta va en Usuarios.
  * - La bitácora no guarda valores personales: solo qué campo cambió
  *   (bitacora_detalle_registrar lo exige). Por eso los detalles de esta
  *   tabla van sin valor anterior ni nuevo.
@@ -342,6 +344,9 @@ class PersonaService
             ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'i.ined_id_zona_regional')
             ->leftJoin('organizacion as o', 'o.orga_id_organizacion', '=', 'p.pers_id_organizacion')
             ->where('p.pers_oculta_admin', false)
+            // Solo las de los directorios: tienen o tuvieron un cargo. Quien solo tiene
+            // cuenta se administra en Usuarios (si tiene ambas cosas, aparece en las dos)
+            ->whereExists(fn (Builder $e) => $e->from('designacion as dd')->whereColumn('dd.desi_id_persona', 'p.pers_id_persona'))
             ->select([
                 'p.pers_id_persona as id',
                 'p.pers_nombre as nombre',
