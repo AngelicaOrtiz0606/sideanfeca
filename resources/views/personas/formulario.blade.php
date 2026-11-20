@@ -2,8 +2,8 @@
     Formulario de una persona, en pantalla propia, por secciones numeradas:
     1. Datos personales (la CURP avisa en amarillo si su H/M no coincide con el género).
     2. Pertenece a: una institución (buscador), una organización o ninguna.
-    3. Cargo (solo al registrar): el primer cargo, con su ámbito según el
-       nivel y desde cuándo. Si el puesto no existe, se crea al guardar.
+    3. Cargos (solo al registrar): uno o varios, como los contactos; cada uno
+       con su nivel, su ámbito y desde cuándo. Si el puesto no existe, se crea.
     4. Grados académicos: varios o ninguno.
     5. Contactos: un correo y un teléfono obligatorios, que siempre se muestran
        en el sitio; aparte, otros contactos opcionales (filas que se agregan y
@@ -33,10 +33,10 @@
     // Al registrar: el número de cada sección después de "Pertenece a" se recorre por el cargo
     $siguiente = $esNueva ? 4 : 3;
     $regresar = $esNueva ? route('personas.index') : route('personas.show', $persona->id);
-    $cargoElegido = (int) old('cargo');
-    // Primero el nivel: así la lista de cargos es corta
-    $nivelElegido = old('nivel_cargo', $cargos->firstWhere('id', $cargoElegido)?->nivel);
-    $nivelesCargo = ['Nacional' => 'Nacionales', 'Regional' => 'Regionales', 'Institucional' => 'De una institución'];
+    // Al registrar: sus cargos (los que se escribieron si hubo un error; si no, uno vacío)
+    $hoy = now()->toDateString();
+    $filaCargo = fn (array $c) => (object) ['nivel' => $c['nivel'] ?? null, 'cargo' => $c['cargo'] ?? null, 'zona' => $c['zona'] ?? null, 'coordinacion' => $c['coordinacion'] ?? null, 'fecha_inicio' => $c['fecha_inicio'] ?? $hoy];
+    $filasCargo = collect(old('cargos') ?: [[]])->values()->map(fn ($c) => $filaCargo(is_array($c) ? $c : []));
 @endphp
 
 @section('titulo', $esNueva ? 'Nueva persona' : 'Editar '.$nombre)
@@ -158,68 +158,23 @@
                 </x-seccion-formulario>
 
                 @if ($esNueva)
-                    {{-- 3. Cargo --}}
-                    <x-seccion-formulario id="seccion-cargo" numero="3" titulo="Cargo" descripcion="El cargo que ocupa en ANFECA. Si el puesto aún no existe, se crea al guardar.">
-                        <fieldset class="campo">
-                            <legend class="campo__etiqueta">Nivel del cargo <x-obligatorio /></legend>
-                            <div class="segmentado">
-                                @foreach (['Nacional' => 'Nacional', 'Regional' => 'Regional', 'Institucional' => 'De una institución'] as $nivel => $texto)
-                                    <label class="segmentado__opcion">
-                                        <input type="radio" name="nivel_cargo" value="{{ $nivel }}" required @checked($nivelElegido === $nivel) data-nivel-cargo>
-                                        {{ $texto }}
-                                    </label>
-                                @endforeach
-                            </div>
-                        </fieldset>
-
-                        <div class="formulario__rejilla formulario__rejilla--cargo" data-cargo>
-                            <div class="campo campo--mitad">
-                                <label for="persona-cargo" class="campo__etiqueta">Cargo <x-obligatorio /></label>
-                                <select id="persona-cargo" name="cargo" class="campo__entrada" required data-cargo-elegido
-                                        @if ($errors->has('cargo')) aria-invalid="true" @endif>
-                                    <option value="" data-vacio>Primero elige el nivel</option>
-                                    @foreach ($nivelesCargo as $nivel => $grupo)
-                                        <optgroup label="{{ $grupo }}">
-                                            @foreach ($cargos->where('nivel', $nivel) as $cargo)
-                                                <option value="{{ $cargo->id }}" data-nivel="{{ $cargo->nivel }}" @selected($cargoElegido === $cargo->id)>
-                                                    {{ $cargo->nombre === $cargo->nombre_f ? $cargo->nombre : $cargo->nombre.' / '.$cargo->nombre_f }}
-                                                </option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="campo campo--mitad">
-                                <label for="persona-fecha-inicio" class="campo__etiqueta">Desde <x-obligatorio /></label>
-                                <input id="persona-fecha-inicio" name="fecha_inicio" type="date" required class="campo__entrada"
-                                       min="1950-01-01" max="{{ now()->toDateString() }}" value="{{ old('fecha_inicio', now()->toDateString()) }}"
-                                       @if ($errors->has('fecha_inicio')) aria-invalid="true" @endif>
-                            </div>
-
-                            <div class="campo campo--mitad" data-solo-nivel="Regional" hidden>
-                                <label for="persona-zona" class="campo__etiqueta">Zona regional <x-obligatorio /></label>
-                                <select id="persona-zona" name="zona" class="campo__entrada" required disabled
-                                        @if ($errors->has('zona')) aria-invalid="true" @endif>
-                                    <option value="">Elige la zona</option>
-                                    @foreach ($zonas as $zona)
-                                        <option value="{{ $zona->id }}" @selected((int) old('zona') === $zona->id)>Zona {{ $zona->numero }} · {{ $zona->nombre }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="campo campo--mitad" data-solo-nivel="Nacional Regional" hidden>
-                                <label for="persona-coordinacion" class="campo__etiqueta">Coordinación nacional <span class="campo__opcional">(opcional)</span></label>
-                                <select id="persona-coordinacion" name="coordinacion" class="campo__entrada" disabled
-                                        @if ($errors->has('coordinacion')) aria-invalid="true" @endif>
-                                    <option value="">Ninguna</option>
-                                    @foreach ($coordinaciones as $coordinacion)
-                                        <option value="{{ $coordinacion->id }}" @selected((int) old('coordinacion') === $coordinacion->id)>{{ $coordinacion->nombre }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <p class="campo--completo campo__ayuda" data-solo-nivel="Institucional" hidden>
-                                Es un cargo de la institución a la que pertenece (sección 2).
-                            </p>
+                    {{-- 3. Cargos (uno o varios) --}}
+                    <x-seccion-formulario id="seccion-cargo" numero="3" titulo="Cargos" descripcion="Los cargos que ocupa en ANFECA. Si un puesto aún no existe, se crea al guardar."
+                                          data-cargos data-maximo="{{ \App\Http\Requests\Personas\PersonaRequest::MAXIMO_CARGOS }}">
+                        <div class="filas-cargo" data-cargos-lista>
+                            @foreach ($filasCargo as $i => $fila)
+                                @include('personas._fila-cargo', ['i' => $i, 'fila' => $fila])
+                            @endforeach
                         </div>
+
+                        <button type="button" class="boton boton--secundario tabla-contactos__agregar" data-cargo-agregar>
+                            <x-icono nombre="mas" />
+                            Agregar otro cargo
+                        </button>
+
+                        <template data-cargo-plantilla>
+                            @include('personas._fila-cargo', ['i' => '__i__', 'fila' => $filaCargo([])])
+                        </template>
                     </x-seccion-formulario>
                 @endif
 

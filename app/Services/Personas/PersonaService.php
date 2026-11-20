@@ -337,12 +337,12 @@ class PersonaService
     }
 
     /**
-     * Registra a una persona con su primer cargo, todo junto: sus datos,
-     * pertenencia, grados y contactos; el puesto (si aún no existe, se crea
-     * con el cargo y su ámbito) y la designación. Si ya tenía cuenta
+     * Registra a una persona con sus cargos, todo junto: sus datos,
+     * pertenencia, grados y contactos; y por cada cargo, el puesto (si aún no
+     * existe, se crea con el cargo y su ámbito) y la designación. Si ya tenía cuenta
      * ($existente), se usan y actualizan sus datos en lugar de duplicarla.
      *
-     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array<string, mixed>>, cargo: array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}}  $datos
+     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array<string, mixed>>, cargos: array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>}  $datos
      */
     public function registrar(Usuario $actor, array $datos, ?int $existente = null): int
     {
@@ -372,26 +372,27 @@ class PersonaService
                 $this->bitacora($actor, 'Registro', 'PERSONA', $id);
             }
 
-            $cargo = $datos['cargo'];
-            $puesto = $this->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
-            if ($puesto === null) {
-                $puesto = (int) DB::table('puesto')->insertGetId([
-                    'pues_id_cargo' => $cargo['cargo'],
-                    'pues_id_zona_regional' => $cargo['zona'],
-                    'pues_id_coordinacion_nacional' => $cargo['coordinacion'],
-                    'pues_id_institucion_educativa' => $cargo['institucion'],
-                    'pues_titularidad' => false,
-                    'pues_activo' => true,
-                ], 'pues_id_puesto');
-                $this->bitacora($actor, 'Registro', 'PUESTO', $puesto);
-            }
+            foreach ($datos['cargos'] as $cargo) {
+                $puesto = $this->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
+                if ($puesto === null) {
+                    $puesto = (int) DB::table('puesto')->insertGetId([
+                        'pues_id_cargo' => $cargo['cargo'],
+                        'pues_id_zona_regional' => $cargo['zona'],
+                        'pues_id_coordinacion_nacional' => $cargo['coordinacion'],
+                        'pues_id_institucion_educativa' => $cargo['institucion'],
+                        'pues_titularidad' => false,
+                        'pues_activo' => true,
+                    ], 'pues_id_puesto');
+                    $this->bitacora($actor, 'Registro', 'PUESTO', $puesto);
+                }
 
-            $designacion = (int) DB::table('designacion')->insertGetId([
-                'desi_id_puesto' => $puesto,
-                'desi_id_persona' => $id,
-                'desi_fecha_inicio' => $cargo['fecha_inicio'],
-            ], 'desi_id_designacion');
-            $this->bitacora($actor, 'Registro', 'DESIGNACION', $designacion);
+                $designacion = (int) DB::table('designacion')->insertGetId([
+                    'desi_id_puesto' => $puesto,
+                    'desi_id_persona' => $id,
+                    'desi_fecha_inicio' => $cargo['fecha_inicio'],
+                ], 'desi_id_designacion');
+                $this->bitacora($actor, 'Registro', 'DESIGNACION', $designacion);
+            }
 
             return $id;
         });

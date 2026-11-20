@@ -23,10 +23,11 @@ use Illuminate\Validation\Rule;
  * - Otros contactos (opcionales, por ejemplo el celular): correo válido (en
  *   minúsculas) o número de 7 a 10 dígitos; la lada (2 o 3) y la extensión
  *   (hasta 5) solo si el tipo las permite; y si es visible en el sitio.
- * - Al registrar (Nueva persona), además su primer cargo: el cargo, su ámbito
- *   según el nivel (zona y coordinación; un cargo institucional es de la
- *   institución a la que pertenece) y la fecha de inicio. Necesita pertenecer
- *   a algo, y el puesto no debe estar ocupado en esa fecha. Si ya tenía cuenta
+ * - Al registrar (Nueva persona), además sus cargos (uno o varios, como los
+ *   contactos): cada uno con su ámbito según el nivel (zona y coordinación;
+ *   un cargo institucional es de la institución a la que pertenece) y la
+ *   fecha de inicio. Necesita pertenecer a algo; ningún puesto debe estar
+ *   ocupado en esa fecha ni repetirse. Si ya tenía cuenta
  *   (persona_existente), se usan sus datos en lugar de duplicarla.
  */
 class PersonaRequest extends FormRequest
@@ -34,6 +35,8 @@ class PersonaRequest extends FormRequest
     public const CURP = '/^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]$/';
 
     public const MAXIMO_CONTACTOS = 20;
+
+    public const MAXIMO_CARGOS = 10;
 
     /** @var array<int, object>|null */
     private ?array $tipos = null;
@@ -66,6 +69,13 @@ class PersonaRequest extends FormRequest
             })->values()->all();
 
         $telefono = is_array($this->input('telefono')) ? $this->input('telefono') : [];
+
+        if ($this->route('persona') === null) {
+            // Filas de cargo sin nada elegido (por ejemplo, una agregada sin llenar) no cuentan
+            $this->merge(['cargos' => collect(is_array($this->input('cargos')) ? $this->input('cargos') : [])
+                ->filter(fn ($c) => is_array($c) && (filled($c['cargo'] ?? null) || filled($c['zona'] ?? null)))
+                ->values()->all()]);
+        }
 
         $this->merge([
             'correo' => is_string($this->input('correo')) ? mb_strtolower(trim($this->input('correo'))) : $this->input('correo'),
@@ -197,15 +207,16 @@ class PersonaRequest extends FormRequest
             'telefono.lada.regex' => 'La lada lleva 2 o 3 dígitos.',
             'telefono.extension.regex' => 'La extensión lleva hasta 5 dígitos.',
             'persona_existente.integer' => 'No encontramos a esa persona. Vuelve a buscarla.',
-            'cargo.required' => 'Elige el cargo.',
-            'cargo.exists' => 'Elige un cargo activo de la lista.',
-            'zona.required' => 'Elige la zona regional del cargo.',
-            'zona.exists' => 'Elige una zona de la lista.',
-            'coordinacion.exists' => 'Elige una coordinación activa de la lista.',
-            'fecha_inicio.required' => 'Escribe desde cuándo tiene el cargo.',
-            'fecha_inicio.date' => 'Escribe una fecha válida.',
-            'fecha_inicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a 1950.',
-            'fecha_inicio.before_or_equal' => 'La fecha de inicio no puede ser posterior a hoy.',
+            'cargos.required' => 'Elige al menos un cargo.',
+            'cargos.max' => 'Puede registrar hasta '.self::MAXIMO_CARGOS.' cargos a la vez.',
+            'cargos.*.cargo.required' => 'Elige el cargo de cada fila o quítala.',
+            'cargos.*.cargo.exists' => 'Elige cargos activos de la lista.',
+            'cargos.*.zona.exists' => 'Elige una zona de la lista.',
+            'cargos.*.coordinacion.exists' => 'Elige una coordinación activa de la lista.',
+            'cargos.*.fecha_inicio.required' => 'Escribe desde cuándo tiene cada cargo.',
+            'cargos.*.fecha_inicio.date' => 'Escribe una fecha válida.',
+            'cargos.*.fecha_inicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a 1950.',
+            'cargos.*.fecha_inicio.before_or_equal' => 'La fecha de inicio no puede ser posterior a hoy.',
             'contactos.max' => 'Puede tener hasta '.self::MAXIMO_CONTACTOS.' contactos.',
             'contactos.*.tipo.required' => 'Elige el tipo de cada contacto.',
             'contactos.*.valor.required' => 'Escribe cada contacto o quita la fila.',
@@ -271,22 +282,26 @@ class PersonaRequest extends FormRequest
     }
 
     /**
-     * El primer cargo, listo para PersonaService::registrar: lo que no aplica
-     * al nivel del cargo va vacío.
+     * Los cargos, listos para PersonaService::registrar: lo que no aplica al
+     * nivel de cada cargo va vacío.
      *
-     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}
+     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>
      */
-    public function cargo(): array
+    public function cargos(): array
     {
-        $nivel = $this->nivel();
+        $institucion = $this->pertenencia()['institucion'];
 
-        return [
-            'cargo' => (int) $this->input('cargo'),
-            'zona' => $nivel === 'Regional' ? (int) $this->input('zona') : null,
-            'coordinacion' => $nivel !== 'Institucional' && filled($this->input('coordinacion')) ? (int) $this->input('coordinacion') : null,
-            'institucion' => $nivel === 'Institucional' ? $this->pertenencia()['institucion'] : null,
-            'fecha_inicio' => (string) $this->input('fecha_inicio'),
-        ];
+        return array_map(function (array $c) use ($institucion) {
+            $nivel = $this->nivelDe($c['cargo'] ?? null);
+
+            return [
+                'cargo' => (int) $c['cargo'],
+                'zona' => $nivel === 'Regional' && filled($c['zona'] ?? null) ? (int) $c['zona'] : null,
+                'coordinacion' => $nivel !== 'Institucional' && filled($c['coordinacion'] ?? null) ? (int) $c['coordinacion'] : null,
+                'institucion' => $nivel === 'Institucional' ? $institucion : null,
+                'fecha_inicio' => (string) $c['fecha_inicio'],
+            ];
+        }, (array) $this->input('cargos', []));
     }
 
     private function registrando(): bool
@@ -294,11 +309,14 @@ class PersonaRequest extends FormRequest
         return $this->route('persona') === null;
     }
 
-    private function nivel(): ?string
+    private function nivelDe(mixed $cargo): ?string
     {
-        $cargo = $this->input('cargo');
+        static $niveles = [];
+        if (! ctype_digit((string) $cargo)) {
+            return null;
+        }
 
-        return ctype_digit((string) $cargo) ? DB::table('cargo')->where('carg_id_cargo', (int) $cargo)->value('carg_nivel') : null;
+        return $niveles[(int) $cargo] ??= DB::table('cargo')->where('carg_id_cargo', (int) $cargo)->value('carg_nivel');
     }
 
     /**
@@ -306,26 +324,26 @@ class PersonaRequest extends FormRequest
      */
     private function reglasCargo(): array
     {
-        $nivel = $this->nivel();
-
         return [
             'persona_existente' => ['nullable', 'integer'],
-            'cargo' => ['required', 'integer', Rule::exists('cargo', 'carg_id_cargo')->where('carg_activo', true)],
-            'zona' => [Rule::requiredIf($nivel === 'Regional'), 'nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
-            'coordinacion' => ['nullable', 'integer', Rule::exists('coordinacion_nacional', 'cona_id_coordinacion_nacional')->where('cona_activo', true)],
-            'fecha_inicio' => ['required', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:today'],
+            'cargos' => ['required', 'array', 'max:'.self::MAXIMO_CARGOS],
+            'cargos.*.cargo' => ['required', 'integer', Rule::exists('cargo', 'carg_id_cargo')->where('carg_activo', true)],
+            'cargos.*.zona' => ['nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
+            'cargos.*.coordinacion' => ['nullable', 'integer', Rule::exists('coordinacion_nacional', 'cona_id_coordinacion_nacional')->where('cona_activo', true)],
+            'cargos.*.fecha_inicio' => ['required', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:today'],
         ];
     }
 
     /**
-     * El cargo según la pertenencia, y que el puesto esté libre en esa fecha.
+     * Cada cargo según la pertenencia, sin repetirse, y que su puesto esté
+     * libre en esa fecha. Los mensajes dicen de qué fila ("Cargo 2: ...").
      */
     private function revisarCargo(Validator $validator): void
     {
         if (filled($this->input('persona_existente')) && $this->existente() === null) {
             $validator->errors()->add('persona_existente', 'Esa persona ya no está disponible para registrarla aquí. Vuelve a buscarla.');
         }
-        if ($validator->errors()->hasAny(['cargo', 'zona', 'coordinacion', 'fecha_inicio', 'pertenencia', 'institucion', 'organizacion'])) {
+        if ($validator->errors()->hasAny(['cargos', 'pertenencia', 'institucion', 'organizacion'])) {
             return;
         }
 
@@ -335,25 +353,44 @@ class PersonaRequest extends FormRequest
 
             return;
         }
-        if ($this->nivel() === 'Institucional' && $pertenencia !== 'institucion') {
-            $validator->errors()->add('cargo', 'Un cargo institucional es de la institución a la que pertenece: elige la institución en «Pertenece a».');
-
-            return;
-        }
 
         $servicio = app(PersonaService::class);
-        $cargo = $this->cargo();
-        $puesto = $servicio->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
-        if ($puesto === null) {
-            return; // Se creará al guardar
-        }
-        if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
-            $validator->errors()->add('cargo', 'Ese puesto está desactivado. Actívalo en Puestos o elige otro.');
+        $vistos = [];
+        foreach ($this->cargos() as $i => $cargo) {
+            $n = $i + 1;
+            $campo = "cargos.{$i}.cargo";
+            if ($validator->errors()->has($campo) || $validator->errors()->has("cargos.{$i}.fecha_inicio")) {
+                continue;
+            }
+            $nivel = $this->nivelDe($cargo['cargo']);
+            if ($nivel === 'Institucional' && $pertenencia !== 'institucion') {
+                $validator->errors()->add($campo, "Cargo {$n}: un cargo institucional es de la institución a la que pertenece; elige la institución en «Pertenece a».");
 
-            return;
-        }
-        if (($ocupante = $servicio->ocupanteDesde($puesto, $cargo['fecha_inicio'])) !== null) {
-            $validator->errors()->add('cargo', "Ese puesto ya lo ocupa {$ocupante} en esa fecha. Primero registra que dejó el cargo.");
+                continue;
+            }
+            if ($nivel === 'Regional' && $cargo['zona'] === null) {
+                $validator->errors()->add("cargos.{$i}.zona", "Cargo {$n}: elige la zona regional.");
+
+                continue;
+            }
+
+            $clave = implode('|', [$cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']]);
+            if (isset($vistos[$clave])) {
+                $validator->errors()->add($campo, "Cargo {$n}: es el mismo puesto que el cargo {$vistos[$clave]}.");
+
+                continue;
+            }
+            $vistos[$clave] = $n;
+
+            $puesto = $servicio->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
+            if ($puesto === null) {
+                continue; // Se creará al guardar
+            }
+            if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
+                $validator->errors()->add($campo, "Cargo {$n}: ese puesto está desactivado. Actívalo en Puestos o elige otro.");
+            } elseif (($ocupante = $servicio->ocupanteDesde($puesto, $cargo['fecha_inicio'])) !== null) {
+                $validator->errors()->add($campo, "Cargo {$n}: ese puesto ya lo ocupa {$ocupante} en esa fecha. Primero registra que dejó el cargo.");
+            }
         }
     }
 

@@ -73,10 +73,10 @@ class PersonaController extends Controller
 
     public function store(PersonaRequest $request): RedirectResponse
     {
-        $datos = $request->datos() + ['cargo' => $request->cargo()];
+        $datos = $request->datos() + ['cargos' => $request->cargos()];
         $id = $this->personas->registrar($request->user(), $datos, $request->existente());
 
-        return redirect()->route('personas.show', $id)->with('estado', 'Se registró '.$this->personas->nombreCompleto((object) $datos).' con su cargo.');
+        return redirect()->route('personas.show', $id)->with('estado', 'Se registró '.$this->personas->nombreCompleto((object) $datos).(count($datos['cargos']) > 1 ? ' con sus cargos.' : ' con su cargo.'));
     }
 
     /**

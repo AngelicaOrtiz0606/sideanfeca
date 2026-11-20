@@ -494,3 +494,41 @@
     color: var(--color-texto-suave);
     font-size: 0.875rem;
 }
+
+/* ---------- Nueva persona: cada cargo en su propio recuadro ---------- */
+.filas-cargo {
+    display: grid;
+    gap: 1rem;
+}
+
+.fila-cargo {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem 1.125rem 1.125rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio);
+}
+
+.fila-cargo__cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.5rem;
+}
+
+.fila-cargo__titulo {
+    color: var(--color-secundario);
+    font-weight: 700;
+}
+
+@media (width < 40rem) {
+    .fila-cargo {
+        padding: 0.875rem;
+    }
+}
+
+/* Con un solo cargo no se ofrece quitarlo (el botón lleva hidden) */
+.fila-cargo__quitar[hidden] {
+    display: none;
+}

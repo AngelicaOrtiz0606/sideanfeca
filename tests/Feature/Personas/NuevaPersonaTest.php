@@ -47,7 +47,8 @@ class NuevaPersonaTest extends TestCase
     {
         $this->actingAs($this->admin)->get('/personas')->assertSee('href="'.route('personas.create').'"', false)->assertSee('Nueva persona');
         $this->actingAs($this->admin)->get('/personas/create')->assertOk()
-            ->assertSee('Registrar persona')->assertSee('name="nivel_cargo"', false)->assertSee('name="cargo"', false)->assertSee('name="fecha_inicio"', false);
+            ->assertSee('Registrar persona')->assertSee('name="cargos[0][nivel]"', false)->assertSee('name="cargos[0][cargo]"', false)->assertSee('name="cargos[0][fecha_inicio]"', false)
+            ->assertSee('Agregar otro cargo');
     }
 
     public function test_registrar_con_un_cargo_nacional_crea_el_puesto_y_la_designacion(): void
@@ -74,7 +75,7 @@ class NuevaPersonaTest extends TestCase
         $this->registrar(['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'])->assertSessionHasNoErrors();
 
         $this->registrar(['cargo' => $presidente, 'nombre' => 'Beatriz', 'curp' => '', 'correo' => 'bea@caceca.org'])
-            ->assertSessionHasErrors(['cargo' => 'Ese puesto ya lo ocupa Anaís Pérez López en esa fecha. Primero registra que dejó el cargo.']);
+            ->assertSessionHasErrors(['cargos.0.cargo' => 'Cargo 1: ese puesto ya lo ocupa Anaís Pérez López en esa fecha. Primero registra que dejó el cargo.']);
         $this->assertDatabaseMissing('persona', ['pers_nombre' => 'Beatriz']);
     }
 
@@ -84,14 +85,41 @@ class NuevaPersonaTest extends TestCase
         $fca = $this->crearInstitucion('Afiliada');
 
         // Perteneciendo a una organización, no
-        $this->registrar(['cargo' => $director])->assertSessionHasErrors('cargo');
+        $this->registrar(['cargo' => $director])->assertSessionHasErrors('cargos.0.cargo');
 
         $this->registrar(['cargo' => $director, 'pertenencia' => 'institucion', 'institucion' => $fca])->assertSessionHasNoErrors();
         $this->assertDatabaseHas('puesto', ['pues_id_cargo' => $director, 'pues_id_institucion_educativa' => $fca, 'pues_titularidad' => false]);
 
         $consejero = $this->cargo('Consejero', 'Regional');
         $this->registrar(['cargo' => $consejero, 'nombre' => 'Carlos', 'curp' => '', 'correo' => 'carlos@caceca.org'])
-            ->assertSessionHasErrors(['zona' => 'Elige la zona regional del cargo.']);
+            ->assertSessionHasErrors(['cargos.0.zona' => 'Cargo 1: elige la zona regional.']);
+    }
+
+    public function test_puede_registrarse_con_varios_cargos_sin_repetir_puesto(): void
+    {
+        $presidente = $this->cargo('Presidente', 'Nacional');
+        $consejero = $this->cargo('Consejero', 'Regional');
+        $zona = (int) DB::table('zona_regional')->where('zore_numero', 2)->value('zore_id_zona_regional');
+
+        // El mismo puesto dos veces, no
+        $this->registrar(['cargos' => [
+            ['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'],
+            ['cargo' => $presidente, 'fecha_inicio' => '2025-02-01'],
+        ]])->assertSessionHasErrors(['cargos.1.cargo' => 'Cargo 2: es el mismo puesto que el cargo 1.']);
+
+        // Dos cargos distintos (y una fila vacía, que no cuenta): dos designaciones
+        $this->registrar(['cargos' => [
+            ['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'],
+            ['cargo' => $consejero, 'zona' => $zona, 'fecha_inicio' => '2024-06-01'],
+            ['cargo' => '', 'fecha_inicio' => '2025-01-15'],
+        ]])->assertSessionHasNoErrors()->assertSessionHas('estado', 'Se registró Anaís Pérez López con sus cargos.');
+
+        $persona = (int) DB::table('persona')->where('pers_nombre', 'Anaís')->value('pers_id_persona');
+        $this->assertSame(2, DB::table('designacion')->where('desi_id_persona', $persona)->count());
+        $this->assertDatabaseHas('puesto', ['pues_id_cargo' => $consejero, 'pues_id_zona_regional' => $zona]);
+
+        // Sin ningún cargo, no
+        $this->registrar(['cargos' => [], 'nombre' => 'Carlos', 'correo' => 'carlos@caceca.org'])->assertSessionHasErrors(['cargos' => 'Elige al menos un cargo.']);
     }
 
     public function test_sin_pertenencia_no_recibe_cargo(): void
@@ -144,11 +172,19 @@ class NuevaPersonaTest extends TestCase
      */
     private function registrar(array $cambios): TestResponse
     {
+        // Un solo cargo ('cargo' y su ámbito) se envía como la primera fila de cargos
+        if (array_key_exists('cargo', $cambios)) {
+            $cambios['cargos'] = [array_filter([
+                'cargo' => $cambios['cargo'], 'zona' => $cambios['zona'] ?? null, 'coordinacion' => $cambios['coordinacion'] ?? null,
+                'fecha_inicio' => $cambios['fecha_inicio'] ?? '2025-01-15',
+            ], fn ($v) => $v !== null)];
+            unset($cambios['cargo'], $cambios['zona'], $cambios['coordinacion'], $cambios['fecha_inicio']);
+        }
+
         return $this->actingAs($this->admin)->post('/personas', $cambios + [
             'nombre' => 'Anaís', 'primer_apellido' => 'Pérez', 'segundo_apellido' => 'López', 'curp' => '', 'genero' => 'F',
             'pertenencia' => 'organizacion', 'organizacion' => $this->organizacion, 'grados' => [],
             'correo' => 'ana@caceca.org', 'telefono' => ['lada' => '55', 'valor' => '56228300', 'extension' => ''], 'contactos' => [],
-            'fecha_inicio' => '2025-01-15',
         ]);
     }
 
