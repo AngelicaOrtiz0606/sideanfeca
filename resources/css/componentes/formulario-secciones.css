@@ -3,7 +3,7 @@
  *
  * - Cada sección: número, título y una línea que explica qué va ahí.
  * - Opciones cortas (género, pertenencia, sector) como control segmentado;
- *   opciones múltiples (grados) como fichas; "visible" como interruptor.
+ *   los grados, desde una lista y como píldoras que se quitan; "visible" como interruptor.
  * Todas son casillas y botones de opción nativos: funcionan con teclado y
  * lectores de pantalla.
  */
@@ -100,80 +100,6 @@
 .segmentado__opcion:has(input:focus-visible) {
     outline: 3px solid var(--color-marca);
     outline-offset: 2px;
-}
-
-/* ---------- Fichas (varias opciones a la vez) ---------- */
-.fichas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.ficha-opcion {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 2.5rem;
-    padding: 0 1rem 0 0.75rem;
-    border: 1px solid var(--color-borde);
-    border-radius: 999px;
-    background: var(--color-superficie);
-    font-size: 0.9375rem;
-    cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.ficha-opcion input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* La palomita: un círculo vacío que se llena al elegir */
-.ficha-opcion__marca {
-    display: inline-grid;
-    place-items: center;
-    width: 1.125rem;
-    height: 1.125rem;
-    border: 1.5px solid var(--color-borde-control);
-    border-radius: 50%;
-}
-
-.ficha-opcion__marca .icono {
-    width: 0.75rem;
-    height: 0.75rem;
-    opacity: 0;
-}
-
-.ficha-opcion:hover {
-    border-color: var(--color-borde-control);
-}
-
-.ficha-opcion:has(input:checked) {
-    border-color: var(--color-marca);
-    background: var(--color-marca-tinte);
-    color: var(--color-marca-oscuro);
-}
-
-.ficha-opcion:has(input:checked) .ficha-opcion__marca {
-    border-color: var(--color-marca);
-    background: var(--color-marca);
-    color: #fff;
-}
-
-.ficha-opcion:has(input:checked) .ficha-opcion__marca .icono {
-    opacity: 1;
-}
-
-.ficha-opcion:has(input:focus-visible) {
-    outline: 3px solid var(--color-marca);
-    outline-offset: 2px;
-}
-
-.ficha-opcion__detalle {
-    color: var(--color-texto-suave);
-    font-size: 0.8125rem;
 }
 
 /* ---------- Interruptor (sí / no) ---------- */
@@ -506,4 +432,65 @@
     .formulario__rejilla--cargo.formulario__rejilla > .campo--mitad:not([hidden]) {
         grid-column: span 6;
     }
+}
+
+/* ---------- Grados que tiene la persona (se agregan desde una lista) ---------- */
+.grados-elegidos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+}
+
+.grados-elegidos:empty {
+    display: none;
+}
+
+.grado-elegido {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.375rem 0 0.875rem;
+    border: 1px solid var(--color-marca);
+    border-radius: 999px;
+    background: var(--color-marca-tinte);
+    color: var(--color-marca-oscuro);
+    font-size: 0.9375rem;
+}
+
+.grado-elegido__abreviatura {
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+}
+
+.grado-elegido__quitar {
+    display: inline-grid;
+    place-items: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-marca-oscuro);
+    cursor: pointer;
+}
+
+.grado-elegido__quitar:hover {
+    background: var(--color-marca-tinte-fuerte);
+}
+
+.grado-elegido__quitar:focus-visible {
+    outline: 3px solid var(--color-marca);
+    outline-offset: 1px;
+}
+
+.grado-elegido__quitar .icono {
+    width: 1rem;
+    height: 1rem;
+}
+
+.grados-elegidos__vacio {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
 }

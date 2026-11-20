@@ -10,9 +10,11 @@
  *   otros contactos son filas que se agregan (desde la plantilla) y se quitan;
  *   según el tipo aparecen la lada y la extensión, y el campo pide número o
  *   correo. En los números solo quedan dígitos ("5622 8300" → "56228300").
- * - Cargo (al registrar): según el nivel del cargo aparecen la zona
- *   (regional), la coordinación (nacional o regional) o la nota de que es de
- *   su institución (institucional).
+ * - Cargo (al registrar): primero el nivel; la lista de cargos muestra solo
+ *   los de ese nivel, y aparecen la zona (regional), la coordinación
+ *   (nacional o regional) o la nota de que es de su institución.
+ * - Grados: se agregan desde una lista (el grado elegido sale de la lista) y
+ *   cada uno se quita con su ×.
  * - ¿Ya existe? (al registrar): al dejar de escribir el nombre o la CURP,
  *   pregunta al servidor quién se parece y lo muestra con un enlace (a su
  *   ficha, o a registrarle el cargo si solo tenía cuenta).
@@ -68,13 +70,65 @@ document.querySelectorAll('form[data-persona]').forEach((formulario) => {
     // ---- Cargo (al registrar) ----
     const cargo = formulario.querySelector('[data-cargo-elegido]');
     if (cargo) {
+        // Todos los cargos, una vez; la lista se arma solo con los del nivel elegido
+        const vacio = cargo.querySelector('[data-vacio]');
+        const todos = [...cargo.querySelectorAll('option[data-nivel]')];
         const nivelCargo = () => {
-            const nivel = cargo.selectedOptions[0]?.dataset.nivel ?? '';
+            const nivel = formulario.querySelector('[data-nivel-cargo]:checked')?.value ?? '';
+            const elegido = cargo.value;
+            const delNivel = todos.filter((opcion) => opcion.dataset.nivel === nivel);
+            vacio.textContent = nivel === '' ? 'Primero elige el nivel' : 'Elige el cargo';
+            cargo.replaceChildren(vacio, ...delNivel);
+            cargo.value = delNivel.some((opcion) => opcion.value === elegido) ? elegido : '';
+            cargo.disabled = nivel === '';
             formulario.querySelectorAll('[data-solo-nivel]').forEach((bloque) => mostrar(bloque, bloque.dataset.soloNivel.split(' ').includes(nivel)));
             avisarCambio(formulario);
         };
-        cargo.addEventListener('change', nivelCargo);
+        formulario.querySelectorAll('[data-nivel-cargo]').forEach((radio) => radio.addEventListener('change', nivelCargo));
         nivelCargo();
+    }
+
+    // ---- Grados ----
+    const agregarGrado = formulario.querySelector('[data-grado-agregar]');
+    if (agregarGrado) {
+        const listaGrados = formulario.querySelector('[data-grados-lista]');
+        const sinGrados = formulario.querySelector('[data-grados-vacio]');
+        const plantillaGrado = formulario.querySelector('[data-grado-plantilla]');
+        const contar = () => { sinGrados.hidden = listaGrados.children.length > 0; avisarCambio(formulario); };
+        const opcionDe = (id) => agregarGrado.querySelector(`option[value="${id}"]`);
+
+        listaGrados.addEventListener('click', (evento) => {
+            const quitar = evento.target.closest('[data-grado-quitar]');
+            if (!quitar) {
+                return;
+            }
+            const elemento = quitar.closest('[data-grado]');
+            opcionDe(elemento.dataset.grado).disabled = false;
+            elemento.remove();
+            contar();
+            agregarGrado.focus();
+        });
+
+        agregarGrado.addEventListener('change', () => {
+            const opcion = agregarGrado.selectedOptions[0];
+            if (!opcion?.value) {
+                return;
+            }
+            // Se arma con el DOM (textos y atributos), nunca con HTML: así nada del catálogo se interpreta
+            const nuevo = plantillaGrado.content.firstElementChild.cloneNode(true);
+            nuevo.dataset.grado = opcion.value;
+            nuevo.querySelector('input').value = opcion.value;
+            nuevo.querySelector('.grado-elegido__nombre').textContent = opcion.dataset.nombre;
+            const abreviatura = nuevo.querySelector('[data-abreviatura]');
+            abreviatura.dataset.m = opcion.dataset.m;
+            abreviatura.dataset.f = opcion.dataset.f;
+            nuevo.querySelector('.solo-lectores').textContent = `Quitar ${opcion.dataset.nombre}`;
+            listaGrados.append(nuevo);
+            opcion.disabled = true;
+            agregarGrado.value = '';
+            revisar();
+            contar();
+        });
     }
 
     // ---- ¿Ya existe? (al registrar) ----

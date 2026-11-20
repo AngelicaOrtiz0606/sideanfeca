@@ -47,7 +47,7 @@ class NuevaPersonaTest extends TestCase
     {
         $this->actingAs($this->admin)->get('/personas')->assertSee('href="'.route('personas.create').'"', false)->assertSee('Nueva persona');
         $this->actingAs($this->admin)->get('/personas/create')->assertOk()
-            ->assertSee('Registrar persona')->assertSee('name="cargo"', false)->assertSee('name="fecha_inicio"', false);
+            ->assertSee('Registrar persona')->assertSee('name="nivel_cargo"', false)->assertSee('name="cargo"', false)->assertSee('name="fecha_inicio"', false);
     }
 
     public function test_registrar_con_un_cargo_nacional_crea_el_puesto_y_la_designacion(): void

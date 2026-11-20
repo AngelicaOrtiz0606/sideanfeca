@@ -195,6 +195,11 @@ class PersonasTest extends TestCase
 
         $this->guardar(['grados' => $ids])->assertSessionHasNoErrors();
         $this->assertSame(2, DB::table('persona_nivel_academico')->where('pena_id_persona', $this->persona)->count());
+
+        // En el formulario se ven como elegidos (y salen de la lista para agregar)
+        $this->actingAs($this->admin)->get("/personas/{$this->persona}/edit")
+            ->assertSee('<input type="hidden" name="grados[]" value="'.$ids[0].'">', false)
+            ->assertSee('Agregar un grado');
         $this->assertSame('Grado académico', DB::table('bitacora_detalle')->orderByDesc('bide_id_detalle')->value('bide_campo'));
         $this->actingAs($this->admin)->get("/personas/{$this->persona}")->assertSee('Mtra.');
 

@@ -34,6 +34,8 @@
     $siguiente = $esNueva ? 4 : 3;
     $regresar = $esNueva ? route('personas.index') : route('personas.show', $persona->id);
     $cargoElegido = (int) old('cargo');
+    // Primero el nivel: así la lista de cargos es corta
+    $nivelElegido = old('nivel_cargo', $cargos->firstWhere('id', $cargoElegido)?->nivel);
     $nivelesCargo = ['Nacional' => 'Nacionales', 'Regional' => 'Regionales', 'Institucional' => 'De una institución'];
 @endphp
 
@@ -158,12 +160,24 @@
                 @if ($esNueva)
                     {{-- 3. Cargo --}}
                     <x-seccion-formulario id="seccion-cargo" numero="3" titulo="Cargo" descripcion="El cargo que ocupa en ANFECA. Si el puesto aún no existe, se crea al guardar.">
+                        <fieldset class="campo">
+                            <legend class="campo__etiqueta">Nivel del cargo <x-obligatorio /></legend>
+                            <div class="segmentado">
+                                @foreach (['Nacional' => 'Nacional', 'Regional' => 'Regional', 'Institucional' => 'De una institución'] as $nivel => $texto)
+                                    <label class="segmentado__opcion">
+                                        <input type="radio" name="nivel_cargo" value="{{ $nivel }}" required @checked($nivelElegido === $nivel) data-nivel-cargo>
+                                        {{ $texto }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </fieldset>
+
                         <div class="formulario__rejilla formulario__rejilla--cargo" data-cargo>
                             <div class="campo campo--mitad">
                                 <label for="persona-cargo" class="campo__etiqueta">Cargo <x-obligatorio /></label>
                                 <select id="persona-cargo" name="cargo" class="campo__entrada" required data-cargo-elegido
                                         @if ($errors->has('cargo')) aria-invalid="true" @endif>
-                                    <option value="">Elige el cargo</option>
+                                    <option value="" data-vacio>Primero elige el nivel</option>
                                     @foreach ($nivelesCargo as $nivel => $grupo)
                                         <optgroup label="{{ $grupo }}">
                                             @foreach ($cargos->where('nivel', $nivel) as $cargo)
@@ -210,20 +224,31 @@
                 @endif
 
                 {{-- Grados académicos --}}
-                <x-seccion-formulario id="seccion-grados" :numero="$siguiente" titulo="Grados académicos" descripcion="Marca todos los que tiene. La abreviatura va antes de su nombre en los directorios." opcional>
-                    <fieldset class="campo">
-                        <legend class="solo-lectores">Grados académicos</legend>
-                        <div class="fichas">
-                            @foreach ($grados as $grado)
-                                <label class="ficha-opcion">
-                                    <input type="checkbox" name="grados[]" value="{{ $grado->id }}" @checked(in_array($grado->id, $tiene, true))>
-                                    <span class="ficha-opcion__marca" aria-hidden="true"><x-icono nombre="palomita" /></span>
-                                    {{ $grado->nombre }}
-                                    <span class="ficha-opcion__detalle" data-abreviatura data-m="{{ $grado->abr_m }}" data-f="{{ $grado->abr_f }}">{{ $genero === 'F' ? $grado->abr_f : $grado->abr_m }}</span>
-                                </label>
-                            @endforeach
+                <x-seccion-formulario id="seccion-grados" :numero="$siguiente" titulo="Grados académicos" descripcion="Agrega los que tiene. La abreviatura va antes de su nombre en los directorios." opcional>
+                    <div class="formulario__rejilla">
+                        <div class="campo campo--mitad">
+                            <label for="persona-grado" class="campo__etiqueta">Agregar un grado</label>
+                            <select id="persona-grado" class="campo__entrada" data-grado-agregar>
+                                <option value="">Elige el grado</option>
+                                @foreach ($grados as $grado)
+                                    <option value="{{ $grado->id }}" data-nombre="{{ $grado->nombre }}" data-m="{{ $grado->abr_m }}" data-f="{{ $grado->abr_f }}"
+                                            @disabled(in_array($grado->id, $tiene, true))>{{ $grado->nombre }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                    </fieldset>
+                    </div>
+
+                    {{-- Los que tiene (cada uno se quita con su ×) --}}
+                    <ul class="grados-elegidos" aria-label="Grados que tiene" data-grados-lista>
+                        @foreach ($grados->filter(fn ($g) => in_array($g->id, $tiene, true)) as $grado)
+                            @include('personas._grado-elegido', ['id' => $grado->id, 'nombre' => $grado->nombre, 'abrM' => $grado->abr_m, 'abrF' => $grado->abr_f])
+                        @endforeach
+                    </ul>
+                    <p class="grados-elegidos__vacio" data-grados-vacio @if (count($tiene) > 0) hidden @endif>Todavía no tiene grados.</p>
+
+                    <template data-grado-plantilla>
+                        @include('personas._grado-elegido', ['id' => '__id__', 'nombre' => '__nombre__', 'abrM' => '__m__', 'abrF' => '__f__'])
+                    </template>
                 </x-seccion-formulario>
 
                 {{-- Contactos --}}
