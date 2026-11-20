@@ -1,6 +1,9 @@
 {{--
     Personas: lista con filtros en el servidor (pueden ser cientos), de 10 en 10.
     El buscador se aplica solo al dejar de escribir; las listas, al cambiarlas.
+    Filtros: el buscador (nombre, CURP, correo, institución u organización, o
+    cargo vigente), el cargo, la zona (de su institución o de su cargo) y el
+    estado (con o sin cargo vigente).
     Cada fila: Consultar (ficha de solo lectura) y Editar (el formulario
     completo, ya lleno). Las personas ocultas no aparecen (M8).
 --}}
@@ -19,15 +22,22 @@
             <h1 class="pagina__titulo">Personas</h1>
             <p class="pagina__texto">Quienes ocupan o han ocupado un cargo en ANFECA, con sus grados y contactos.</p>
         </div>
+
+        <div class="pagina__acciones">
+            <a href="{{ route('personas.create') }}" class="boton boton--primario">
+                <x-icono nombre="mas" />
+                Nueva persona
+            </a>
+        </div>
     </header>
 
     <x-aviso-estado />
 
     <section class="tarjeta tarjeta--tabla" aria-label="Lista de personas">
         <form method="GET" action="{{ route('personas.index') }}" class="filtros filtros--servidor" role="search" data-filtros-servidor>
-            <label for="buscar-persona" class="solo-lectores">Buscar por nombre o CURP</label>
+            <label for="buscar-persona" class="solo-lectores">Buscar por nombre, CURP, correo, institución u organización, o cargo</label>
             <input id="buscar-persona" name="texto" type="search" class="campo__entrada filtros__buscar"
-                   placeholder="Buscar por nombre o CURP" value="{{ $filtros['texto'] }}" maxlength="100"
+                   placeholder="Nombre, CURP, correo o cargo" value="{{ $filtros['texto'] }}" maxlength="100"
                    data-filtro-escrito @if ($filtros['texto'] !== null) autofocus @endif>
 
             <button type="button" class="filtros__resumen" aria-expanded="{{ $activos > 0 ? 'true' : 'false' }}" aria-controls="filtros-opciones" data-filtros-boton>
@@ -36,11 +46,15 @@
             </button>
             <div class="filtros__opciones" id="filtros-opciones" data-filtros-opciones @if ($activos === 0) data-cerrado @endif>
                 <label class="filtros__selector">
-                    <span class="filtros__etiqueta">Grado</span>
-                    <select name="grado" class="campo__entrada">
+                    <span class="filtros__etiqueta">Cargo</span>
+                    <select name="cargo" class="campo__entrada">
                         <option value="">Todos</option>
-                        @foreach ($grados as $grado)
-                            <option value="{{ $grado->id }}" @selected($filtros['grado'] === $grado->id)>{{ $grado->nombre }}</option>
+                        @foreach (['Nacional' => 'Nacionales', 'Regional' => 'Regionales', 'Institucional' => 'De una institución'] as $nivel => $grupo)
+                            <optgroup label="{{ $grupo }}">
+                                @foreach ($cargos->where('nivel', $nivel) as $cargo)
+                                    <option value="{{ $cargo->id }}" @selected($filtros['cargo'] === $cargo->id)>{{ $cargo->nombre }}</option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
                 </label>
@@ -56,9 +70,9 @@
                 </label>
 
                 <label class="filtros__selector">
-                    <span class="filtros__etiqueta">Cargo</span>
+                    <span class="filtros__etiqueta">Estado</span>
                     <select name="situacion" class="campo__entrada">
-                        <option value="">Con o sin cargo</option>
+                        <option value="">Todas</option>
                         <option value="con-cargo" @selected($filtros['situacion'] === 'con-cargo')>Con cargo vigente</option>
                         <option value="sin-cargo" @selected($filtros['situacion'] === 'sin-cargo')>Sin cargo vigente</option>
                     </select>

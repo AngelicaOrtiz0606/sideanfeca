@@ -63,14 +63,27 @@ class PersonasTest extends TestCase
         $this->actingAs($this->admin)->get("/personas/{$this->persona}")->assertNotFound();
     }
 
-    public function test_la_lista_filtra_por_grado_zona_y_situacion_y_va_de_10_en_10(): void
+    public function test_la_lista_filtra_por_cargo_zona_y_estado_y_va_de_10_en_10(): void
     {
-        $doctorado = (int) DB::table('nivel_academico')->where('niac_nombre', 'Doctorado')->value('niac_id_nivel_academico');
-        DB::table('persona_nivel_academico')->insert(['pena_id_persona' => $this->persona, 'pena_id_nivel_academico' => $doctorado]);
-
-        $this->assertSame(['María José Núñez Álvarez'], $this->filas("/personas?grado={$doctorado}"));
         $this->assertContains('María José Núñez Álvarez', $this->filas('/personas?situacion=sin-cargo'));
         $this->assertSame([], $this->filas('/personas?situacion=con-cargo'));
+
+        // Le damos un cargo regional vigente: zona 3, en una coordinación
+        $zona = (int) DB::table('zona_regional')->where('zore_numero', 3)->value('zore_id_zona_regional');
+        $coordinacion = (int) DB::table('coordinacion_nacional')->value('cona_id_coordinacion_nacional');
+        $consejero = (int) DB::table('cargo')->insertGetId(['carg_nombre_m' => 'Vocal de prueba', 'carg_nombre_f' => 'Vocal de prueba', 'carg_nivel' => 'Regional', 'carg_activo' => true], 'carg_id_cargo');
+        $puesto = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $consejero, 'pues_id_zona_regional' => $zona, 'pues_id_coordinacion_nacional' => $coordinacion], 'pues_id_puesto');
+        $this->conPertenenciaTemporal($this->persona, fn () => DB::table('designacion')->insert(['desi_id_puesto' => $puesto, 'desi_id_persona' => $this->persona, 'desi_fecha_inicio' => '2025-01-01']));
+
+        $mia = ['María José Núñez Álvarez'];
+        $this->assertSame($mia, $this->filas('/personas?situacion=con-cargo'));
+        $this->assertSame($mia, $this->filas("/personas?cargo={$consejero}"));
+        $this->assertSame($mia, $this->filas("/personas?zona={$zona}"));
+        $this->assertSame([], $this->filas('/personas?zona='.DB::table('zona_regional')->where('zore_numero', 4)->value('zore_id_zona_regional')));
+
+        // El buscador también encuentra por correo y por cargo (sin acentos)
+        $this->assertSame($mia, $this->filas(route('personas.index', ['texto' => 'maria@unam'])));
+        $this->assertSame($mia, $this->filas(route('personas.index', ['texto' => 'vocal de PRUEBA'])));
 
         foreach (range(1, 11) as $n) {
             $this->enDirectorio($this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => "Persona {$n}", 'pers_primer_apellido' => 'Zeta'])->usua_id_persona);
@@ -349,6 +362,17 @@ class PersonasTest extends TestCase
         $puesto = $this->puestoNacional();
         $anio = 1980 + DB::table('designacion')->where('desi_id_puesto', $puesto)->count();
         DB::table('designacion')->insert(['desi_id_puesto' => $puesto, 'desi_id_persona' => $persona, 'desi_fecha_inicio' => "{$anio}-01-01", 'desi_fecha_fin' => "{$anio}-12-31"]);
+        DB::table('persona')->where('pers_id_persona', $persona)->update(['pers_id_institucion_educativa' => $antes->pers_id_institucion_educativa, 'pers_id_organizacion' => $antes->pers_id_organizacion]);
+    }
+
+    /**
+     * Para designarla, pertenece un momento a la organización de prueba (la base lo pide) y luego se le regresa la suya.
+     */
+    private function conPertenenciaTemporal(int $persona, \Closure $hacer): void
+    {
+        $antes = DB::table('persona')->where('pers_id_persona', $persona)->first(['pers_id_institucion_educativa', 'pers_id_organizacion']);
+        DB::table('persona')->where('pers_id_persona', $persona)->update(['pers_id_institucion_educativa' => null, 'pers_id_organizacion' => DB::table('organizacion')->value('orga_id_organizacion')]);
+        $hacer();
         DB::table('persona')->where('pers_id_persona', $persona)->update(['pers_id_institucion_educativa' => $antes->pers_id_institucion_educativa, 'pers_id_organizacion' => $antes->pers_id_organizacion]);
     }
 

@@ -82,6 +82,9 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     // Personas (M5): lista, consulta (solo lectura) y edición con el formulario completo
     Route::middleware(Privilegio::GestionarPersonas->middleware())->group(function () {
         Route::get('/personas', [PersonaController::class, 'index'])->name('personas.index');
+        Route::get('/personas/create', [PersonaController::class, 'create'])->name('personas.create');
+        Route::get('/personas/coincidencias', [PersonaController::class, 'coincidencias'])->name('personas.coincidencias');
+        Route::post('/personas', [PersonaController::class, 'store'])->name('personas.store');
         Route::get('/personas/{persona}', [PersonaController::class, 'show'])->name('personas.show');
         Route::get('/personas/{persona}/edit', [PersonaController::class, 'edit'])->name('personas.edit');
         Route::put('/personas/{persona}', [PersonaController::class, 'update'])->name('personas.update');

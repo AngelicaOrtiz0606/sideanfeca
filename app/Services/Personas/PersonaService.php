@@ -32,9 +32,13 @@ class PersonaService
     public const GENEROS = ['F' => 'Femenino', 'M' => 'Masculino'];
 
     /**
-     * Lista con filtros: texto (nombre o CURP), grado, zona (de su institución) y situación.
+     * Lista con filtros:
+     * - texto: nombre, CURP, correo, su institución u organización, o un cargo vigente;
+     * - cargo: uno vigente;
+     * - zona: la de su institución o la de un cargo vigente;
+     * - situación (en pantalla, "Estado"): con o sin cargo vigente.
      *
-     * @param  array{texto?: ?string, grado?: ?int, zona?: ?int, situacion?: ?string}  $filtros
+     * @param  array{texto?: ?string, cargo?: ?int, zona?: ?int, situacion?: ?string}  $filtros
      */
     public function listado(array $filtros): LengthAwarePaginator
     {
@@ -42,13 +46,23 @@ class PersonaService
             ->when($filtros['texto'] ?? null, function (Builder $q, string $texto) {
                 // Sin importar mayúsculas ni acentos (la ñ cuenta como letra distinta)
                 $parecido = '%'.addcslashes(TextoCatalogo::clave($texto), '%_\\').'%';
+                $sinAcentos = fn (string $columna) => "translate(lower({$columna}), 'áéíóúü', 'aeiouu') like ?";
                 $q->where(fn (Builder $w) => $w
-                    ->whereRaw("translate(lower(concat_ws(' ', p.pers_nombre, p.pers_primer_apellido, p.pers_segundo_apellido)), 'áéíóúü', 'aeiouu') like ?", [$parecido])
-                    ->orWhere('p.pers_curp', 'ilike', $parecido));
+                    ->whereRaw($sinAcentos("concat_ws(' ', p.pers_nombre, p.pers_primer_apellido, p.pers_segundo_apellido)"), [$parecido])
+                    ->orWhere('p.pers_curp', 'ilike', $parecido)
+                    ->orWhereRaw($sinAcentos('n.instn_nombre'), [$parecido])
+                    ->orWhereRaw($sinAcentos('o.orga_nombre'), [$parecido])
+                    ->orWhereExists(fn (Builder $e) => $e->from('contacto as ct')
+                        ->join('tipo_contacto as tc', 'tc.tico_id_tipo_contacto', '=', 'ct.cont_id_tipo_contacto')
+                        ->whereColumn('ct.cont_id_persona', 'p.pers_id_persona')->where('tc.tico_nombre', 'Correo')
+                        ->where('ct.cont_valor', 'ilike', $parecido))
+                    ->orWhereExists($this->cargoVigente(fn (Builder $c) => $c->where(fn (Builder $n) => $n
+                        ->whereRaw($sinAcentos('cv.carg_nombre_m'), [$parecido])->orWhereRaw($sinAcentos('cv.carg_nombre_f'), [$parecido])))));
             })
-            ->when($filtros['grado'] ?? null, fn (Builder $q, int $grado) => $q->whereExists(fn (Builder $e) => $e->from('persona_nivel_academico')
-                ->whereColumn('pena_id_persona', 'p.pers_id_persona')->where('pena_id_nivel_academico', $grado)))
-            ->when($filtros['zona'] ?? null, fn (Builder $q, int $zona) => $q->where('i.ined_id_zona_regional', $zona))
+            ->when($filtros['cargo'] ?? null, fn (Builder $q, int $cargo) => $q->whereExists($this->cargoVigente(fn (Builder $c) => $c->where('pv.pues_id_cargo', $cargo))))
+            ->when($filtros['zona'] ?? null, fn (Builder $q, int $zona) => $q->where(fn (Builder $w) => $w
+                ->where('i.ined_id_zona_regional', $zona)
+                ->orWhereExists($this->cargoVigente(fn (Builder $c) => $c->where('pv.pues_id_zona_regional', $zona)))))
             ->when(($filtros['situacion'] ?? null) === 'con-cargo', fn (Builder $q) => $q->whereExists($this->vigentes()))
             ->when(($filtros['situacion'] ?? null) === 'sin-cargo', fn (Builder $q) => $q->whereNotExists($this->vigentes()))
             ->orderBy('p.pers_primer_apellido')->orderBy('p.pers_segundo_apellido')->orderBy('p.pers_nombre')
@@ -277,6 +291,143 @@ class PersonaService
     }
 
     /**
+     * Quien solo tiene cuenta (aún no está en los directorios), para registrarle
+     * su primer cargo con los datos que ya tiene. Null si no existe, está oculta
+     * o ya está en los directorios.
+     */
+    public function buscarSoloCuenta(int $id): ?object
+    {
+        $persona = $this->consulta(false)->where('p.pers_id_persona', $id)->whereNotExists($this->enDirectorio())->first();
+        if ($persona !== null) {
+            $persona->grados = DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->get(['pena_id_nivel_academico as id']);
+        }
+
+        return $persona;
+    }
+
+    /**
+     * Personas que se parecen a lo que se escribe (nombre completo o CURP),
+     * para no registrar a alguien dos veces. Incluye a quien solo tiene cuenta.
+     *
+     * @return Collection<int, object>
+     */
+    public function coincidencias(string $nombre, string $curp): Collection
+    {
+        $clave = TextoCatalogo::clave($nombre);
+        if (mb_strlen($clave) < 5 && strlen($curp) !== 18) {
+            return collect();
+        }
+
+        return $this->consulta(false)
+            ->where(fn (Builder $q) => $q
+                ->when(mb_strlen($clave) >= 5, fn (Builder $w) => $w->orWhereRaw(
+                    "translate(lower(concat_ws(' ', p.pers_nombre, p.pers_primer_apellido, p.pers_segundo_apellido)), 'áéíóúü', 'aeiouu') like ?",
+                    [addcslashes($clave, '%_\\').'%']))
+                ->when(strlen($curp) === 18, fn (Builder $w) => $w->orWhere('p.pers_curp', $curp)))
+            ->orderBy('p.pers_primer_apellido')
+            ->limit(5)
+            ->get()
+            ->map(fn (object $p) => (object) [
+                'id' => (int) $p->id,
+                'nombre' => $this->nombreCompleto($p),
+                'misma_curp' => strlen($curp) === 18 && $p->curp === $curp,
+                'en_directorio' => DB::table('designacion')->where('desi_id_persona', $p->id)->exists(),
+                'tiene_cuenta' => DB::table('usuario')->where('usua_id_persona', $p->id)->exists(),
+            ]);
+    }
+
+    /**
+     * Registra a una persona con su primer cargo, todo junto: sus datos,
+     * pertenencia, grados y contactos; el puesto (si aún no existe, se crea
+     * con el cargo y su ámbito) y la designación. Si ya tenía cuenta
+     * ($existente), se usan y actualizan sus datos en lugar de duplicarla.
+     *
+     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array<string, mixed>>, cargo: array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}}  $datos
+     */
+    public function registrar(Usuario $actor, array $datos, ?int $existente = null): int
+    {
+        return DB::transaction(function () use ($actor, $datos, $existente): int {
+            if ($existente !== null) {
+                $this->actualizar($actor, $existente, $datos);
+                $id = $existente;
+            } else {
+                $id = (int) DB::table('persona')->insertGetId([
+                    'pers_nombre' => $datos['nombre'],
+                    'pers_primer_apellido' => $datos['primer_apellido'],
+                    'pers_segundo_apellido' => $datos['segundo_apellido'],
+                    'pers_curp' => $datos['curp'],
+                    'pers_genero' => $datos['genero'],
+                    'pers_id_institucion_educativa' => $datos['institucion'],
+                    'pers_id_organizacion' => $datos['organizacion'],
+                ], 'pers_id_persona');
+                DB::table('persona_nivel_academico')->insert(array_map(fn (int $g) => ['pena_id_persona' => $id, 'pena_id_nivel_academico' => $g], $datos['grados']));
+                DB::table('contacto')->insert(array_map(fn (array $c) => [
+                    'cont_id_persona' => $id,
+                    'cont_id_tipo_contacto' => $c['tipo'],
+                    'cont_valor' => $c['valor'],
+                    'cont_lada' => $c['lada'],
+                    'cont_extension' => $c['extension'],
+                    'cont_visible' => $c['visible'],
+                ], $datos['contactos']));
+                $this->bitacora($actor, 'Registro', 'PERSONA', $id);
+            }
+
+            $cargo = $datos['cargo'];
+            $puesto = $this->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
+            if ($puesto === null) {
+                $puesto = (int) DB::table('puesto')->insertGetId([
+                    'pues_id_cargo' => $cargo['cargo'],
+                    'pues_id_zona_regional' => $cargo['zona'],
+                    'pues_id_coordinacion_nacional' => $cargo['coordinacion'],
+                    'pues_id_institucion_educativa' => $cargo['institucion'],
+                    'pues_titularidad' => false,
+                    'pues_activo' => true,
+                ], 'pues_id_puesto');
+                $this->bitacora($actor, 'Registro', 'PUESTO', $puesto);
+            }
+
+            $designacion = (int) DB::table('designacion')->insertGetId([
+                'desi_id_puesto' => $puesto,
+                'desi_id_persona' => $id,
+                'desi_fecha_inicio' => $cargo['fecha_inicio'],
+            ], 'desi_id_designacion');
+            $this->bitacora($actor, 'Registro', 'DESIGNACION', $designacion);
+
+            return $id;
+        });
+    }
+
+    /**
+     * El puesto con ese cargo y ese ámbito, si ya existe.
+     */
+    public function puestoDe(int $cargo, ?int $zona, ?int $coordinacion, ?int $institucion): ?int
+    {
+        $id = DB::table('puesto')
+            ->where('pues_id_cargo', $cargo)
+            ->where(fn (Builder $q) => $zona === null ? $q->whereNull('pues_id_zona_regional') : $q->where('pues_id_zona_regional', $zona))
+            ->where(fn (Builder $q) => $coordinacion === null ? $q->whereNull('pues_id_coordinacion_nacional') : $q->where('pues_id_coordinacion_nacional', $coordinacion))
+            ->where(fn (Builder $q) => $institucion === null ? $q->whereNull('pues_id_institucion_educativa') : $q->where('pues_id_institucion_educativa', $institucion))
+            ->value('pues_id_puesto');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * Si el puesto ya está ocupado en esa fecha (o después), quién lo ocupa.
+     */
+    public function ocupanteDesde(int $puesto, string $fecha): ?string
+    {
+        $ocupante = DB::table('designacion as d')
+            ->join('persona as p', 'p.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('d.desi_id_puesto', $puesto)
+            ->where(fn (Builder $q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $fecha))
+            ->orderBy('d.desi_fecha_inicio')
+            ->first(['p.pers_nombre as nombre', 'p.pers_primer_apellido as primer_apellido', 'p.pers_segundo_apellido as segundo_apellido', 'p.pers_oculta_admin as oculta']);
+
+        return $ocupante === null ? null : ($ocupante->oculta ? 'otra persona' : $this->nombreCompleto($ocupante));
+    }
+
+    /**
      * Nombre completo, como se escribe.
      */
     public function nombreCompleto(object $persona): string
@@ -328,6 +479,19 @@ class PersonaService
             ]);
     }
 
+    /**
+     * Tiene un cargo vigente hoy que cumple $condicion (sobre dv, pv: puesto y cv: cargo).
+     */
+    private function cargoVigente(\Closure $condicion): \Closure
+    {
+        return function (Builder $e) use ($condicion): void {
+            $this->vigentes()($e);
+            $e->join('puesto as pv', 'pv.pues_id_puesto', '=', 'dv.desi_id_puesto')
+                ->join('cargo as cv', 'cv.carg_id_cargo', '=', 'pv.pues_id_cargo');
+            $condicion($e);
+        };
+    }
+
     private function vigentes(): \Closure
     {
         return fn (Builder $e) => $e->from('designacion as dv')
@@ -336,7 +500,10 @@ class PersonaService
             ->where(fn (Builder $q) => $q->whereNull('dv.desi_fecha_fin')->orWhere('dv.desi_fecha_fin', '>=', DB::raw('current_date')));
     }
 
-    private function consulta(): Builder
+    /**
+     * @param  bool  $soloDirectorio  false: también quien solo tiene cuenta (para recuperarla al registrar)
+     */
+    private function consulta(bool $soloDirectorio = true): Builder
     {
         return DB::table('persona as p')
             ->leftJoin('institucion_educativa as i', 'i.ined_id_institucion_educativa', '=', 'p.pers_id_institucion_educativa')
@@ -346,7 +513,7 @@ class PersonaService
             ->where('p.pers_oculta_admin', false)
             // Solo las de los directorios: tienen o tuvieron un cargo. Quien solo tiene
             // cuenta se administra en Usuarios (si tiene ambas cosas, aparece en las dos)
-            ->whereExists(fn (Builder $e) => $e->from('designacion as dd')->whereColumn('dd.desi_id_persona', 'p.pers_id_persona'))
+            ->when($soloDirectorio, fn (Builder $q) => $q->whereExists($this->enDirectorio()))
             ->select([
                 'p.pers_id_persona as id',
                 'p.pers_nombre as nombre',
@@ -361,6 +528,11 @@ class PersonaService
                 'p.pers_id_organizacion as organizacion_id',
                 'o.orga_nombre as organizacion',
             ]);
+    }
+
+    private function enDirectorio(): \Closure
+    {
+        return fn (Builder $e) => $e->from('designacion as dd')->whereColumn('dd.desi_id_persona', 'p.pers_id_persona');
     }
 
     private function idTipoCorreo(): int

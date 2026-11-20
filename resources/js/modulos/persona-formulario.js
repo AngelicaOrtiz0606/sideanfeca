@@ -10,6 +10,12 @@
  *   otros contactos son filas que se agregan (desde la plantilla) y se quitan;
  *   según el tipo aparecen la lada y la extensión, y el campo pide número o
  *   correo. En los números solo quedan dígitos ("5622 8300" → "56228300").
+ * - Cargo (al registrar): según el nivel del cargo aparecen la zona
+ *   (regional), la coordinación (nacional o regional) o la nota de que es de
+ *   su institución (institucional).
+ * - ¿Ya existe? (al registrar): al dejar de escribir el nombre o la CURP,
+ *   pregunta al servidor quién se parece y lo muestra con un enlace (a su
+ *   ficha, o a registrarle el cargo si solo tenía cuenta).
  */
 const mostrar = (bloque, visible) => {
     if (!bloque) {
@@ -58,6 +64,67 @@ document.querySelectorAll('form[data-persona]').forEach((formulario) => {
     });
     formulario.querySelectorAll('[data-genero]').forEach((radio) => radio.addEventListener('change', revisar));
     revisar();
+
+    // ---- Cargo (al registrar) ----
+    const cargo = formulario.querySelector('[data-cargo-elegido]');
+    if (cargo) {
+        const nivelCargo = () => {
+            const nivel = cargo.selectedOptions[0]?.dataset.nivel ?? '';
+            formulario.querySelectorAll('[data-solo-nivel]').forEach((bloque) => mostrar(bloque, bloque.dataset.soloNivel.split(' ').includes(nivel)));
+            avisarCambio(formulario);
+        };
+        cargo.addEventListener('change', nivelCargo);
+        nivelCargo();
+    }
+
+    // ---- ¿Ya existe? (al registrar) ----
+    const coincidencias = formulario.querySelector('[data-coincidencias]');
+    if (coincidencias) {
+        const lista = coincidencias.querySelector('[data-coincidencias-lista]');
+        const campos = ['nombre', 'primer_apellido', 'segundo_apellido'].map((nombre) => formulario.querySelector(`[name="${nombre}"]`));
+        let espera;
+        let ultima = '';
+
+        const buscar = async () => {
+            const nombre = campos.map((campo) => campo.value.trim()).filter(Boolean).join(' ');
+            const consulta = new URLSearchParams({ nombre, curp: curp.value });
+            if (consulta.toString() === ultima) {
+                return;
+            }
+            ultima = consulta.toString();
+            try {
+                const respuesta = await fetch(`${coincidencias.dataset.coincidencias}?${consulta}`, { headers: { Accept: 'application/json' } });
+                const personas = respuesta.ok ? await respuesta.json() : [];
+                lista.replaceChildren(...personas.map((persona) => {
+                    const fila = document.createElement('li');
+                    fila.className = 'coincidencias__persona';
+                    const nombreTexto = document.createElement('strong');
+                    nombreTexto.textContent = persona.nombre;
+                    const detalle = document.createElement('span');
+                    detalle.className = 'coincidencias__detalle';
+                    detalle.textContent = [
+                        persona.misma_curp ? 'Misma CURP' : null,
+                        persona.en_directorio ? 'Ya está en Personas' : 'Solo tiene cuenta de usuario',
+                    ].filter(Boolean).join(' · ');
+                    const enlace = document.createElement('a');
+                    enlace.href = persona.enlace;
+                    enlace.className = 'boton boton--secundario';
+                    enlace.textContent = persona.en_directorio ? 'Ver su ficha' : 'Usar sus datos';
+                    fila.append(nombreTexto, detalle, enlace);
+
+                    return fila;
+                }));
+                coincidencias.hidden = personas.length === 0;
+            } catch {
+                coincidencias.hidden = true;
+            }
+        };
+        const programar = () => {
+            clearTimeout(espera);
+            espera = setTimeout(buscar, 400);
+        };
+        [...campos, curp].forEach((campo) => campo.addEventListener('input', programar));
+    }
 
     // ---- Contactos ----
     formulario.querySelectorAll('[data-solo-digitos]').forEach((campo) => campo.addEventListener('input', () => {

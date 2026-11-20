@@ -2,18 +2,24 @@
     Formulario de una persona, en pantalla propia, por secciones numeradas:
     1. Datos personales (la CURP avisa en amarillo si su H/M no coincide con el género).
     2. Pertenece a: una institución (buscador), una organización o ninguna.
-    3. Grados académicos: varios o ninguno.
-    4. Contactos: un correo y un teléfono obligatorios, que siempre se muestran
+    3. Cargo (solo al registrar): el primer cargo, con su ámbito según el
+       nivel y desde cuándo. Si el puesto no existe, se crea al guardar.
+    4. Grados académicos: varios o ninguno.
+    5. Contactos: un correo y un teléfono obligatorios, que siempre se muestran
        en el sitio; aparte, otros contactos opcionales (filas que se agregan y
        se quitan; según el tipo aparecen la lada y la extensión, y cada uno
        dice si es visible en el sitio).
-    Al final, Guardar y Cancelar. Hoy se usa para editar; registrar llega con
-    el primer cargo. Comportamiento en persona-formulario.js.
+    Al editar no hay sección de cargo (los cargos se llevan en la ficha).
+    Al registrar, mientras se escribe el nombre o la CURP avisa si ya existe;
+    si alguien solo tenía cuenta, llega con sus datos ($persona->id).
+    Al final, Guardar y Cancelar. Comportamiento en persona-formulario.js.
 --}}
 @extends('layouts.admin')
 
 @php
-    $pertenenciaActual = $persona->institucion_id ? 'institucion' : ($persona->organizacion_id ? 'organizacion' : 'ninguna');
+    // Al registrar siempre pertenece a algo (lo pide el cargo): no se ofrece "Ninguna"
+    $pertenenciaActual = $persona->institucion_id ? 'institucion' : ($persona->organizacion_id ? 'organizacion' : ($esNueva ? 'institucion' : 'ninguna'));
+    $opcionesPertenencia = ['institucion' => 'Una institución', 'organizacion' => 'Una organización'] + ($esNueva ? [] : ['ninguna' => 'Ninguna']);
     $pertenencia = old('pertenencia', $pertenenciaActual);
     $genero = old('genero', $persona->genero);
     $tiene = collect(old('grados', $persona->grados->pluck('id')->all()))->map(fn ($g) => (int) $g)->all();
@@ -24,26 +30,42 @@
     $telefono = $contactos['telefono'];
     // Una fila nueva empieza como celular, que es lo que más se agrega
     $tipoNuevo = $tiposContacto->firstWhere('nombre', 'Celular')?->id ?? 0;
+    // Al registrar: el número de cada sección después de "Pertenece a" se recorre por el cargo
+    $siguiente = $esNueva ? 4 : 3;
+    $regresar = $esNueva ? route('personas.index') : route('personas.show', $persona->id);
+    $cargoElegido = (int) old('cargo');
+    $nivelesCargo = ['Nacional' => 'Nacionales', 'Regional' => 'Regionales', 'Institucional' => 'De una institución'];
 @endphp
 
-@section('titulo', 'Editar '.$nombre)
+@section('titulo', $esNueva ? 'Nueva persona' : 'Editar '.$nombre)
 
 @section('contenido')
-    <a href="{{ route('personas.show', $persona->id) }}" class="enlace-regresar">
+    <a href="{{ $regresar }}" class="enlace-regresar">
         <x-icono nombre="regresar" />
-        {{ $nombre }}
+        {{ $esNueva ? 'Personas' : $nombre }}
     </a>
 
     <header class="pagina__encabezado">
         <div>
-            <h1 class="pagina__titulo">Editar persona</h1>
-            <p class="pagina__texto">Los campos con <span class="campo__obligatorio" aria-hidden="true">*</span> son obligatorios.</p>
+            <h1 class="pagina__titulo">{{ $esNueva ? 'Nueva persona' : 'Editar persona' }}</h1>
+            <p class="pagina__texto">
+                @if ($esNueva && $persona->id)
+                    {{ $nombre }} ya tiene cuenta en el sistema: revisa sus datos y registra su cargo.
+                @endif
+                Los campos con <span class="campo__obligatorio" aria-hidden="true">*</span> son obligatorios.
+            </p>
         </div>
     </header>
 
-    <form method="POST" action="{{ route('personas.update', $persona->id) }}" class="formulario" novalidate data-validar data-persona>
+    <form method="POST" action="{{ $esNueva ? route('personas.store') : route('personas.update', $persona->id) }}" class="formulario" novalidate data-validar data-persona>
         @csrf
-        @method('PUT')
+        @if ($esNueva)
+            @if ($persona->id)
+                <input type="hidden" name="persona_existente" value="{{ $persona->id }}">
+            @endif
+        @else
+            @method('PUT')
+        @endif
 
                 <x-errores-formulario />
 
@@ -89,6 +111,14 @@
                             <p class="campo__retro" id="persona-curp-aviso" data-tipo="aviso" data-curp-aviso aria-live="polite" hidden></p>
                         </div>
                     </div>
+
+                    @if ($esNueva && ! $persona->id)
+                        {{-- Mientras se escribe: ¿ya está registrada? (se llena desde persona-formulario.js) --}}
+                        <div class="coincidencias" data-coincidencias="{{ route('personas.coincidencias') }}" aria-live="polite" hidden>
+                            <p class="coincidencias__titulo"><x-icono nombre="alerta" /> ¿Es alguna de estas personas? Ya están registradas.</p>
+                            <ul class="coincidencias__lista" data-coincidencias-lista></ul>
+                        </div>
+                    @endif
                 </x-seccion-formulario>
 
                 {{-- 2. Pertenencia --}}
@@ -96,7 +126,7 @@
                     <fieldset class="campo">
                         <legend class="solo-lectores">¿A qué pertenece?</legend>
                         <div class="segmentado">
-                            @foreach (['institucion' => 'Una institución', 'organizacion' => 'Una organización', 'ninguna' => 'Ninguna'] as $clave => $texto)
+                            @foreach ($opcionesPertenencia as $clave => $texto)
                                 <label class="segmentado__opcion">
                                     <input type="radio" name="pertenencia" value="{{ $clave }}" required @checked($pertenencia === $clave) data-pertenencia-tipo>
                                     {{ $texto }}
@@ -125,8 +155,62 @@
                     </div>
                 </x-seccion-formulario>
 
-                {{-- 3. Grados académicos --}}
-                <x-seccion-formulario id="seccion-grados" numero="3" titulo="Grados académicos" descripcion="Marca todos los que tiene. La abreviatura va antes de su nombre en los directorios." opcional>
+                @if ($esNueva)
+                    {{-- 3. Cargo --}}
+                    <x-seccion-formulario id="seccion-cargo" numero="3" titulo="Cargo" descripcion="El cargo que ocupa en ANFECA. Si el puesto aún no existe, se crea al guardar.">
+                        <div class="formulario__rejilla formulario__rejilla--cargo" data-cargo>
+                            <div class="campo campo--mitad">
+                                <label for="persona-cargo" class="campo__etiqueta">Cargo <x-obligatorio /></label>
+                                <select id="persona-cargo" name="cargo" class="campo__entrada" required data-cargo-elegido
+                                        @if ($errors->has('cargo')) aria-invalid="true" @endif>
+                                    <option value="">Elige el cargo</option>
+                                    @foreach ($nivelesCargo as $nivel => $grupo)
+                                        <optgroup label="{{ $grupo }}">
+                                            @foreach ($cargos->where('nivel', $nivel) as $cargo)
+                                                <option value="{{ $cargo->id }}" data-nivel="{{ $cargo->nivel }}" @selected($cargoElegido === $cargo->id)>
+                                                    {{ $cargo->nombre === $cargo->nombre_f ? $cargo->nombre : $cargo->nombre.' / '.$cargo->nombre_f }}
+                                                </option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="campo campo--mitad">
+                                <label for="persona-fecha-inicio" class="campo__etiqueta">Desde <x-obligatorio /></label>
+                                <input id="persona-fecha-inicio" name="fecha_inicio" type="date" required class="campo__entrada"
+                                       min="1950-01-01" max="{{ now()->toDateString() }}" value="{{ old('fecha_inicio', now()->toDateString()) }}"
+                                       @if ($errors->has('fecha_inicio')) aria-invalid="true" @endif>
+                            </div>
+
+                            <div class="campo campo--mitad" data-solo-nivel="Regional" hidden>
+                                <label for="persona-zona" class="campo__etiqueta">Zona regional <x-obligatorio /></label>
+                                <select id="persona-zona" name="zona" class="campo__entrada" required disabled
+                                        @if ($errors->has('zona')) aria-invalid="true" @endif>
+                                    <option value="">Elige la zona</option>
+                                    @foreach ($zonas as $zona)
+                                        <option value="{{ $zona->id }}" @selected((int) old('zona') === $zona->id)>Zona {{ $zona->numero }} · {{ $zona->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="campo campo--mitad" data-solo-nivel="Nacional Regional" hidden>
+                                <label for="persona-coordinacion" class="campo__etiqueta">Coordinación nacional <span class="campo__opcional">(opcional)</span></label>
+                                <select id="persona-coordinacion" name="coordinacion" class="campo__entrada" disabled
+                                        @if ($errors->has('coordinacion')) aria-invalid="true" @endif>
+                                    <option value="">Ninguna</option>
+                                    @foreach ($coordinaciones as $coordinacion)
+                                        <option value="{{ $coordinacion->id }}" @selected((int) old('coordinacion') === $coordinacion->id)>{{ $coordinacion->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="campo--completo campo__ayuda" data-solo-nivel="Institucional" hidden>
+                                Es un cargo de la institución a la que pertenece (sección 2).
+                            </p>
+                        </div>
+                    </x-seccion-formulario>
+                @endif
+
+                {{-- Grados académicos --}}
+                <x-seccion-formulario id="seccion-grados" :numero="$siguiente" titulo="Grados académicos" descripcion="Marca todos los que tiene. La abreviatura va antes de su nombre en los directorios." opcional>
                     <fieldset class="campo">
                         <legend class="solo-lectores">Grados académicos</legend>
                         <div class="fichas">
@@ -142,8 +226,8 @@
                     </fieldset>
                 </x-seccion-formulario>
 
-                {{-- 4. Contactos --}}
-                <x-seccion-formulario id="seccion-contactos" numero="4" titulo="Contactos" descripcion="El correo y el teléfono son obligatorios y siempre se muestran en el sitio de ANFECA."
+                {{-- Contactos --}}
+                <x-seccion-formulario id="seccion-contactos" :numero="$siguiente + 1" titulo="Contactos" descripcion="El correo y el teléfono son obligatorios y siempre se muestran en el sitio de ANFECA."
                                       data-contactos data-maximo="{{ \App\Http\Requests\Personas\PersonaRequest::MAXIMO_CONTACTOS }}">
                     <div class="tabla-contactos">
                         <div class="tabla-contactos__encabezado" aria-hidden="true">
@@ -210,10 +294,10 @@
 
         <div class="tarjeta cierre-registro">
             <div class="cierre-registro__acciones">
-                <a href="{{ route('personas.show', $persona->id) }}" class="boton boton--secundario">Cancelar</a>
+                <a href="{{ $regresar }}" class="boton boton--secundario">Cancelar</a>
                 <button type="submit" class="boton boton--primario">
                     <x-icono nombre="correcto" />
-                    Guardar cambios
+                    {{ $esNueva ? 'Registrar persona' : 'Guardar cambios' }}
                 </button>
             </div>
         </div>

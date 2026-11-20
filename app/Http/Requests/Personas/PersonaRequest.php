@@ -23,6 +23,11 @@ use Illuminate\Validation\Rule;
  * - Otros contactos (opcionales, por ejemplo el celular): correo válido (en
  *   minúsculas) o número de 7 a 10 dígitos; la lada (2 o 3) y la extensión
  *   (hasta 5) solo si el tipo las permite; y si es visible en el sitio.
+ * - Al registrar (Nueva persona), además su primer cargo: el cargo, su ámbito
+ *   según el nivel (zona y coordinación; un cargo institucional es de la
+ *   institución a la que pertenece) y la fecha de inicio. Necesita pertenecer
+ *   a algo, y el puesto no debe estar ocupado en esa fecha. Si ya tenía cuenta
+ *   (persona_existente), se usan sus datos en lugar de duplicarla.
  */
 class PersonaRequest extends FormRequest
 {
@@ -79,7 +84,7 @@ class PersonaRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('persona');
+        $id = $this->route('persona') ?? $this->existente();
         $pertenencia = $this->input('pertenencia');
         $actual = $id === null ? null : DB::table('persona')->where('pers_id_persona', (int) $id)->first();
 
@@ -108,6 +113,8 @@ class PersonaRequest extends FormRequest
             'telefono.valor' => ['required', 'string', 'regex:/^[0-9]{7,10}$/'],
             'telefono.lada' => ['nullable', 'string', 'regex:/^[0-9]{2,3}$/'],
             'telefono.extension' => ['nullable', 'string', 'regex:/^[0-9]{1,5}$/'],
+
+            ...($this->registrando() ? $this->reglasCargo() : []),
 
             'contactos' => ['array', 'max:'.self::MAXIMO_CONTACTOS],
             'contactos.*.tipo' => ['required', 'integer', Rule::exists('tipo_contacto', 'tico_id_tipo_contacto')],
@@ -145,6 +152,10 @@ class PersonaRequest extends FormRequest
                     if (! $tipo->tico_permite_extension && filled($contacto['extension'] ?? null)) {
                         $validator->errors()->add("contactos.{$i}.extension", "Contacto {$n}: un {$nombre} no lleva extensión.");
                     }
+                }
+
+                if ($this->registrando()) {
+                    $this->revisarCargo($validator);
                 }
 
                 // La pertenencia, si tiene un cargo vigente
@@ -185,6 +196,16 @@ class PersonaRequest extends FormRequest
             'telefono.valor.regex' => 'El teléfono lleva de 7 a 10 dígitos (sin la lada).',
             'telefono.lada.regex' => 'La lada lleva 2 o 3 dígitos.',
             'telefono.extension.regex' => 'La extensión lleva hasta 5 dígitos.',
+            'persona_existente.integer' => 'No encontramos a esa persona. Vuelve a buscarla.',
+            'cargo.required' => 'Elige el cargo.',
+            'cargo.exists' => 'Elige un cargo activo de la lista.',
+            'zona.required' => 'Elige la zona regional del cargo.',
+            'zona.exists' => 'Elige una zona de la lista.',
+            'coordinacion.exists' => 'Elige una coordinación activa de la lista.',
+            'fecha_inicio.required' => 'Escribe desde cuándo tiene el cargo.',
+            'fecha_inicio.date' => 'Escribe una fecha válida.',
+            'fecha_inicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a 1950.',
+            'fecha_inicio.before_or_equal' => 'La fecha de inicio no puede ser posterior a hoy.',
             'contactos.max' => 'Puede tener hasta '.self::MAXIMO_CONTACTOS.' contactos.',
             'contactos.*.tipo.required' => 'Elige el tipo de cada contacto.',
             'contactos.*.valor.required' => 'Escribe cada contacto o quita la fila.',
@@ -234,6 +255,106 @@ class PersonaRequest extends FormRequest
                 ];
             }, (array) $this->input('contactos', []))],
         ];
+    }
+
+    /**
+     * Al registrar: si ya tenía cuenta, su número (si de verdad solo tiene cuenta).
+     */
+    public function existente(): ?int
+    {
+        $id = $this->input('persona_existente');
+        if (! $this->registrando() || ! ctype_digit((string) $id)) {
+            return null;
+        }
+
+        return app(PersonaService::class)->buscarSoloCuenta((int) $id) === null ? null : (int) $id;
+    }
+
+    /**
+     * El primer cargo, listo para PersonaService::registrar: lo que no aplica
+     * al nivel del cargo va vacío.
+     *
+     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}
+     */
+    public function cargo(): array
+    {
+        $nivel = $this->nivel();
+
+        return [
+            'cargo' => (int) $this->input('cargo'),
+            'zona' => $nivel === 'Regional' ? (int) $this->input('zona') : null,
+            'coordinacion' => $nivel !== 'Institucional' && filled($this->input('coordinacion')) ? (int) $this->input('coordinacion') : null,
+            'institucion' => $nivel === 'Institucional' ? $this->pertenencia()['institucion'] : null,
+            'fecha_inicio' => (string) $this->input('fecha_inicio'),
+        ];
+    }
+
+    private function registrando(): bool
+    {
+        return $this->route('persona') === null;
+    }
+
+    private function nivel(): ?string
+    {
+        $cargo = $this->input('cargo');
+
+        return ctype_digit((string) $cargo) ? DB::table('cargo')->where('carg_id_cargo', (int) $cargo)->value('carg_nivel') : null;
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function reglasCargo(): array
+    {
+        $nivel = $this->nivel();
+
+        return [
+            'persona_existente' => ['nullable', 'integer'],
+            'cargo' => ['required', 'integer', Rule::exists('cargo', 'carg_id_cargo')->where('carg_activo', true)],
+            'zona' => [Rule::requiredIf($nivel === 'Regional'), 'nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
+            'coordinacion' => ['nullable', 'integer', Rule::exists('coordinacion_nacional', 'cona_id_coordinacion_nacional')->where('cona_activo', true)],
+            'fecha_inicio' => ['required', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:today'],
+        ];
+    }
+
+    /**
+     * El cargo según la pertenencia, y que el puesto esté libre en esa fecha.
+     */
+    private function revisarCargo(Validator $validator): void
+    {
+        if (filled($this->input('persona_existente')) && $this->existente() === null) {
+            $validator->errors()->add('persona_existente', 'Esa persona ya no está disponible para registrarla aquí. Vuelve a buscarla.');
+        }
+        if ($validator->errors()->hasAny(['cargo', 'zona', 'coordinacion', 'fecha_inicio', 'pertenencia', 'institucion', 'organizacion'])) {
+            return;
+        }
+
+        $pertenencia = $this->input('pertenencia');
+        if ($pertenencia === 'ninguna') {
+            $validator->errors()->add('pertenencia', 'Para recibir un cargo debe pertenecer a una institución u organización.');
+
+            return;
+        }
+        if ($this->nivel() === 'Institucional' && $pertenencia !== 'institucion') {
+            $validator->errors()->add('cargo', 'Un cargo institucional es de la institución a la que pertenece: elige la institución en «Pertenece a».');
+
+            return;
+        }
+
+        $servicio = app(PersonaService::class);
+        $cargo = $this->cargo();
+        $puesto = $servicio->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
+        if ($puesto === null) {
+            return; // Se creará al guardar
+        }
+        if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
+            $validator->errors()->add('cargo', 'Ese puesto está desactivado. Actívalo en Puestos o elige otro.');
+
+            return;
+        }
+        if (($ocupante = $servicio->ocupanteDesde($puesto, $cargo['fecha_inicio'])) !== null) {
+            $validator->errors()->add('cargo', "Ese puesto ya lo ocupa {$ocupante} en esa fecha. Primero registra que dejó el cargo.");
+        }
     }
 
     /**

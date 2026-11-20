@@ -448,3 +448,62 @@
 .formulario > .bloque {
     margin-top: 0;
 }
+
+/* ---------- Nueva persona: ¿ya está registrada? ---------- */
+.coincidencias {
+    display: grid;
+    gap: 0.625rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radio);
+    background: var(--color-aviso-fondo);
+    color: var(--color-aviso);
+}
+
+.coincidencias__titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.coincidencias__titulo .icono {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.coincidencias__lista {
+    display: grid;
+    gap: 0.5rem;
+    list-style: none;
+}
+
+.coincidencias__persona {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radio);
+    background: var(--color-superficie);
+    color: var(--color-texto);
+}
+
+.coincidencias__detalle {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}
+
+.coincidencias__persona .boton {
+    min-height: 2.25rem;
+    margin-left: auto;
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+}
+
+/* Nueva persona, cargo: los campos van de dos en dos aunque haya campos ocultos según el nivel */
+@media (width >= 48rem) {
+    .formulario__rejilla--cargo.formulario__rejilla > .campo--mitad:not([hidden]) {
+        grid-column: span 6;
+    }
+}
