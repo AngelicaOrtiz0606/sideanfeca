@@ -4,12 +4,11 @@ namespace App\Services\Personas;
 
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
-use App\Services\Puestos\PuestoService;
+use App\Services\Designaciones\DesignacionService;
 use App\Support\Paginacion;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -357,7 +356,7 @@ class PersonaService
      * existe, se crea con el cargo y su ámbito) y la designación. Si ya tenía cuenta
      * ($existente), se usan y actualizan sus datos en lugar de duplicarla.
      *
-     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array<string, mixed>>, cargos: array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>}  $datos
+     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array<string, mixed>>, designaciones: array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>}  $datos
      */
     public function registrar(Usuario $actor, array $datos, ?int $existente = null): int
     {
@@ -393,36 +392,7 @@ class PersonaService
                 $idBitacora = $this->bitacora($actor, 'Registro', 'PERSONA', $id);
             }
 
-            $puestos = app(PuestoService::class);
-            foreach ($datos['cargos'] as $cargo) {
-                $creado = false;
-                $puesto = $this->puestoDe($cargo['cargo'], $cargo['zona'], $cargo['coordinacion'], $cargo['institucion']);
-                if ($puesto === null) {
-                    $puesto = (int) DB::table('puesto')->insertGetId([
-                        'pues_id_cargo' => $cargo['cargo'],
-                        'pues_id_zona_regional' => $cargo['zona'],
-                        'pues_id_coordinacion_nacional' => $cargo['coordinacion'],
-                        'pues_id_institucion_educativa' => $cargo['institucion'],
-                        'pues_titularidad' => false,
-                        'pues_activo' => true,
-                    ], 'pues_id_puesto');
-                    $creado = true;
-                }
-
-                $designacion = (int) DB::table('designacion')->insertGetId([
-                    'desi_id_puesto' => $puesto,
-                    'desi_id_persona' => $id,
-                    'desi_fecha_inicio' => $cargo['fecha_inicio'],
-                ], 'desi_id_designacion');
-
-                // "Presidenta · Nacional, desde 20/11/2026" (el cargo en el género de la persona)
-                $nombrePuesto = $puestos->nombre($puestos->buscar($puesto), $datos['genero']);
-                $this->detalle($idBitacora, $designacion, 'Designación', null,
-                    $nombrePuesto.', desde '.Carbon::parse($cargo['fecha_inicio'])->format('d/m/Y'));
-                if ($creado) {
-                    $this->detalle($idBitacora, $puesto, 'Puesto creado', null, $puestos->nombre($puestos->buscar($puesto)));
-                }
-            }
+            app(DesignacionService::class)->designar($id, $datos['genero'], $datos['designaciones'], $idBitacora);
 
             return $id;
         });

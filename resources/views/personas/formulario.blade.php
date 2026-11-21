@@ -2,8 +2,9 @@
     Formulario de una persona, en pantalla propia, por secciones numeradas:
     1. Datos personales (la CURP avisa en amarillo si su H/M no coincide con el género).
     2. Pertenece a: una institución (buscador), una organización o ninguna.
-    3. Cargos (solo al registrar): uno o varios, como los contactos; cada uno
-       con su nivel, su ámbito y desde cuándo. Si el puesto no existe, se crea.
+    3. Designaciones (solo al registrar): una o varias (componente Vue
+       FilasDesignacion); cada una con el nivel del cargo, el cargo, su ámbito
+       y desde cuándo. Si el puesto no existe, se crea.
     4. Grados académicos: varios o ninguno.
     5. Contactos: un correo y un teléfono obligatorios, que siempre se muestran
        en el sitio; aparte, otros contactos opcionales (filas que se agregan y
@@ -33,10 +34,6 @@
     // Al registrar: el número de cada sección después de "Pertenece a" se recorre por el cargo
     $siguiente = $esNueva ? 4 : 3;
     $regresar = $esNueva ? route('personas.index') : route('personas.show', $persona->id);
-    // Al registrar: sus cargos (los que se escribieron si hubo un error; si no, uno vacío)
-    $hoy = now()->toDateString();
-    $filaCargo = fn (array $c) => (object) ['nivel' => $c['nivel'] ?? null, 'cargo' => $c['cargo'] ?? null, 'zona' => $c['zona'] ?? null, 'coordinacion' => $c['coordinacion'] ?? null, 'fecha_inicio' => $c['fecha_inicio'] ?? $hoy];
-    $filasCargo = collect(old('cargos') ?: [[]])->values()->map(fn ($c) => $filaCargo(is_array($c) ? $c : []));
 @endphp
 
 @section('titulo', $esNueva ? 'Nueva persona' : 'Editar '.$nombre)
@@ -158,23 +155,9 @@
                 </x-seccion-formulario>
 
                 @if ($esNueva)
-                    {{-- 3. Cargos (uno o varios) --}}
-                    <x-seccion-formulario id="seccion-cargo" numero="3" titulo="Cargos" descripcion="Los cargos que ocupa en ANFECA. Si un puesto aún no existe, se crea al guardar."
-                                          data-cargos data-maximo="{{ \App\Http\Requests\Personas\PersonaRequest::MAXIMO_CARGOS }}">
-                        <div class="filas-cargo" data-cargos-lista>
-                            @foreach ($filasCargo as $i => $fila)
-                                @include('personas._fila-cargo', ['i' => $i, 'fila' => $fila])
-                            @endforeach
-                        </div>
-
-                        <button type="button" class="boton boton--secundario tabla-contactos__agregar" data-cargo-agregar>
-                            <x-icono nombre="mas" />
-                            Agregar otro cargo
-                        </button>
-
-                        <template data-cargo-plantilla>
-                            @include('personas._fila-cargo', ['i' => '__i__', 'fila' => $filaCargo([])])
-                        </template>
+                    {{-- 3. Designaciones (una o varias) --}}
+                    <x-seccion-formulario id="seccion-designaciones" numero="3" titulo="Designaciones" descripcion="Los puestos que ocupa en ANFECA: el cargo y su ámbito. Si un puesto aún no existe, se crea al guardar.">
+                        @include('personas._designaciones', ['notaInstitucional' => 'Es un cargo de la institución a la que pertenece (sección 2).'])
                     </x-seccion-formulario>
                 @endif
 

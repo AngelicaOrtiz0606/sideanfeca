@@ -495,13 +495,13 @@
     font-size: 0.875rem;
 }
 
-/* ---------- Nueva persona: cada cargo en su propio recuadro ---------- */
-.filas-cargo {
+/* ---------- Designaciones: cada una en su propio recuadro ---------- */
+.filas-designacion {
     display: grid;
     gap: 1rem;
 }
 
-.fila-cargo {
+.fila-designacion {
     display: grid;
     gap: 1rem;
     padding: 1rem 1.125rem 1.125rem;
@@ -509,7 +509,7 @@
     border-radius: var(--radio);
 }
 
-.fila-cargo__cabecera {
+.fila-designacion__cabecera {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -517,18 +517,15 @@
     min-height: 2.5rem;
 }
 
-.fila-cargo__titulo {
+.fila-designacion__titulo {
     color: var(--color-secundario);
     font-weight: 700;
 }
 
 @media (width < 40rem) {
-    .fila-cargo {
+    .fila-designacion {
         padding: 0.875rem;
     }
 }
 
-/* Con un solo cargo no se ofrece quitarlo (el botón lleva hidden) */
-.fila-cargo__quitar[hidden] {
-    display: none;
-}
+

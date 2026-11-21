@@ -10,15 +10,13 @@
  *   otros contactos son filas que se agregan (desde la plantilla) y se quitan;
  *   según el tipo aparecen la lada y la extensión, y el campo pide número o
  *   correo. En los números solo quedan dígitos ("5622 8300" → "56228300").
- * - Cargos (al registrar): uno o varios, que se agregan y se quitan (siempre
- *   queda al menos uno). En cada uno, primero el nivel; la lista de cargos
- *   muestra solo los de ese nivel, y aparecen la zona (regional), la
- *   coordinación (nacional o regional) o la nota de que es de su institución.
+ * - Las designaciones (al registrar) las maneja el componente Vue
+ *   FilasDesignacion (resources/js/components).
  * - Grados: se agregan desde una lista (el grado elegido sale de la lista) y
  *   cada uno se quita con su ×.
  * - ¿Ya existe? (al registrar): al dejar de escribir el nombre o la CURP,
  *   pregunta al servidor quién se parece y lo muestra con un enlace (a su
- *   ficha, o a registrarle el cargo si solo tenía cuenta).
+ *   ficha, o a registrarle sus designaciones si solo tenía cuenta).
  */
 const mostrar = (bloque, visible) => {
     if (!bloque) {
@@ -67,75 +65,6 @@ document.querySelectorAll('form[data-persona]').forEach((formulario) => {
     });
     formulario.querySelectorAll('[data-genero]').forEach((radio) => radio.addEventListener('change', revisar));
     revisar();
-
-    // ---- Cargos (al registrar): uno o varios ----
-    const seccionCargos = formulario.querySelector('[data-cargos]');
-    if (seccionCargos) {
-        const listaCargos = seccionCargos.querySelector('[data-cargos-lista]');
-        const plantillaCargo = seccionCargos.querySelector('[data-cargo-plantilla]');
-        const agregarCargo = seccionCargos.querySelector('[data-cargo-agregar]');
-        const maximoCargos = Number(seccionCargos.dataset.maximo);
-        let siguienteCargo = listaCargos.querySelectorAll('[data-fila-cargo]').length;
-
-        const numerarCargos = () => {
-            const filas = [...listaCargos.querySelectorAll('[data-fila-cargo]')];
-            filas.forEach((fila, indice) => {
-                fila.setAttribute('aria-label', `Cargo ${indice + 1}`);
-                fila.querySelector('[data-fila-cargo-titulo]').textContent = `Cargo ${indice + 1}`;
-                fila.querySelector('[data-cargo-quitar] .accion__texto').textContent = `Quitar cargo ${indice + 1}`;
-                // Con un solo cargo no se quita: siempre debe tener al menos uno
-                fila.querySelector('[data-cargo-quitar]').hidden = filas.length === 1;
-            });
-            agregarCargo.disabled = filas.length >= maximoCargos;
-            avisarCambio(formulario);
-        };
-
-        const prepararCargo = (fila) => {
-            const cargo = fila.querySelector('[data-cargo-elegido]');
-            // Todos los cargos, una vez; la lista se arma solo con los del nivel elegido
-            const vacio = cargo.querySelector('[data-vacio]');
-            const todos = [...cargo.querySelectorAll('option[data-nivel]')];
-            const nivelCargo = () => {
-                const nivel = fila.querySelector('[data-nivel-cargo]:checked')?.value ?? '';
-                const elegido = cargo.value;
-                const delNivel = todos.filter((opcion) => opcion.dataset.nivel === nivel);
-                vacio.textContent = nivel === '' ? 'Primero elige el nivel' : 'Elige el cargo';
-                cargo.replaceChildren(vacio, ...delNivel);
-                cargo.value = delNivel.some((opcion) => opcion.value === elegido) ? elegido : '';
-                cargo.disabled = nivel === '';
-                fila.querySelectorAll('[data-solo-nivel]').forEach((bloque) => mostrar(bloque, bloque.dataset.soloNivel.split(' ').includes(nivel)));
-                avisarCambio(formulario);
-            };
-            fila.querySelectorAll('[data-nivel-cargo]').forEach((radio) => radio.addEventListener('change', nivelCargo));
-            fila.querySelector('[data-cargo-quitar]').addEventListener('click', () => {
-                const otra = fila.nextElementSibling ?? fila.previousElementSibling;
-                fila.remove();
-                numerarCargos();
-                (otra?.querySelector('[data-nivel-cargo]') ?? agregarCargo).focus();
-            });
-            nivelCargo();
-        };
-
-        agregarCargo.addEventListener('click', () => {
-            const fila = plantillaCargo.content.firstElementChild.cloneNode(true);
-            // Cada fila nueva lleva su propio número en los nombres y los id
-            fila.querySelectorAll('[name], [id], [for]').forEach((elemento) => {
-                ['name', 'id', 'for'].forEach((atributo) => {
-                    if (elemento.hasAttribute(atributo)) {
-                        elemento.setAttribute(atributo, elemento.getAttribute(atributo).replaceAll('__i__', String(siguienteCargo)));
-                    }
-                });
-            });
-            siguienteCargo += 1;
-            listaCargos.append(fila);
-            prepararCargo(fila);
-            numerarCargos();
-            fila.querySelector('[data-nivel-cargo]').focus();
-        });
-
-        listaCargos.querySelectorAll('[data-fila-cargo]').forEach(prepararCargo);
-        numerarCargos();
-    }
 
     // ---- Grados ----
     const agregarGrado = formulario.querySelector('[data-grado-agregar]');

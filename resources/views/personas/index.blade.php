@@ -3,7 +3,7 @@
     El buscador se aplica solo al dejar de escribir; las listas, al cambiarlas.
     Filtros: el buscador (nombre, CURP, correo, institución u organización, o
     cargo vigente), el cargo, la zona (de su institución o de su cargo) y el
-    estado (con o sin cargo vigente).
+    estado (con o sin designación vigente).
     Cada fila: Consultar (ficha de solo lectura) y Editar (el formulario
     completo, ya lleno). Las personas ocultas no aparecen (M8).
 --}}
@@ -73,8 +73,8 @@
                     <span class="filtros__etiqueta">Estado</span>
                     <select name="situacion" class="campo__entrada">
                         <option value="">Todas</option>
-                        <option value="con-cargo" @selected($filtros['situacion'] === 'con-cargo')>Con cargo vigente</option>
-                        <option value="sin-cargo" @selected($filtros['situacion'] === 'sin-cargo')>Sin cargo vigente</option>
+                        <option value="con-cargo" @selected($filtros['situacion'] === 'con-cargo')>Con designación vigente</option>
+                        <option value="sin-cargo" @selected($filtros['situacion'] === 'sin-cargo')>Sin designación vigente</option>
                     </select>
                 </label>
             </div>

@@ -184,7 +184,7 @@ class PersonasTest extends TestCase
         $this->assertDatabaseHas('persona', ['pers_id_persona' => $this->persona, 'pers_id_institucion_educativa' => $fca]);
 
         // La consulta muestra su cargo vigente
-        $this->actingAs($this->admin)->get("/personas/{$this->persona}")->assertSee('Directora · Facultad 1000001')->assertSee('Con cargo vigente');
+        $this->actingAs($this->admin)->get("/personas/{$this->persona}")->assertSee('Directora · Facultad 1000001')->assertSee('Con designación vigente');
     }
 
     // ---- Grados ----
@@ -282,7 +282,7 @@ class PersonasTest extends TestCase
     {
         $this->actingAs($this->admin)->get("/personas/{$this->persona}")->assertOk()
             ->assertSee('href="'.route('personas.edit', $this->persona).'"', false)
-            ->assertDontSee('<dialog', false);
+            ->assertDontSee('name="nombre"', false);
 
         $this->actingAs($this->admin)->get("/personas/{$this->persona}/edit")->assertOk()
             ->assertSee('value="María José"', false)

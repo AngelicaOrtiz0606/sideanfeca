@@ -27,6 +27,13 @@
     text-decoration: none;
 }
 
+/* En teléfono las pestañas se acercan para que quepan */
+@media (width < 40rem) {
+    .pestanas__pestana {
+        padding: 0 0.625rem;
+    }
+}
+
 .pestanas__pestana:hover {
     color: var(--color-tinta);
 }

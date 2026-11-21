@@ -8,6 +8,7 @@ use App\Http\Controllers\Catalogos\CodigoPostalController;
 use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\NivelAcademicoController;
 use App\Http\Controllers\Catalogos\ZonaController;
+use App\Http\Controllers\Designaciones\DesignacionController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
@@ -88,6 +89,16 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::get('/personas/{persona}', [PersonaController::class, 'show'])->name('personas.show');
         Route::get('/personas/{persona}/edit', [PersonaController::class, 'edit'])->name('personas.edit');
         Route::put('/personas/{persona}', [PersonaController::class, 'update'])->name('personas.update');
+    });
+
+    // Designaciones (M6) de una persona, desde su ficha: agregar, terminar (deja el puesto) y borrar la errónea
+    Route::middleware([Privilegio::GestionarPersonas->middleware(), Privilegio::GestionarDesignaciones->middleware()])->group(function () {
+        Route::get('/personas/{persona}/designaciones/create', [DesignacionController::class, 'create'])->name('personas.designaciones.create');
+        Route::post('/personas/{persona}/designaciones', [DesignacionController::class, 'store'])->name('personas.designaciones.store');
+        Route::patch('/personas/{persona}/designaciones/{designacion}/terminar', [DesignacionController::class, 'terminar'])
+            ->whereNumber('designacion')->name('personas.designaciones.terminar');
+        Route::delete('/personas/{persona}/designaciones/{designacion}', [DesignacionController::class, 'destroy'])
+            ->whereNumber('designacion')->name('personas.designaciones.destroy');
     });
 
     // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas

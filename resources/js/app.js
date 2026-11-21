@@ -24,7 +24,11 @@
  *   persona-formulario.js       formulario de persona: pertenencia, aviso de CURP y filas de contacto
  *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
+ *
+ * vue.js va primero: monta las partes hechas con Vue (por ejemplo, las filas
+ * de designación) antes de que la validación revise los campos.
  */
+import './vue.js';
 import './modulos/menu-movil.js';
 import './modulos/campo-contrasenia.js';
 import './modulos/validacion-formularios.js';

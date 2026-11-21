@@ -66,6 +66,13 @@ class BitacoraService
     ];
 
     /**
+     * Nombres de campo escritos por las funciones de la base, como se dicen en pantalla.
+     */
+    private const CAMPOS_EN_PANTALLA = [
+        'Fecha en que deja el cargo' => 'Deja el puesto desde',
+    ];
+
+    /**
      * Máximo de cambios de campo que se muestran por movimiento.
      */
     private const DETALLES_MAXIMOS = 3;
@@ -170,7 +177,7 @@ class BitacoraService
                 'verbo' => $movimiento->bita_tabla === 'USUARIO' && $movimiento->bita_accion === 'Registro'
                     ? 'creó'
                     : (self::VERBOS[$movimiento->bita_accion] ?? mb_strtolower($movimiento->bita_accion)),
-                'objeto' => $this->describirRegistro($movimiento, $cuentas, $personas, $nombres, $contextos),
+                'objeto' => $this->describirRegistro($movimiento, $cuentas, $personas, $nombres, $contextos, $detalles[$movimiento->bita_id_bitacora] ?? collect()),
                 'motivo' => $movimiento->bita_motivo,
                 'detalles' => $cambios->take(self::DETALLES_MAXIMOS)->values()->all(),
                 'mas_detalles' => max(0, $cambios->count() - self::DETALLES_MAXIMOS),
@@ -185,7 +192,7 @@ class BitacoraService
      * @param  array<string, array<int, string>>  $nombres
      * @param  array<string, array<int, string>>  $contextos
      */
-    private function describirRegistro(object $movimiento, Collection $cuentas, Collection $personas, array $nombres = [], array $contextos = []): string
+    private function describirRegistro(object $movimiento, Collection $cuentas, Collection $personas, array $nombres = [], array $contextos = [], ?Collection $detalles = null): string
     {
         $referencia = $movimiento->bita_referencia;
         $generico = strtolower(str_replace('_', ' ', $movimiento->bita_tabla));
@@ -199,17 +206,24 @@ class BitacoraService
 
         $contexto = $contextos[$movimiento->bita_tabla][$referencia] ?? null;
 
+        // Agregar designaciones a una persona ya registrada: "modificó las designaciones de la persona …"
+        $soloDesignaciones = $detalles !== null && $detalles->isNotEmpty()
+            && $detalles->every(fn (object $d) => in_array($d->bide_campo, ['Designación', 'Puesto creado'], true));
+
         return match ($movimiento->bita_tabla) {
-            'PERSONA' => $this->describirPersona($movimiento, $personas[$referencia] ?? null, $referencia, $contexto),
+            'PERSONA' => $this->describirPersona($movimiento, $personas[$referencia] ?? null, $referencia, $contexto, $soloDesignaciones),
             'USUARIO' => 'la cuenta de '.($cuentas[$referencia] ?? "una persona eliminada (#{$referencia})")
                 .($contexto !== null ? " ({$contexto})" : ''),
-            default => isset($nombres[$movimiento->bita_tabla][$referencia])
-                ? "{$singular} {$nombres[$movimiento->bita_tabla][$referencia]}"
-                : "{$singular} #{$referencia}",
+            default => match (true) {
+                isset($nombres[$movimiento->bita_tabla][$referencia]) => "{$singular} {$nombres[$movimiento->bita_tabla][$referencia]}",
+                // Una designación borrada ya no tiene nombre: sus detalles dicen de quién y qué puesto
+                $movimiento->bita_tabla === 'DESIGNACION' => 'una designación',
+                default => "{$singular} #{$referencia}",
+            },
         };
     }
 
-    private function describirPersona(object $movimiento, ?string $nombre, int $referencia, ?string $pertenencia): string
+    private function describirPersona(object $movimiento, ?string $nombre, int $referencia, ?string $pertenencia, bool $soloDesignaciones = false): string
     {
         if ($nombre === null) {
             return "a una persona eliminada (#{$referencia})";
@@ -217,7 +231,11 @@ class BitacoraService
 
         $persona = "la persona {$nombre}".($pertenencia !== null ? ", de {$pertenencia}" : '');
 
-        return $movimiento->bita_accion === 'Modificacion' ? "los datos de {$persona}" : "a {$persona}";
+        if ($movimiento->bita_accion === 'Modificacion') {
+            return $soloDesignaciones ? "las designaciones de {$persona}" : "los datos de {$persona}";
+        }
+
+        return "a {$persona}";
     }
 
     /**
@@ -226,13 +244,14 @@ class BitacoraService
      */
     private function describirCambio(object $detalle, object $movimiento, array $nombres): string
     {
-        $campo = $detalle->bide_campo;
+        // Algunos campos los nombra la base con otras palabras; aquí se dicen como en las pantallas
+        $campo = self::CAMPOS_EN_PANTALLA[$detalle->bide_campo] ?? $detalle->bide_campo;
 
         // Un detalle que nombra otro registro: "Designación: Presidenta · Nacional, desde 20/11/2026".
         // Si guardó su texto se usa ese (no cambia aunque el registro se borre después)
-        if (isset(self::CAMPOS_DE_OTRA_TABLA[$campo])) {
+        if (isset(self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo])) {
             $nombre = $detalle->bide_nuevo ?? $detalle->bide_anterior
-                ?? $nombres[self::CAMPOS_DE_OTRA_TABLA[$campo]][$detalle->bide_referencia] ?? null;
+                ?? $nombres[self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo]][$detalle->bide_referencia] ?? null;
 
             return $nombre !== null ? "{$campo}: {$nombre}" : $campo;
         }
@@ -253,10 +272,20 @@ class BitacoraService
             return $campo;
         }
 
-        $anterior = $detalle->bide_anterior ?? 'sin valor';
-        $nuevo = $detalle->bide_nuevo ?? 'sin valor';
+        $anterior = $this->valor($detalle->bide_anterior) ?? 'sin valor';
+        $nuevo = $this->valor($detalle->bide_nuevo) ?? 'sin valor';
 
         return "{$campo}: {$anterior} → {$nuevo}";
+    }
+
+    /**
+     * Un valor guardado, como se lee: las fechas de la base (2026-11-21) van como 21/11/2026.
+     */
+    private function valor(?string $valor): ?string
+    {
+        return $valor !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) === 1
+            ? Carbon::parse($valor)->format('d/m/Y')
+            : $valor;
     }
 
     /**

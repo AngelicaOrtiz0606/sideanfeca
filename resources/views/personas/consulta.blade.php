@@ -1,7 +1,8 @@
 {{--
-    Consulta de una persona (solo lectura), por pestañas: General (datos,
-    pertenencia y grados), Contactos y Cargos. Todo se cambia desde "Editar",
-    que abre el formulario completo ya lleno.
+    Consulta de una persona, por pestañas: General (datos, pertenencia y
+    grados), Contactos y Designaciones. Los datos se cambian desde "Editar"
+    (el formulario completo, ya lleno). En Designaciones: agregar, terminar
+    (la persona deja el puesto) y borrar la capturada por error.
 --}}
 @extends('layouts.admin')
 
@@ -22,7 +23,7 @@
         <div>
             <h1 class="pagina__titulo">{{ $nombre }}</h1>
             <div class="pagina__detalles">
-                <span @class(['estado', 'estado--activo' => $persona->cargos->isNotEmpty()])>{{ $persona->cargos->isNotEmpty() ? 'Con cargo vigente' : 'Sin cargo vigente' }}</span>
+                <span @class(['estado', 'estado--activo' => $persona->cargos->isNotEmpty()])>{{ $persona->cargos->isNotEmpty() ? 'Con designación vigente' : 'Sin designación vigente' }}</span>
             </div>
         </div>
 
@@ -46,8 +47,8 @@
                     {{ $titulo }}
                     @if ($clave === 'contactos')
                         <span class="pestanas__cifra">{{ $contactos->count() }}</span>
-                    @elseif ($clave === 'cargos')
-                        <span class="pestanas__cifra">{{ $cargos->count() }}</span>
+                    @elseif ($clave === 'designaciones')
+                        <span class="pestanas__cifra">{{ $designaciones->count() }}</span>
                     @endif
                 </a>
             @endforeach
@@ -142,26 +143,90 @@
             </div>
         </section>
 
-        {{-- Cargos --}}
-        <section id="panel-cargos" class="pestanas__panel" role="tabpanel" aria-labelledby="pestana-cargos" @if ($pestana !== 'cargos') hidden @endif>
-            <div class="tarjeta">
-                @if ($cargos->isEmpty())
-                    <p class="vacio">Todavía no tiene cargos.</p>
+        {{-- Designaciones: los puestos que ocupa u ocupó --}}
+        <section id="panel-designaciones" class="pestanas__panel" role="tabpanel" aria-labelledby="pestana-designaciones" @if ($pestana !== 'designaciones') hidden @endif>
+            <div class="tarjeta tarjeta--tabla">
+                @can(\App\Enums\Privilegio::GestionarDesignaciones->value)
+                    <div class="tarjeta__barra">
+                        <p class="tarjeta__texto">Los puestos que ocupa u ocupó en ANFECA.</p>
+                        <a href="{{ route('personas.designaciones.create', $persona->id) }}" class="boton boton--secundario">
+                            <x-icono nombre="mas" />
+                            Agregar designación
+                        </a>
+                    </div>
+                @endcan
+
+                @if ($designaciones->isEmpty())
+                    <p class="vacio vacio--en-tabla">Todavía no tiene designaciones.</p>
                 @else
-                    <ol class="linea-tiempo">
-                        @foreach ($cargos as $cargo)
-                            @php
-                                $vigente = $cargo->desde <= $hoy && ($cargo->hasta === null || $cargo->hasta >= $hoy);
-                            @endphp
-                            <li @class(['linea-tiempo__item', 'linea-tiempo__item--actual' => $vigente])>
-                                <span class="linea-tiempo__nombre">{{ $cargo->nombre }}</span>
-                                <span class="linea-tiempo__fechas">{{ $fecha($cargo->desde) }} – {{ $cargo->hasta ? $fecha($cargo->hasta) : 'hoy' }}</span>
-                            </li>
-                        @endforeach
-                    </ol>
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Puesto</th>
+                                <th scope="col">Periodo</th>
+                                <th scope="col">Estado</th>
+                                @can(\App\Enums\Privilegio::GestionarDesignaciones->value)
+                                    <th scope="col" class="tabla__acciones"><span class="solo-lectores">Acciones</span></th>
+                                @endcan
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($designaciones as $designacion)
+                                @php
+                                    $vigente = $designacion->desde <= $hoy && ($designacion->hasta === null || $designacion->hasta >= $hoy);
+                                    $porVenir = $designacion->desde > $hoy;
+                                    // El primer día que ya no lo ocupa debe ser después de su inicio
+                                    $minimo = \Illuminate\Support\Carbon::parse($designacion->desde)->addDay()->toDateString();
+                                @endphp
+                                <tr>
+                                    <th scope="row" data-etiqueta="Puesto"><span class="tabla__principal">{{ $designacion->nombre }}</span></th>
+                                    <td data-etiqueta="Periodo">{{ $fecha($designacion->desde) }} – {{ $designacion->hasta ? $fecha($designacion->hasta) : 'a la fecha' }}</td>
+                                    <td data-etiqueta="Estado">
+                                        <span @class(['estado', 'estado--activo' => $vigente])>{{ $vigente ? 'Vigente' : ($porVenir ? 'Por iniciar' : 'Terminada') }}</span>
+                                    </td>
+                                    @can(\App\Enums\Privilegio::GestionarDesignaciones->value)
+                                        <td class="tabla__acciones">
+                                            <div class="acciones-fila">
+                                                @if ($designacion->hasta === null)
+                                                    <button type="button" class="accion accion--desactivar"
+                                                            data-abrir-dialogo="dialogo-terminar"
+                                                            data-accion="{{ route('personas.designaciones.terminar', [$persona->id, $designacion->id]) }}"
+                                                            data-texto="{{ $designacion->nombre }}, desde el {{ $fecha($designacion->desde) }}."
+                                                            data-valores="{{ json_encode(['fecha' => max($hoy, $minimo)]) }}"
+                                                            data-atributos="{{ json_encode(['fecha' => ['min' => $minimo]]) }}">
+                                                        <x-icono nombre="pausa" />
+                                                        <span class="accion__texto">Terminar designación <span class="solo-lectores">{{ $designacion->nombre }}</span></span>
+                                                    </button>
+                                                @endif
+                                                <button type="button" @class(['accion', 'accion--borrar', 'accion--a-la-derecha', 'accion--bloqueada' => $motivoParaNoBorrar])
+                                                        data-abrir-dialogo="dialogo-borrar"
+                                                        data-bloqueo="{{ $motivoParaNoBorrar }}"
+                                                        data-accion="{{ route('personas.designaciones.destroy', [$persona->id, $designacion->id]) }}"
+                                                        data-titulo="¿Borrar la designación {{ $designacion->nombre }}?"
+                                                        data-texto="Solo si se capturó por error: la designación desaparece de su historial. Si la persona dejó el puesto, usa «Terminar designación». Queda en la bitácora con su motivo."
+                                                        data-valores="{{ json_encode(['_id' => $designacion->id, 'motivo' => '']) }}">
+                                                    <x-icono nombre="papelera" />
+                                                    <span class="accion__texto">Borrar designación <span class="solo-lectores">{{ $designacion->nombre }}</span></span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    @endcan
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 @endif
             </div>
         </section>
     </div>
 
+    @can(\App\Enums\Privilegio::GestionarDesignaciones->value)
+        @include('personas._dialogo-terminar')
+        @include('catalogos._dialogo-borrar', [
+            'motivos' => $motivosParaBorrar,
+            'abrir' => false,
+            'accion' => '',
+            'titulo' => 'Borrar designación',
+        ])
+    @endcan
 @endsection

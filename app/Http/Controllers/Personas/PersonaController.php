@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Personas;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Personas\PersonaRequest;
+use App\Services\Designaciones\DesignacionService;
 use App\Services\Personas\PersonaService;
 use App\Services\Puestos\PuestoService;
 use Illuminate\Http\JsonResponse;
@@ -73,10 +74,10 @@ class PersonaController extends Controller
 
     public function store(PersonaRequest $request): RedirectResponse
     {
-        $datos = $request->datos() + ['cargos' => $request->cargos()];
+        $datos = $request->datos() + ['designaciones' => $request->designacionesNuevas()];
         $id = $this->personas->registrar($request->user(), $datos, $request->existente());
 
-        return redirect()->route('personas.show', $id)->with('estado', 'Se registró '.$this->personas->nombreCompleto((object) $datos).(count($datos['cargos']) > 1 ? ' con sus designaciones.' : ' con su designación.'));
+        return redirect()->route('personas.show', $id)->with('estado', 'Se registró '.$this->personas->nombreCompleto((object) $datos).(count($datos['designaciones']) > 1 ? ' con sus designaciones.' : ' con su designación.'));
     }
 
     /**
@@ -101,7 +102,7 @@ class PersonaController extends Controller
         $encontrada = $this->personas->buscar($persona);
         abort_if($encontrada === null, 404);
 
-        $pestanas = ['general' => 'General', 'contactos' => 'Contactos', 'cargos' => 'Cargos'];
+        $pestanas = ['general' => 'General', 'contactos' => 'Contactos', 'designaciones' => 'Designaciones'];
         $pestana = array_key_exists((string) $request->query('pestana'), $pestanas) ? (string) $request->query('pestana') : 'general';
 
         return view('personas.consulta', [
@@ -110,7 +111,9 @@ class PersonaController extends Controller
             'pestanas' => $pestanas,
             'pestana' => $pestana,
             'contactos' => $this->personas->contactos($persona),
-            'cargos' => $this->personas->historialCargos($persona, $encontrada->genero),
+            'designaciones' => $this->personas->historialCargos($persona, $encontrada->genero),
+            'motivosParaBorrar' => DesignacionService::MOTIVOS_PARA_BORRAR,
+            'motivoParaNoBorrar' => app(DesignacionService::class)->motivoParaNoBorrar($persona),
             'generos' => PersonaService::GENEROS,
         ]);
     }
