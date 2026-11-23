@@ -22,6 +22,9 @@ use RuntimeException;
  *     7 coordinadores regionales de esa coordinación. En Maratones, después
  *     del Coordinador Nacional va el Secretario Técnico General (su secretario).
  *
+ * También crea el puesto Director General CACECA (nacional), que no va en
+ * ningún directorio: quien lo ocupa pertenece a la organización CACECA.
+ *
  * El Secretario Técnico Regional de cada coordinación ya no existe: no se crea.
  * Solo crea puestos (vacantes); las personas se designan desde la pantalla.
  *
@@ -76,6 +79,9 @@ class PuestosDirectoriosSeeder extends Seeder
             $this->ordenar('Consejo Nacional Directivo', $this->consejoNacional());
             $this->ordenar('Consejos Regionales', $this->consejosRegionales());
             $this->ordenar('Coordinaciones Nacionales', $this->coordinacionesNacionales());
+
+            // Puestos que no van en ningún directorio publicado
+            $this->puesto('Director General CACECA');
         });
     }
 
@@ -196,7 +202,7 @@ class PuestosDirectoriosSeeder extends Seeder
     {
         $nombres = ['Presidente', 'Vicepresidente', 'Secretario General', 'Director Ejecutivo', 'Director Regional',
             'Secretario Regional', 'Coordinador Nacional', 'Coordinador Regional', 'Secretario Técnico General',
-            'Representante de ANFECA ante ALAFEC'];
+            'Representante de ANFECA ante ALAFEC', 'Director General CACECA'];
 
         foreach ($nombres as $nombre) {
             $this->cargos[$nombre] = (int) (DB::table('cargo')->where('carg_nombre_m', $nombre)->value('carg_id_cargo')

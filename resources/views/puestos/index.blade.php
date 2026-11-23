@@ -37,18 +37,79 @@
         @if ($puestos->isEmpty())
             <p class="vacio vacio--en-tabla">Todavía no hay puestos. Registra el primero con <strong>Nuevo puesto</strong>.</p>
         @else
-            <x-filtros-lista ruta="puestos.index" :filtros="$filtros" id="buscar-puesto" placeholder="Buscar puesto o persona"
-                             :grupos="collect($niveles)->mapWithKeys(fn ($n) => [$n => $puestos->where('nivel', $n)->count()])->all()"
-                             :total="$puestos->count()" />
+            @php
+                $activos = collect([$filtros['nivel'], $filtros['coordinacion'], $filtros['zona']])->filter()->count() + ($filtros['orden'] !== 'puesto' ? 1 : 0);
+                $hayFiltros = $filtros['texto'] !== null || $activos > 0;
+            @endphp
+            <form method="GET" action="{{ route('puestos.index') }}" class="filtros filtros--servidor" role="search" data-filtros-servidor>
+                <label for="buscar-puesto" class="solo-lectores">Buscar puesto o persona</label>
+                <input id="buscar-puesto" name="texto" type="search" class="campo__entrada filtros__buscar"
+                       placeholder="Buscar puesto o persona" value="{{ $filtros['texto'] }}" maxlength="100"
+                       data-filtro-escrito @if ($filtros['texto'] !== null) autofocus @endif>
+
+                <button type="button" class="filtros__resumen" aria-expanded="{{ $activos > 0 ? 'true' : 'false' }}" aria-controls="filtros-opciones" data-filtros-boton>
+                    <x-icono nombre="ordenar" />
+                    Filtros @if ($activos > 0)<span class="filtro__cifra">({{ $activos }})</span>@endif
+                </button>
+                <div class="filtros__opciones" id="filtros-opciones" data-filtros-opciones @if ($activos === 0) data-cerrado @endif>
+                    <label class="filtros__selector">
+                        <span class="filtros__etiqueta">Nivel</span>
+                        <select name="nivel" class="campo__entrada">
+                            <option value="">Todos</option>
+                            @foreach ($niveles as $nivel)
+                                <option value="{{ $nivel }}" @selected($filtros['nivel'] === $nivel)>{{ $nivel }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="filtros__selector">
+                        <span class="filtros__etiqueta">Coordinación</span>
+                        <select name="coordinacion" class="campo__entrada">
+                            <option value="">Todas</option>
+                            @foreach ($coordinaciones as $coordinacion)
+                                <option value="{{ $coordinacion->id }}" @selected($filtros['coordinacion'] === $coordinacion->id)>{{ $coordinacion->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="filtros__selector">
+                        <span class="filtros__etiqueta">Zona</span>
+                        <select name="zona" class="campo__entrada">
+                            <option value="">Todas</option>
+                            @foreach ($zonas as $zona)
+                                <option value="{{ $zona->id }}" @selected($filtros['zona'] === $zona->id)>Zona {{ $zona->numero }} · {{ $zona->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="filtros__selector">
+                        <span class="filtros__etiqueta">Ordenar por</span>
+                        <select name="orden" class="campo__entrada">
+                            @foreach ($ordenes as $valor => $texto)
+                                {{-- El orden de siempre va sin valor: así no se marca como filtro elegido --}}
+                                <option value="{{ $valor === 'puesto' ? '' : $valor }}" @selected($filtros['orden'] === $valor)>{{ $texto }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+
+                @if ($hayFiltros)
+                    <a href="{{ route('puestos.index') }}" class="boton boton--discreto filtros__borrar">
+                        <x-icono nombre="cerrar" />
+                        Borrar filtros
+                    </a>
+                @endif
+            </form>
             @if ($pagina->isEmpty())
                 <p class="vacio vacio--en-tabla">Ningún puesto coincide con la búsqueda.</p>
             @else
             <table class="tabla">
                 <thead>
                     <tr>
-                        <th scope="col">Puesto</th>
+                        <th scope="col" @if ($filtros['orden'] === 'puesto') aria-sort="ascending" @endif>Puesto</th>
+                        <th scope="col" @if ($filtros['orden'] === 'coordinacion') aria-sort="ascending" @endif>Coordinación</th>
                         <th scope="col">Nivel</th>
-                        <th scope="col">Ocupado por</th>
+                        <th scope="col" @if ($filtros['orden'] === 'ocupante') aria-sort="ascending" @endif>Ocupado por</th>
                         <th scope="col">Estado</th>
                         <th scope="col" class="tabla__acciones"><span class="solo-lectores">Acciones</span></th>
                     </tr>
@@ -62,16 +123,23 @@
                         <tr @class(['tabla__fila--inactiva' => ! $puesto->activo])>
                             <th scope="row" data-etiqueta="Puesto">
                                 <span class="tabla__principal">{{ $puesto->cargo }}</span>
-                                {{-- Un puesto nacional sin coordinación no repite "Nacional" (ya lo dice su nivel) --}}
-                                @if ($puesto->nivel !== 'Nacional' || $puesto->coordinacion)
+                                {{-- Debajo, solo lo que no va en otra columna: la zona o la institución --}}
+                                @if ($puesto->zona_numero || $puesto->institucion)
                                     <span class="tabla__detalle">
-                                        {{ $puesto->ambito }}
+                                        {{ $puesto->institucion ?? "Zona {$puesto->zona_numero} · {$puesto->zona_nombre}" }}
                                         @if ($puesto->titular)
                                             <span class="insignia-titular">Titular</span>
                                         @endif
                                     </span>
                                 @endif
                             </th>
+                            <td data-etiqueta="Coordinación">
+                                @if ($puesto->coordinacion)
+                                    <span class="etiqueta-coordinacion">{{ $puesto->coordinacion }}</span>
+                                @else
+                                    <span class="tabla__vacio">—</span>
+                                @endif
+                            </td>
                             <td data-etiqueta="Nivel"><span class="nivel-cargo nivel-cargo--{{ strtolower($puesto->nivel) }}">{{ $puesto->nivel }}</span></td>
                             <td data-etiqueta="Ocupado por">
                                 @if ($puesto->ocupante)

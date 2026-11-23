@@ -4,6 +4,7 @@ namespace App\Services\Puestos;
 
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
+use App\Support\TextoCatalogo;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,14 @@ class PuestoService
     use BitacoraCatalogo;
 
     public const NIVELES = ['Nacional', 'Regional', 'Institucional'];
+
+    /** Cómo se puede ordenar la lista (valor en la dirección => texto). */
+    public const ORDENES = [
+        'puesto' => 'Puesto',
+        'coordinacion' => 'Coordinación',
+        'zona' => 'Zona',
+        'ocupante' => 'Ocupado por',
+    ];
 
     /**
      * Lista con su ámbito, quién lo ocupa hoy y cuántas designaciones tiene.
@@ -58,6 +67,36 @@ class PuestoService
                 $puesto->motivo_para_no_borrar = $this->explicar((int) $puesto->designaciones);
                 $puesto->ambito = $this->ambito($puesto);
             });
+    }
+
+    /**
+     * La lista en otro orden. "puesto" es el del listado (nivel, zona, cargo,
+     * coordinación); los demás dejan al final los puestos sin ese dato.
+     *
+     * @param  Collection<int, object>  $puestos
+     * @return Collection<int, object>
+     */
+    public function ordenar(Collection $puestos, string $orden): Collection
+    {
+        $nivel = fn (object $p) => array_search($p->nivel, self::NIVELES, true);
+        $texto = fn (?string $t) => mb_strtolower(TextoCatalogo::clave($t));
+
+        $criterios = match ($orden) {
+            'coordinacion' => [
+                fn ($a, $b) => [$a->coordinacion === null, $a->coordinacion_orden, $nivel($a), $a->zona_numero, $texto($a->cargo)]
+                    <=> [$b->coordinacion === null, $b->coordinacion_orden, $nivel($b), $b->zona_numero, $texto($b->cargo)],
+            ],
+            'zona' => [
+                fn ($a, $b) => [$a->zona_numero === null, $a->zona_numero, $a->coordinacion_orden ?? 0, $texto($a->cargo), $texto($a->institucion)]
+                    <=> [$b->zona_numero === null, $b->zona_numero, $b->coordinacion_orden ?? 0, $texto($b->cargo), $texto($b->institucion)],
+            ],
+            'ocupante' => [
+                fn ($a, $b) => [$a->ocupante === null, $texto($a->ocupante), $nivel($a)] <=> [$b->ocupante === null, $texto($b->ocupante), $nivel($b)],
+            ],
+            default => [],
+        };
+
+        return $criterios === [] ? $puestos->values() : $puestos->sort($criterios[0])->values();
     }
 
     public function buscar(int $id): ?object
@@ -283,6 +322,7 @@ class PuestoService
                 'z.zore_nombre as zona_nombre',
                 'p.pues_id_coordinacion_nacional as coordinacion_id',
                 'cn.cona_nombre as coordinacion',
+                'cn.cona_orden as coordinacion_orden',
                 'p.pues_id_institucion_educativa as institucion_id',
                 'n.instn_nombre as institucion',
                 'p.pues_titularidad as titular',

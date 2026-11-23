@@ -242,7 +242,7 @@
     </div>
 
     @include('catalogos._dialogo-borrar', [
-        'id' => 'dialogo-borrar-persona',
+        'dialogo' => 'dialogo-borrar-persona',
         'motivos' => $motivosParaBorrarPersona,
         'abrir' => $errors->has('motivo') && (int) old('_id') === (int) $persona->id,
         'accion' => route('personas.destroy', $persona->id),

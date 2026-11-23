@@ -157,6 +157,35 @@ class PuestosTest extends TestCase
         $this->actingAs($this->admin)->get('/puestos')->assertOk()->assertDontSee('Juan Pérez López')->assertSee('Vacante');
     }
 
+    public function test_la_lista_resalta_la_coordinacion_y_se_filtra_y_ordena(): void
+    {
+        $certificacion = (int) DB::table('coordinacion_nacional')->where('cona_nombre', 'Certificación Académica')->value('cona_id_coordinacion_nacional');
+        $historia = (int) DB::table('coordinacion_nacional')->where('cona_nombre', 'Historia')->value('cona_id_coordinacion_nacional');
+        $this->puesto(['cargo' => $this->cargos['Presidente']]);
+        $this->puesto(['cargo' => $this->cargos['Coordinador Regional'], 'zona' => $this->zona(2), 'coordinacion' => $historia]);
+        $this->puesto(['cargo' => $this->cargos['Coordinador Regional'], 'zona' => $this->zona(1), 'coordinacion' => $certificacion]);
+        $this->puesto(['cargo' => $this->cargos['Coordinador Nacional'], 'coordinacion' => $historia]);
+
+        // La coordinación va en su propia columna, resaltada
+        $this->actingAs($this->admin)->get('/puestos')->assertOk()
+            ->assertSee('<span class="etiqueta-coordinacion">Historia</span>', false);
+
+        // Por coordinación: solo los de Historia (el nacional y el regional)
+        $this->actingAs($this->admin)->get("/puestos?coordinacion={$historia}")->assertOk()
+            ->assertSee('Mostrando 1–2 de 2')->assertDontSee('<span class="tabla__principal">Presidente</span>', false);
+
+        // Ordenar por coordinación: Certificación (1.ª) antes que Historia; sin coordinación al final
+        $this->actingAs($this->admin)->get('/puestos?orden=coordinacion')->assertOk()
+            ->assertSeeInOrder(['Certificación Académica</span>', 'Historia</span>', 'Historia</span>', '<span class="tabla__principal">Presidente</span>'], false);
+
+        // Ordenar por zona: zona 1, zona 2 y después los que no tienen zona
+        $this->actingAs($this->admin)->get('/puestos?orden=zona')->assertOk()
+            ->assertSeeInOrder(['Zona 1 · Noroeste', 'Zona 2 · Norte', '<span class="tabla__principal">Presidente</span>'], false);
+
+        // Un orden desconocido se ignora
+        $this->actingAs($this->admin)->get('/puestos?orden=nada&coordinacion=999999')->assertOk()->assertSee('<span class="tabla__principal">Presidente</span>', false);
+    }
+
     public function test_desactivar_activar_y_borrar_sin_designaciones(): void
     {
         $id = $this->puesto(['cargo' => $this->cargos['Presidente']]);

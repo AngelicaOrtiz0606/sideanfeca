@@ -30,7 +30,8 @@ class PuestosDirectoriosSeederTest extends TestCase
 
         // 4 del consejo + 7 directores + 7 secretarios regionales + 14 coordinadores
         // nacionales + secretario técnico general + ALAFEC + 14 × 7 coordinadores regionales
-        $this->assertSame(132, DB::table('puesto')->count());
+        // + Director General CACECA (que no va en ningún directorio)
+        $this->assertSame(133, DB::table('puesto')->count());
 
         $nacional = $this->directorio('Consejo Nacional Directivo');
         $this->assertCount(27, $nacional);
@@ -59,10 +60,9 @@ class PuestosDirectoriosSeederTest extends TestCase
     {
         $this->seed(PuestosDirectoriosSeeder::class);
 
-        // El usuario agregó un puesto al final del Consejo Nacional y movió el Presidente
+        // El usuario agregó al final del Consejo Nacional un puesto que el seeder no pone ahí
         $cnd = (int) DB::table('tipo_directorio')->where('tidi_nombre', 'Consejo Nacional Directivo')->value('tidi_id_tipo_directorio');
-        $cargo = (int) DB::table('cargo')->where('carg_nombre_m', 'Director General CACECA')->value('carg_id_cargo');
-        $propio = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $cargo], 'pues_id_puesto');
+        $propio = (int) DB::table('puesto')->join('cargo', 'carg_id_cargo', '=', 'pues_id_cargo')->where('carg_nombre_m', 'Director General CACECA')->value('pues_id_puesto');
         DB::table('puesto_directorio')->insert(['pudi_id_puesto' => $propio, 'pudi_id_tipo_directorio' => $cnd, 'pudi_orden' => 28]);
 
         $this->seed(PuestosDirectoriosSeeder::class);

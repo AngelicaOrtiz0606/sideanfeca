@@ -497,6 +497,13 @@ a.paginacion__enlace:hover {
         gap: 0.75rem;
     }
 
+    /* En teléfonos angostos, un selector por renglón para leer bien su valor */
+    @media (width < 30rem) {
+        .filtros__opciones {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
     .filtros__opciones[data-cerrado] {
         display: none;
     }
@@ -505,10 +512,22 @@ a.paginacion__enlace:hover {
         justify-content: space-between;
     }
 
+    /* Cada selector cabe en su columna aunque su valor sea largo ("Planes y Programas de Estudio") */
+    .filtros__selector {
+        min-width: 0;
+    }
+
+    .filtros__selector .filtros__etiqueta {
+        flex: none;
+    }
+
     .filtros__selector .campo__entrada {
         flex: 1;
+        min-width: 0;
         max-width: none;
+        overflow: hidden;
         text-align: right;
+        text-overflow: ellipsis;
     }
 
     .filtros__borrar {

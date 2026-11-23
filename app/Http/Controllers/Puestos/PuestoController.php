@@ -23,21 +23,29 @@ class PuestoController extends Controller
     public function index(Request $request): View
     {
         $puestos = $this->puestos->listado();
+        $zonas = $this->puestos->zonas();
+        $coordinaciones = $this->puestos->coordinaciones();
         $filtros = [
             'texto' => trim((string) $request->query('texto')) ?: null,
             'nivel' => in_array($request->query('nivel'), PuestoService::NIVELES, true) ? $request->query('nivel') : null,
+            'coordinacion' => $coordinaciones->firstWhere('id', $request->integer('coordinacion'))?->id,
+            'zona' => $zonas->firstWhere('id', $request->integer('zona'))?->id,
+            'orden' => array_key_exists((string) $request->query('orden'), PuestoService::ORDENES) ? (string) $request->query('orden') : 'puesto',
         ];
         $filtrados = Paginacion::buscar($puestos, $filtros['texto'], fn ($p) => "{$p->cargo} {$p->cargo_f} {$p->ambito} {$p->ocupante}")
-            ->when($filtros['nivel'], fn ($lista, $nivel) => $lista->where('nivel', $nivel)->values());
+            ->when($filtros['nivel'], fn ($lista, $nivel) => $lista->where('nivel', $nivel)->values())
+            ->when($filtros['coordinacion'], fn ($lista, $id) => $lista->where('coordinacion_id', $id)->values())
+            ->when($filtros['zona'], fn ($lista, $id) => $lista->where('zona_id', $id)->values());
 
         return view('puestos.index', [
             'puestos' => $puestos,
-            'pagina' => Paginacion::de($filtrados),
+            'pagina' => Paginacion::de($this->puestos->ordenar($filtrados, $filtros['orden'])),
             'filtros' => $filtros,
+            'ordenes' => PuestoService::ORDENES,
             'niveles' => PuestoService::NIVELES,
             'cargos' => $this->puestos->cargos(),
-            'zonas' => $this->puestos->zonas(),
-            'coordinaciones' => $this->puestos->coordinaciones(),
+            'zonas' => $zonas,
+            'coordinaciones' => $coordinaciones,
             'instituciones' => $this->puestos->instituciones(),
             'motivos' => EliminarRequest::MOTIVOS,
         ]);
