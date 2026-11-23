@@ -19,8 +19,8 @@ class CargosBaseSeederTest extends TestCase
     {
         $this->seed(CargosBaseSeeder::class);
 
-        $this->assertSame(39, DB::table('cargo')->count());
-        $this->assertSame(['Nacional' => 8, 'Regional' => 4, 'Institucional' => 27],
+        $this->assertSame(38, DB::table('cargo')->count());
+        $this->assertSame(['Nacional' => 8, 'Regional' => 3, 'Institucional' => 27],
             DB::table('cargo')->selectRaw('carg_nivel, count(*) as total')->groupBy('carg_nivel')->pluck('total', 'carg_nivel')->map(fn ($n) => (int) $n)
                 ->sortBy(fn ($n, $nivel) => array_search($nivel, ['Nacional', 'Regional', 'Institucional']))->all());
         $this->assertDatabaseHas('cargo', ['carg_nombre_m' => 'Coordinador Regional', 'carg_nombre_f' => 'Coordinadora Regional', 'carg_nivel' => 'Regional', 'carg_activo' => true]);
@@ -35,7 +35,7 @@ class CargosBaseSeederTest extends TestCase
         $this->seed(CargosBaseSeeder::class);
         $this->seed(CargosBaseSeeder::class);
 
-        $this->assertSame(39, DB::table('cargo')->count());
+        $this->assertSame(38, DB::table('cargo')->count());
         $this->assertDatabaseHas('cargo', ['carg_nombre_m' => 'DIRECTOR', 'carg_activo' => false]);
         $this->assertDatabaseMissing('cargo', ['carg_nombre_m' => 'Director']);
     }

@@ -35,9 +35,8 @@ class CargosBaseSeeder extends Seeder
         ['Director Regional', 'Directora Regional', 'Regional'],
         ['Secretario Regional', 'Secretaria Regional', 'Regional'],
 
-        // Regionales con coordinaciones
+        // Regionales con coordinaciones (el Secretario Técnico Regional ya no existe)
         ['Coordinador Regional', 'Coordinadora Regional', 'Regional'],
-        ['Secretario Técnico', 'Secretaria Técnica', 'Regional'],
 
         // Institucionales
         ['Director', 'Directora', 'Institucional'],

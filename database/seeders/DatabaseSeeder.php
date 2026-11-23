@@ -15,6 +15,7 @@ use Illuminate\Database\Seeder;
  *   2. CatalogosInicialesSeeder: zonas, entidades y coordinaciones.
  *   3. GradosAcademicosSeeder: Licenciatura, Maestría y Doctorado.
  *   4. CargosBaseSeeder: los cargos base de ANFECA (nacionales, regionales e institucionales).
+ *   5. PuestosDirectoriosSeeder: los puestos de los tres directorios y su orden.
  *
  * Municipios y colonias no van aquí: se cargan con
  *   php artisan catalogos:importar-correos
@@ -28,6 +29,7 @@ class DatabaseSeeder extends Seeder
             CatalogosInicialesSeeder::class,
             GradosAcademicosSeeder::class,
             CargosBaseSeeder::class,
+            PuestosDirectoriosSeeder::class,
         ]);
     }
 }
