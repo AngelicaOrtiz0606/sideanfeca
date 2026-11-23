@@ -42,7 +42,7 @@ class AgregarDesignacionesRequest extends FormRequest
             function (Validator $validator): void {
                 $persona = $this->persona();
                 $pertenencia = $persona?->pers_id_institucion_educativa ? 'institucion' : ($persona?->pers_id_organizacion ? 'organizacion' : 'ninguna');
-                $this->revisarDesignaciones($validator, $pertenencia, $this->institucion(), 'designaciones');
+                $this->revisarDesignaciones($validator, $pertenencia, $this->institucion(), 'designaciones', $this->organizacion());
             },
         ];
     }
@@ -60,6 +60,13 @@ class AgregarDesignacionesRequest extends FormRequest
         $institucion = $this->persona()?->pers_id_institucion_educativa;
 
         return $institucion === null ? null : (int) $institucion;
+    }
+
+    public function organizacion(): ?int
+    {
+        $organizacion = $this->persona()?->pers_id_organizacion;
+
+        return $organizacion === null ? null : (int) $organizacion;
     }
 
     private function persona(): ?object

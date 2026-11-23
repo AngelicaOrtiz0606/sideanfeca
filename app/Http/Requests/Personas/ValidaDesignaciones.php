@@ -17,7 +17,9 @@ use Illuminate\Validation\Rule;
  * designaciones que ya terminaron. Reglas:
  * - la persona debe pertenecer a una institución u organización;
  * - el mismo puesto no se repite entre las filas en periodos que se cruzan;
- * - el puesto debe estar activo y libre en todo ese periodo.
+ * - el puesto debe estar activo y libre en todo ese periodo;
+ * - un cargo nacional que es de una organización (Director General CACECA)
+ *   solo lo ocupa alguien de esa organización, y se usa el puesto de ella.
  * Los mensajes dicen de qué fila se trata ("Designación 2: ...").
  */
 trait ValidaDesignaciones
@@ -72,20 +74,24 @@ trait ValidaDesignaciones
 
     /**
      * Las designaciones, listas para guardar: lo que no aplica al nivel del
-     * cargo va vacío; un cargo institucional lleva la institución de la persona.
+     * cargo va vacío; un cargo institucional lleva la institución de la persona
+     * y uno nacional sin coordinación, su organización (para usar el puesto de
+     * su organización, si lo hay).
      *
-     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin: ?string}>
+     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, fecha_inicio: string, fecha_fin: ?string}>
      */
-    public function designaciones(?int $institucion): array
+    public function designaciones(?int $institucion, ?int $organizacion = null): array
     {
-        return array_map(function (array $d) use ($institucion) {
+        return array_map(function (array $d) use ($institucion, $organizacion) {
             $nivel = $this->nivelDe($d['cargo'] ?? null);
+            $coordinacion = $nivel !== 'Institucional' && filled($d['coordinacion'] ?? null) ? (int) $d['coordinacion'] : null;
 
             return [
                 'cargo' => (int) $d['cargo'],
                 'zona' => $nivel === 'Regional' && filled($d['zona'] ?? null) ? (int) $d['zona'] : null,
-                'coordinacion' => $nivel !== 'Institucional' && filled($d['coordinacion'] ?? null) ? (int) $d['coordinacion'] : null,
+                'coordinacion' => $coordinacion,
                 'institucion' => $nivel === 'Institucional' ? $institucion : null,
+                'organizacion' => $nivel === 'Nacional' && $coordinacion === null ? $organizacion : null,
                 'fecha_inicio' => (string) $d['fecha_inicio'],
                 'fecha_fin' => filled($d['fecha_fin'] ?? null) ? (string) $d['fecha_fin'] : null,
             ];
@@ -96,7 +102,7 @@ trait ValidaDesignaciones
      * @param  string  $pertenencia  'institucion', 'organizacion' o 'ninguna'
      * @param  string  $campoPertenencia  dónde se avisa si no pertenece a nada
      */
-    protected function revisarDesignaciones(Validator $validator, string $pertenencia, ?int $institucion, string $campoPertenencia): void
+    protected function revisarDesignaciones(Validator $validator, string $pertenencia, ?int $institucion, string $campoPertenencia, ?int $organizacion = null): void
     {
         if ($validator->errors()->has('designaciones')) {
             return;
@@ -109,7 +115,7 @@ trait ValidaDesignaciones
 
         $servicio = app(PersonaService::class);
         $vistas = [];
-        foreach ($this->designaciones($institucion) as $i => $designacion) {
+        foreach ($this->designaciones($institucion, $organizacion) as $i => $designacion) {
             $n = $i + 1;
             $campo = "designaciones.{$i}.cargo";
             if ($validator->errors()->hasAny([$campo, "designaciones.{$i}.fecha_inicio", "designaciones.{$i}.fecha_fin"])) {
@@ -127,6 +133,17 @@ trait ValidaDesignaciones
                 continue;
             }
 
+            // Un cargo de una organización (Director General CACECA) solo lo ocupa alguien de ella
+            if ($nivel === 'Nacional' && $designacion['coordinacion'] === null) {
+                $deOrganizaciones = DB::table('puesto as p')->join('organizacion as o', 'o.orga_id_organizacion', '=', 'p.pues_id_organizacion')
+                    ->where('p.pues_id_cargo', $designacion['cargo'])->pluck('o.orga_nombre', 'p.pues_id_organizacion');
+                if ($deOrganizaciones->isNotEmpty() && ! $deOrganizaciones->has($designacion['organizacion'])) {
+                    $validator->errors()->add($campo, "Designación {$n}: ese cargo es de {$deOrganizaciones->implode(', ')}; solo lo ocupa alguien que pertenezca a esa organización.");
+
+                    continue;
+                }
+            }
+
             // El mismo puesto puede repetirse en periodos distintos (por ejemplo, dos periodos de presidencia)
             $clave = implode('|', [$designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion']]);
             foreach ($vistas[$clave] ?? [] as [$otra, $inicio, $fin]) {
@@ -138,7 +155,7 @@ trait ValidaDesignaciones
             }
             $vistas[$clave][] = [$n, $designacion['fecha_inicio'], $designacion['fecha_fin']];
 
-            $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion']);
+            $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion'], $designacion['organizacion']);
             if ($puesto === null) {
                 continue; // El puesto se creará al guardar
             }

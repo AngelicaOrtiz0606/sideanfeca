@@ -174,12 +174,12 @@ class PersonaRequest extends FormRequest
                         $validator->errors()->add('persona_existente', 'Esa persona ya no está disponible para registrarla aquí. Vuelve a buscarla.');
                     }
                     if (! $validator->errors()->hasAny(['pertenencia', 'institucion', 'organizacion'])) {
-                        $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia');
+                        $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia', $this->pertenencia()['organizacion']);
                     }
                 } else {
                     $this->revisarExistentes($validator, (int) $this->route('persona'));
                     if ($this->input('designaciones', []) !== [] && ! $validator->errors()->hasAny(['pertenencia', 'institucion', 'organizacion'])) {
-                        $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia');
+                        $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia', $this->pertenencia()['organizacion']);
                     }
                 }
 
@@ -409,7 +409,7 @@ class PersonaRequest extends FormRequest
      */
     public function designacionesNuevas(): array
     {
-        return $this->designaciones($this->pertenencia()['institucion']);
+        return $this->designaciones($this->pertenencia()['institucion'], $this->pertenencia()['organizacion']);
     }
 
     /**

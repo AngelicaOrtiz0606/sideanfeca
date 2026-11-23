@@ -6,6 +6,7 @@ use Database\Seeders\CatalogosInicialesSeeder;
 use Database\Seeders\PuestosDirectoriosSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreaInstituciones;
 use Tests\TestCase;
 
 /**
@@ -15,13 +16,21 @@ use Tests\TestCase;
  */
 class PuestosDirectoriosSeederTest extends TestCase
 {
+    use CreaInstituciones;
     use DatabaseTransactions;
+
+    private int $caceca;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(CatalogosInicialesSeeder::class);
+        $this->caceca = (int) DB::table('organizacion')->insertGetId([
+            'orga_nombre' => 'CACECA',
+            'orga_id_domicilio' => DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $this->crearInstitucion('Observadora'))->value('ined_id_domicilio'),
+            'orga_activo' => true,
+        ], 'orga_id_organizacion');
     }
 
     public function test_crea_los_puestos_de_los_tres_directorios_en_el_orden_oficial(): void
@@ -54,6 +63,27 @@ class PuestosDirectoriosSeederTest extends TestCase
 
         // El Secretario Técnico Regional ya no existe: ni cargo ni puestos
         $this->assertDatabaseMissing('cargo', ['carg_nombre_m' => 'Secretario Técnico']);
+
+        // Director General CACECA es de la organización CACECA
+        $this->assertSame($this->caceca, (int) $this->puestoDeCaceca()->pues_id_organizacion);
+    }
+
+    public function test_liga_a_caceca_el_puesto_que_ya_existia_sin_organizacion(): void
+    {
+        $this->seed(PuestosDirectoriosSeeder::class);
+        $puesto = (int) $this->puestoDeCaceca()->pues_id_puesto;
+        DB::table('puesto')->where('pues_id_puesto', $puesto)->update(['pues_id_organizacion' => null]);
+
+        $this->seed(PuestosDirectoriosSeeder::class);
+
+        // El mismo puesto (con su historia), ahora de CACECA; no se crea otro
+        $this->assertSame([$puesto, $this->caceca], [(int) $this->puestoDeCaceca()->pues_id_puesto, (int) $this->puestoDeCaceca()->pues_id_organizacion]);
+        $this->assertSame(133, DB::table('puesto')->count());
+    }
+
+    private function puestoDeCaceca(): object
+    {
+        return DB::table('puesto')->join('cargo', 'carg_id_cargo', '=', 'pues_id_cargo')->where('carg_nombre_m', 'Director General CACECA')->first(['pues_id_puesto', 'pues_id_organizacion']);
     }
 
     public function test_es_repetible_y_respeta_los_puestos_que_agrego_el_usuario(): void

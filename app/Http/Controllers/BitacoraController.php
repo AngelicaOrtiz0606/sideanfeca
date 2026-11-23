@@ -9,7 +9,8 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Bitácora completa (privilegio ver_bitacora: solo superadministrador).
+ * Bitácora completa (privilegio ver_bitacora: solo superadministrador) y
+ * "Mi actividad" (cualquier cuenta: solo lo que hizo ella).
  * Solo se consulta: nada se edita ni se borra. Filtros por texto, acción,
  * qué se modificó y fechas; de 10 en 10, y todo lo filtrado en CSV.
  */
@@ -19,21 +20,43 @@ class BitacoraController extends Controller
 
     public function index(Request $request): View
     {
-        $filtros = $this->filtros($request);
+        return $this->pantalla($this->filtros($request), propia: false);
+    }
 
+    public function propia(Request $request): View
+    {
+        return $this->pantalla($this->filtros($request) + ['usuario' => $request->user()->usua_id_usuario], propia: true);
+    }
+
+    public function csv(Request $request): StreamedResponse
+    {
+        return $this->descargar($this->filtros($request), 'bitacora');
+    }
+
+    public function propiaCsv(Request $request): StreamedResponse
+    {
+        return $this->descargar($this->filtros($request) + ['usuario' => $request->user()->usua_id_usuario], 'mi-actividad');
+    }
+
+    /** @param  array<string, mixed>  $filtros */
+    private function pantalla(array $filtros, bool $propia): View
+    {
         return view('bitacora.index', [
             'movimientos' => $this->bitacora->listado($filtros),
             'filtros' => $filtros,
             'acciones' => $this->bitacora->acciones(),
             'tablas' => $this->bitacora->tablas(),
+            'propia' => $propia,
         ]);
     }
 
-    /** Lo mismo que la pantalla, completo, en CSV (UTF-8 con BOM para Excel). */
-    public function csv(Request $request): StreamedResponse
+    /**
+     * Lo mismo que la pantalla, completo, en CSV (UTF-8 con BOM para Excel).
+     *
+     * @param  array<string, mixed>  $filtros
+     */
+    private function descargar(array $filtros, string $nombre): StreamedResponse
     {
-        $filtros = $this->filtros($request);
-
         return response()->streamDownload(function () use ($filtros): void {
             $salida = fopen('php://output', 'w');
             fwrite($salida, "\u{FEFF}");
@@ -52,7 +75,7 @@ class BitacoraController extends Controller
                 }
             });
             fclose($salida);
-        }, 'bitacora-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $nombre.'-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**

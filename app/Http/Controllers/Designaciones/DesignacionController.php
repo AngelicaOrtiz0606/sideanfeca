@@ -49,7 +49,7 @@ class DesignacionController extends Controller
         $encontrada = $this->personas->buscar($persona);
         abort_if($encontrada === null, 404);
 
-        $nuevas = $request->designaciones($request->institucion());
+        $nuevas = $request->designaciones($request->institucion(), $request->organizacion());
         $this->designaciones->agregar($request->user(), $persona, $encontrada->genero, $nuevas);
 
         return redirect()->route('personas.show', ['persona' => $persona, 'pestana' => 'designaciones'])

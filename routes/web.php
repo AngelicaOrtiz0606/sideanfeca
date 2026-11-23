@@ -64,6 +64,10 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
 
     // Pantallas con privilegio: quien no lo tiene recibe 403.
     // Mientras su módulo no exista, muestran la pantalla provisional.
+    // Mi actividad: la bitácora de lo que hizo la propia cuenta (cualquier cuenta)
+    Route::get('/mi-actividad', [BitacoraController::class, 'propia'])->name('actividad.index');
+    Route::get('/mi-actividad/csv', [BitacoraController::class, 'propiaCsv'])->name('actividad.csv');
+
     // Bitácora completa (solo superadministrador): solo se consulta
     Route::middleware(Privilegio::VerBitacora->middleware())->group(function () {
         Route::get('/bitacora', [BitacoraController::class, 'index'])->name('bitacora.index');

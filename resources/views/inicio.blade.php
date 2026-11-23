@@ -62,24 +62,56 @@
         </dl>
     </section>
 
-    @if ($verBitacora)
-        <section aria-labelledby="bitacora-titulo" class="inicio__seccion tarjeta-seccion">
+    @php $pendientes = collect($porAtender)->sum('cantidad'); @endphp
+    @if ($porAtender !== [])
+        <section aria-labelledby="atender-titulo" class="inicio__seccion tarjeta-seccion">
             <div class="tarjeta-seccion__encabezado">
-                <h2 id="bitacora-titulo" class="seccion__titulo">Actividad reciente</h2>
-                @if ($hayMasMovimientos)
-                    <a href="{{ route('bitacora.index') }}" class="enlace-flecha">Ver toda la bitácora</a>
-                @endif
+                <h2 id="atender-titulo" class="seccion__titulo">Por atender</h2>
             </div>
 
-            @if ($movimientos->isEmpty())
-                <p class="vacio">Todavía no hay movimientos registrados.</p>
+            @if ($pendientes === 0)
+                <p class="vacio">Todo al día: no hay puestos vacantes, instituciones sin titular ni personas sin correo.</p>
             @else
-                <ol class="actividad" aria-label="Últimos {{ $movimientos->count() }} movimientos de la bitácora">
-                    @foreach ($movimientos as $movimiento)
-                        @include('bitacora._movimiento')
+                <ul class="pendientes">
+                    @foreach ($porAtender as $pendiente)
+                        @continue($pendiente['cantidad'] === 0)
+                        <li class="pendiente">
+                            <p class="pendiente__titulo">
+                                <span class="pendiente__cifra">{{ number_format($pendiente['cantidad']) }}</span>
+                                {{ $pendiente['texto'] }}
+                            </p>
+                            <ul class="pendiente__enlaces">
+                                @foreach ($pendiente['enlaces'] as $enlace)
+                                    <li><a href="{{ $enlace['url'] }}">{{ $enlace['texto'] }}</a></li>
+                                @endforeach
+                                @if ($pendiente['todos'])
+                                    <li><a href="{{ $pendiente['todos'] }}" class="enlace-flecha">Ver todas</a></li>
+                                @endif
+                            </ul>
+                        </li>
                     @endforeach
-                </ol>
+                </ul>
             @endif
         </section>
     @endif
+
+    {{-- Quien ve la bitácora ve la actividad de todos; los demás, la suya --}}
+    <section aria-labelledby="bitacora-titulo" class="inicio__seccion tarjeta-seccion">
+        <div class="tarjeta-seccion__encabezado">
+            <h2 id="bitacora-titulo" class="seccion__titulo">{{ $verBitacora ? 'Actividad reciente' : 'Mi actividad reciente' }}</h2>
+            @if ($hayMasMovimientos)
+                <a href="{{ $verBitacora ? route('bitacora.index') : route('actividad.index') }}" class="enlace-flecha">{{ $verBitacora ? 'Ver toda la bitácora' : 'Ver toda mi actividad' }}</a>
+            @endif
+        </div>
+
+        @if ($movimientos->isEmpty())
+            <p class="vacio">{{ $verBitacora ? 'Todavía no hay movimientos registrados.' : 'Todavía no has hecho cambios en el sistema.' }}</p>
+        @else
+            <ol class="actividad" aria-label="Últimos {{ $movimientos->count() }} movimientos">
+                @foreach ($movimientos as $movimiento)
+                    @include('bitacora._movimiento')
+                @endforeach
+            </ol>
+        @endif
+    </section>
 @endsection

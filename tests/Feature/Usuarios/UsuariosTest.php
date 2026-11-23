@@ -111,8 +111,8 @@ class UsuariosTest extends TestCase
         $this->assertTrue(Hash::check($this->contraseniaDePrueba, $cuenta->fresh()->usua_contrasenia));
         $detalles = app(BitacoraService::class)->recientes(1)->first()['detalles'];
         $this->assertContains('Rol: Administrador → Superadministrador', $detalles);
-        $this->assertContains('Nombre', $detalles);
-        $this->assertNotContains('Contraseña', $detalles);
+        $this->assertContains('Nombre: cambió (el valor no se guarda, por privacidad)', $detalles);
+        $this->assertNotContains('Contraseña: cambió', $detalles);
     }
 
     public function test_nadie_cambia_su_propio_rol_ni_desactiva_su_cuenta(): void
@@ -176,7 +176,7 @@ class UsuariosTest extends TestCase
         $this->assertTrue(Hash::check('Nueva-Clave-1', $admin->fresh()->usua_contrasenia));
         // La sesión sigue abierta con la contraseña nueva
         $this->get('/inicio')->assertOk();
-        $this->assertSame(['Contraseña'], app(BitacoraService::class)->recientes(1)->first()['detalles']);
+        $this->assertSame(['Contraseña: cambió'], app(BitacoraService::class)->recientes(1)->first()['detalles']);
     }
 
     // ---- Ayudas ----

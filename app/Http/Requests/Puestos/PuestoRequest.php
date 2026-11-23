@@ -12,7 +12,8 @@ use Illuminate\Validation\Rule;
  * Registro y edición de un puesto. Lo que se pide depende del nivel del cargo:
  * - Institucional: institución (y si es el titular de la institución).
  * - Regional: zona; coordinación opcional.
- * - Nacional: coordinación opcional.
+ * - Nacional: coordinación u organización (por ejemplo, Director General de
+ *   CACECA), opcionales y nunca las dos.
  * Lo que no aplica al nivel se ignora. Los cargos, coordinaciones e
  * instituciones inactivos no se ofrecen para puestos nuevos.
  */
@@ -43,6 +44,9 @@ class PuestoRequest extends FormRequest
             'coordinacion' => ['nullable', 'integer',
                 Rule::exists('coordinacion_nacional', 'cona_id_coordinacion_nacional')->where(fn ($q) => $q->where('cona_activo', true)
                     ->when($actual?->coordinacion_id, fn ($w, $id) => $w->orWhere('cona_id_coordinacion_nacional', $id)))],
+            'organizacion' => ['nullable', 'integer',
+                Rule::exists('organizacion', 'orga_id_organizacion')->where(fn ($q) => $q->where('orga_activo', true)
+                    ->when($actual?->organizacion_id, fn ($w, $id) => $w->orWhere('orga_id_organizacion', $id)))],
             'titular' => ['nullable', 'boolean'],
         ];
     }
@@ -59,10 +63,16 @@ class PuestoRequest extends FormRequest
                 $actual = $this->actual();
                 $servicio = app(PuestoService::class);
 
+                if ($datos['coordinacion'] !== null && $datos['organizacion'] !== null) {
+                    $validator->errors()->add('organizacion', 'Un puesto nacional lleva coordinación u organización, no las dos.');
+
+                    return;
+                }
+
                 // Con designaciones, el cargo y el ámbito no cambian
                 if ($actual !== null && ($motivo = $servicio->motivoParaNoCambiarAmbito((int) $actual->designaciones)) !== null
-                    && [$datos['cargo'], $datos['zona'], $datos['coordinacion'], $datos['institucion']]
-                        !== [(int) $actual->cargo_id, $this->entero($actual->zona_id), $this->entero($actual->coordinacion_id), $this->entero($actual->institucion_id)]) {
+                    && [$datos['cargo'], $datos['zona'], $datos['coordinacion'], $datos['institucion'], $datos['organizacion']]
+                        !== [(int) $actual->cargo_id, $this->entero($actual->zona_id), $this->entero($actual->coordinacion_id), $this->entero($actual->institucion_id), $this->entero($actual->organizacion_id)]) {
                     $validator->errors()->add('cargo', $motivo);
 
                     return;
@@ -74,6 +84,7 @@ class PuestoRequest extends FormRequest
                     ->where(fn ($q) => $datos['zona'] === null ? $q->whereNull('pues_id_zona_regional') : $q->where('pues_id_zona_regional', $datos['zona']))
                     ->where(fn ($q) => $datos['coordinacion'] === null ? $q->whereNull('pues_id_coordinacion_nacional') : $q->where('pues_id_coordinacion_nacional', $datos['coordinacion']))
                     ->where(fn ($q) => $datos['institucion'] === null ? $q->whereNull('pues_id_institucion_educativa') : $q->where('pues_id_institucion_educativa', $datos['institucion']))
+                    ->where(fn ($q) => $datos['organizacion'] === null ? $q->whereNull('pues_id_organizacion') : $q->where('pues_id_organizacion', $datos['organizacion']))
                     ->when($actual, fn ($q) => $q->where('pues_id_puesto', '!=', $actual->id))
                     ->value('pues_id_puesto');
                 if ($repetido !== null) {
@@ -109,13 +120,14 @@ class PuestoRequest extends FormRequest
             'zona.required' => 'Elige la zona regional del puesto.',
             'zona.exists' => 'Elige una zona de la lista.',
             'coordinacion.exists' => 'Elige una coordinación activa de la lista.',
+            'organizacion.exists' => 'Elige una organización activa de la lista.',
         ];
     }
 
     /**
      * Datos listos para PuestoService: lo que no aplica al nivel del cargo va vacío.
      *
-     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, titular: bool}
+     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, titular: bool}
      */
     public function datos(): array
     {
@@ -126,6 +138,7 @@ class PuestoRequest extends FormRequest
             'zona' => $nivel === 'Regional' ? $this->entero($this->input('zona')) : null,
             'coordinacion' => $nivel !== 'Institucional' ? $this->entero($this->input('coordinacion')) : null,
             'institucion' => $nivel === 'Institucional' ? $this->entero($this->input('institucion')) : null,
+            'organizacion' => $nivel === 'Nacional' ? $this->entero($this->input('organizacion')) : null,
             'titular' => $nivel === 'Institucional' && $this->boolean('titular'),
         ];
     }

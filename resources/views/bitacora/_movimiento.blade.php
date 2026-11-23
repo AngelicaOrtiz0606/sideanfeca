@@ -33,6 +33,9 @@
                         <li>Y {{ $movimiento['mas_detalles'] }} más en la bitácora completa.</li>
                     @endif
                 </ul>
+                @if ($movimiento['ficha'] ?? null)
+                    <a href="{{ $movimiento['ficha'] }}" class="actividad__ficha">Ver los datos actuales en su ficha</a>
+                @endif
             </details>
         @endif
     </div>

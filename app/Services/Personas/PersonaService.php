@@ -220,8 +220,8 @@ class PersonaService
             $cambios = $this->guardarDatos($id, $datos);
             if ($cambios !== [] || $nuevas !== []) {
                 $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
-                foreach ($cambios as $campo) {
-                    $this->detalle($idBitacora, $id, $campo, null, null);
+                foreach ($cambios as $campo => [$anterior, $nuevo]) {
+                    $this->detalle($idBitacora, $id, $campo, $anterior, $nuevo);
                 }
                 app(DesignacionService::class)->designar($id, $datos['genero'], $nuevas, $idBitacora);
             }
@@ -252,11 +252,13 @@ class PersonaService
 
     /**
      * Guarda datos personales, pertenencia, grados y contactos, y dice qué
-     * campos cambiaron (sin valores: son datos personales). No escribe en la
-     * bitácora: quien la llama decide en qué movimiento van.
+     * campos cambiaron: campo => [antes, después]. Los datos personales van
+     * sin valores (la bitácora no los guarda, por ARCO); la pertenencia y el
+     * grado académico sí llevan su valor. No escribe en la bitácora: quien la
+     * llama decide en qué movimiento van.
      *
      * @param  array<string, mixed>  $datos
-     * @return array<int, string>
+     * @return array<string, array{0: ?string, 1: ?string}>
      */
     private function guardarDatos(int $id, array $datos): array
     {
@@ -279,8 +281,14 @@ class PersonaService
         ];
         foreach ($nuevos as $columna => $valor) {
             if ((string) $actual->{$columna} !== (string) $valor) {
-                $cambios[] = $campos[$columna];
+                $cambios[$campos[$columna]] = [null, null];
             }
+        }
+        if (isset($cambios['Pertenencia'])) {
+            $cambios['Pertenencia'] = [
+                $this->nombrePertenencia($actual->pers_id_institucion_educativa, $actual->pers_id_organizacion),
+                $this->nombrePertenencia($datos['institucion'], $datos['organizacion']),
+            ];
         }
         DB::table('persona')->where('pers_id_persona', $id)->update($nuevos);
 
@@ -290,7 +298,9 @@ class PersonaService
         if ($antes !== $despues) {
             DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->delete();
             DB::table('persona_nivel_academico')->insert(array_map(fn (int $g) => ['pena_id_persona' => $id, 'pena_id_nivel_academico' => $g], $despues));
-            $cambios[] = 'Grado académico';
+            $grados = fn (array $ids) => DB::table('nivel_academico')->whereIn('niac_id_nivel_academico', $ids)->orderBy('niac_id_nivel_academico')
+                ->pluck('niac_nombre')->implode(', ') ?: null;
+            $cambios['Grado académico'] = [$grados($antes), $grados($despues)];
         }
 
         // Contactos: si cambiaron, se reemplazan (la bitácora dice si fueron correos u otros).
@@ -318,14 +328,24 @@ class PersonaService
                 'cont_visible' => $c['visible'],
             ], $datos['contactos']));
             if ($cambioCorreo) {
-                $cambios[] = 'Correo';
+                $cambios['Correo'] = [null, null];
             }
             if ($cambioOtros) {
-                $cambios[] = 'Contacto';
+                $cambios['Contacto'] = [null, null];
             }
         }
 
-        return array_values(array_unique($cambios));
+        return $cambios;
+    }
+
+    /** "FCA UNAM" o "CACECA": a qué pertenece (institución u organización), para la bitácora. */
+    private function nombrePertenencia(mixed $institucion, mixed $organizacion): ?string
+    {
+        return match (true) {
+            filled($institucion) => DB::table('institucion_nombre')->where('instn_id_institucion', (int) $institucion)->whereNull('instn_fecha_fin')->value('instn_nombre'),
+            filled($organizacion) => DB::table('organizacion')->where('orga_id_organizacion', (int) $organizacion)->value('orga_nombre'),
+            default => null,
+        };
     }
 
     /**
@@ -391,8 +411,8 @@ class PersonaService
                 $id = $existente;
                 $cambios = $this->guardarDatos($id, $datos);
                 $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
-                foreach ($cambios as $campo) {
-                    $this->detalle($idBitacora, $id, $campo, null, null);
+                foreach ($cambios as $campo => [$anterior, $nuevo]) {
+                    $this->detalle($idBitacora, $id, $campo, $anterior, $nuevo);
                 }
             } else {
                 $id = (int) DB::table('persona')->insertGetId([
@@ -425,10 +445,21 @@ class PersonaService
     /**
      * El puesto con ese cargo y ese ámbito, si ya existe.
      */
-    public function puestoDe(int $cargo, ?int $zona, ?int $coordinacion, ?int $institucion): ?int
+    public function puestoDe(int $cargo, ?int $zona, ?int $coordinacion, ?int $institucion, ?int $organizacion = null): ?int
     {
+        // Un cargo nacional de una organización: primero el puesto de la organización de la persona
+        if ($organizacion !== null && $zona === null && $coordinacion === null && $institucion === null) {
+            $deSuOrganizacion = DB::table('puesto')->where('pues_id_cargo', $cargo)->where('pues_id_organizacion', $organizacion)
+                ->whereNull('pues_id_zona_regional')->whereNull('pues_id_coordinacion_nacional')->whereNull('pues_id_institucion_educativa')
+                ->value('pues_id_puesto');
+            if ($deSuOrganizacion !== null) {
+                return (int) $deSuOrganizacion;
+            }
+        }
+
         $id = DB::table('puesto')
             ->where('pues_id_cargo', $cargo)
+            ->whereNull('pues_id_organizacion')
             ->where(fn (Builder $q) => $zona === null ? $q->whereNull('pues_id_zona_regional') : $q->where('pues_id_zona_regional', $zona))
             ->where(fn (Builder $q) => $coordinacion === null ? $q->whereNull('pues_id_coordinacion_nacional') : $q->where('pues_id_coordinacion_nacional', $coordinacion))
             ->where(fn (Builder $q) => $institucion === null ? $q->whereNull('pues_id_institucion_educativa') : $q->where('pues_id_institucion_educativa', $institucion))

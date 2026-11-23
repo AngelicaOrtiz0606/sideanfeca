@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\TextoCatalogo;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,9 @@ use RuntimeException;
  *     del Coordinador Nacional va el Secretario Técnico General (su secretario).
  *
  * También crea el puesto Director General CACECA (nacional), que no va en
- * ningún directorio: quien lo ocupa pertenece a la organización CACECA.
+ * ningún directorio, ligado a la organización CACECA: solo lo ocupa alguien
+ * de CACECA. Si ya existía sin organización, se liga (con sus designaciones).
+ * Si CACECA todavía no está registrada, avisa: corre antes OrganizacionesSeeder.
  *
  * El Secretario Técnico Regional de cada coordinación ya no existe: no se crea.
  * Solo crea puestos (vacantes); las personas se designan desde la pantalla.
@@ -81,7 +84,7 @@ class PuestosDirectoriosSeeder extends Seeder
             $this->ordenar('Coordinaciones Nacionales', $this->coordinacionesNacionales());
 
             // Puestos que no van en ningún directorio publicado
-            $this->puesto('Director General CACECA');
+            $this->directorGeneralCaceca();
         });
     }
 
@@ -153,13 +156,40 @@ class PuestosDirectoriosSeeder extends Seeder
     }
 
     /** Busca el puesto (cargo + ámbito) y, si no existe, lo crea. */
-    private function puesto(string $cargo, ?int $zona = null, ?int $coordinacion = null): int
+    /** El puesto Director General CACECA, ligado a la organización CACECA. */
+    private function directorGeneralCaceca(): void
+    {
+        $caceca = DB::table('organizacion')->get(['orga_id_organizacion', 'orga_nombre'])
+            ->first(fn (object $o) => TextoCatalogo::clave($o->orga_nombre) === TextoCatalogo::clave('CACECA'))
+            ?->orga_id_organizacion;
+
+        if ($caceca === null) {
+            $this->command?->warn('No se ligó Director General CACECA: falta la organización CACECA. Corre OrganizacionesSeeder y vuelve a correr este.');
+
+            return;
+        }
+
+        $cargo = $this->cargos['Director General CACECA'];
+        $ligado = DB::table('puesto')->where('pues_id_cargo', $cargo)->where('pues_id_organizacion', $caceca)->exists();
+        $sinOrganizacion = DB::table('puesto')->where('pues_id_cargo', $cargo)->whereNull('pues_id_organizacion')
+            ->whereNull('pues_id_zona_regional')->whereNull('pues_id_coordinacion_nacional')->whereNull('pues_id_institucion_educativa')
+            ->value('pues_id_puesto');
+
+        if (! $ligado && $sinOrganizacion !== null) {
+            DB::table('puesto')->where('pues_id_puesto', $sinOrganizacion)->update(['pues_id_organizacion' => $caceca]);
+        } elseif (! $ligado) {
+            $this->puesto('Director General CACECA', organizacion: (int) $caceca);
+        }
+    }
+
+    private function puesto(string $cargo, ?int $zona = null, ?int $coordinacion = null, ?int $organizacion = null): int
     {
         $ambito = [
             'pues_id_cargo' => $this->cargos[$cargo],
             'pues_id_zona_regional' => $zona,
             'pues_id_coordinacion_nacional' => $coordinacion,
             'pues_id_institucion_educativa' => null,
+            'pues_id_organizacion' => $organizacion,
         ];
 
         $consulta = DB::table('puesto');

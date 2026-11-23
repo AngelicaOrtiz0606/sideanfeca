@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  * Puestos: un cargo en un ámbito concreto (tabla PUESTO).
  * - Institucional: lleva institución; puede ser el titular de la institución.
  * - Regional: lleva zona (obligatoria) y coordinación (opcional).
- * - Nacional: sin zona ni institución; coordinación opcional.
+ * - Nacional: sin zona ni institución; coordinación u organización opcional
+ *   (nunca las dos). Quien ocupa el puesto de una organización pertenece a ella.
  *
  * - No se repite la combinación cargo + zona + coordinación + institución.
  * - Una institución tiene a lo más un puesto titular (el que aparece en el
@@ -137,6 +138,18 @@ class PuestoService
     }
 
     /**
+     * Organizaciones para un puesto nacional de una organización (las
+     * inactivas no se ofrecen para puestos nuevos, pero se conservan al editar).
+     *
+     * @return Collection<int, object>
+     */
+    public function organizaciones(): Collection
+    {
+        return DB::table('organizacion')->orderBy('orga_nombre')
+            ->get(['orga_id_organizacion as id', 'orga_nombre as nombre', 'orga_activo as activo']);
+    }
+
+    /**
      * @return Collection<int, object>
      */
     public function zonas(): Collection
@@ -181,6 +194,7 @@ class PuestoService
                 'pues_id_zona_regional' => $datos['zona'],
                 'pues_id_coordinacion_nacional' => $datos['coordinacion'],
                 'pues_id_institucion_educativa' => $datos['institucion'],
+                'pues_id_organizacion' => $datos['organizacion'] ?? null,
                 'pues_titularidad' => $datos['titular'],
                 'pues_activo' => true,
             ], 'pues_id_puesto');
@@ -192,7 +206,7 @@ class PuestoService
     }
 
     /**
-     * @param  array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, titular: bool}  $datos
+     * @param  array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion?: ?int, titular: bool}  $datos
      */
     public function actualizar(Usuario $actor, int $id, array $datos): void
     {
@@ -204,6 +218,7 @@ class PuestoService
                 'Zona regional' => [$this->nombreZona($actual->pues_id_zona_regional), $this->nombreZona($datos['zona'])],
                 'Coordinación nacional' => [$this->nombreCoordinacion($actual->pues_id_coordinacion_nacional), $this->nombreCoordinacion($datos['coordinacion'])],
                 'Institución' => [$this->nombreInstitucion($actual->pues_id_institucion_educativa), $this->nombreInstitucion($datos['institucion'])],
+                'Organización' => [$this->nombreOrganizacion($actual->pues_id_organizacion), $this->nombreOrganizacion($datos['organizacion'] ?? null)],
                 'Titular de la institución' => [$actual->pues_titularidad ? 'Sí' : 'No', $datos['titular'] ? 'Sí' : 'No'],
             ], fn (array $par) => $par[0] !== $par[1]);
 
@@ -216,6 +231,7 @@ class PuestoService
                 'pues_id_zona_regional' => $datos['zona'],
                 'pues_id_coordinacion_nacional' => $datos['coordinacion'],
                 'pues_id_institucion_educativa' => $datos['institucion'],
+                'pues_id_organizacion' => $datos['organizacion'] ?? null,
                 'pues_titularidad' => $datos['titular'],
             ]);
 
@@ -281,11 +297,17 @@ class PuestoService
      */
     public function ambito(object $puesto, bool $conCargo = false): string
     {
+        $organizacion = $puesto->organizacion ?? null;
         $partes = match ($puesto->nivel) {
             'Institucional' => [$puesto->institucion],
             'Regional' => ["Zona {$puesto->zona_numero} · {$puesto->zona_nombre}", $puesto->coordinacion],
-            default => [$puesto->coordinacion ?? 'Nacional'],
+            default => [$puesto->coordinacion ?? $organizacion ?? 'Nacional'],
         };
+
+        // "Director General CACECA" ya dice su organización: no se repite
+        if ($conCargo && $organizacion !== null && str_contains(TextoCatalogo::clave($puesto->cargo), TextoCatalogo::clave($organizacion))) {
+            return $puesto->cargo;
+        }
 
         return implode(' · ', array_filter([$conCargo ? $puesto->cargo : null, ...$partes]));
     }
@@ -311,6 +333,7 @@ class PuestoService
             ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'p.pues_id_zona_regional')
             ->leftJoin('coordinacion_nacional as cn', 'cn.cona_id_coordinacion_nacional', '=', 'p.pues_id_coordinacion_nacional')
             ->leftJoin('institucion_nombre as n', fn ($j) => $j->on('n.instn_id_institucion', '=', 'p.pues_id_institucion_educativa')->whereNull('n.instn_fecha_fin'))
+            ->leftJoin('organizacion as o', 'o.orga_id_organizacion', '=', 'p.pues_id_organizacion')
             ->select([
                 'p.pues_id_puesto as id',
                 'p.pues_id_cargo as cargo_id',
@@ -325,6 +348,8 @@ class PuestoService
                 'cn.cona_orden as coordinacion_orden',
                 'p.pues_id_institucion_educativa as institucion_id',
                 'n.instn_nombre as institucion',
+                'p.pues_id_organizacion as organizacion_id',
+                'o.orga_nombre as organizacion',
                 'p.pues_titularidad as titular',
                 'p.pues_activo as activo',
             ]);
@@ -354,6 +379,11 @@ class PuestoService
     private function nombreCoordinacion(?int $id): ?string
     {
         return $id === null ? null : DB::table('coordinacion_nacional')->where('cona_id_coordinacion_nacional', $id)->value('cona_nombre');
+    }
+
+    private function nombreOrganizacion(?int $id): ?string
+    {
+        return $id === null ? null : DB::table('organizacion')->where('orga_id_organizacion', $id)->value('orga_nombre');
     }
 
     private function nombreInstitucion(?int $id): ?string

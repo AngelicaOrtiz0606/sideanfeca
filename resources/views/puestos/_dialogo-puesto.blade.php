@@ -3,7 +3,7 @@
     aparece lo que aplica (puesto-formulario.js):
     - Institucional: la institución (buscador) y si es su titular.
     - Regional: la zona y, si aplica, la coordinación.
-    - Nacional: la coordinación, si aplica.
+    - Nacional: la coordinación o la organización (por ejemplo, CACECA), si aplica.
     Si el puesto ya tiene designaciones, el cargo y el ámbito quedan fijos.
 --}}
 @php
@@ -93,6 +93,21 @@
                     </option>
                 @endforeach
             </select>
+        </div>
+
+        {{-- Nacional: de una organización (quien lo ocupe debe pertenecer a ella) --}}
+        <div class="campo" data-ambito data-solo-nivel="Nacional" hidden>
+            <label for="puesto-organizacion" class="campo__etiqueta">Organización <span class="campo__opcional">(opcional)</span></label>
+            <select id="puesto-organizacion" name="organizacion" class="campo__entrada" disabled aria-describedby="puesto-organizacion-ayuda"
+                    @if ($abrir && $errors->has('organizacion')) aria-invalid="true" @endif>
+                <option value="">Sin organización</option>
+                @foreach ($organizaciones as $organizacion)
+                    <option value="{{ $organizacion->id }}" @selected($abrir && (int) old('organizacion') === $organizacion->id) @unless ($organizacion->activo) hidden @endunless>
+                        {{ $organizacion->nombre }}@unless ($organizacion->activo) (inactiva)@endunless
+                    </option>
+                @endforeach
+            </select>
+            <p class="campo__ayuda" id="puesto-organizacion-ayuda">Por ejemplo, el Director General de CACECA. Solo personas de esa organización podrán ocuparlo. Lleva coordinación u organización, no las dos.</p>
         </div>
 
         <div class="dialogo__acciones">

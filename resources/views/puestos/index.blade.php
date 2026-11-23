@@ -24,7 +24,7 @@
                     data-abrir-dialogo="dialogo-puesto"
                     data-accion="{{ route('puestos.store') }}" data-metodo="POST"
                     data-titulo="Nuevo puesto" data-boton="Registrar puesto" data-ambito-fijo=""
-                    data-valores="{{ json_encode(['cargo' => '', 'zona' => '', 'coordinacion' => '', 'institucion' => '', 'titular' => false, '_id' => '']) }}">
+                    data-valores="{{ json_encode(['cargo' => '', 'zona' => '', 'coordinacion' => '', 'institucion' => '', 'organizacion' => '', 'titular' => false, '_id' => '']) }}">
                 <x-icono nombre="mas" />
                 Nuevo puesto
             </button>
@@ -124,9 +124,9 @@
                             <th scope="row" data-etiqueta="Puesto">
                                 <span class="tabla__principal">{{ $puesto->cargo }}</span>
                                 {{-- Debajo, solo lo que no va en otra columna: la zona o la institución --}}
-                                @if ($puesto->zona_numero || $puesto->institucion)
+                                @if ($puesto->zona_numero || $puesto->institucion || $puesto->organizacion)
                                     <span class="tabla__detalle">
-                                        {{ $puesto->institucion ?? "Zona {$puesto->zona_numero} · {$puesto->zona_nombre}" }}
+                                        {{ $puesto->institucion ?? $puesto->organizacion ?? "Zona {$puesto->zona_numero} · {$puesto->zona_nombre}" }}
                                         @if ($puesto->titular)
                                             <span class="insignia-titular">Titular</span>
                                         @endif
@@ -158,7 +158,7 @@
                                             data-accion="{{ route('puestos.update', $id) }}" data-metodo="PUT"
                                             data-titulo="Editar puesto" data-boton="Guardar cambios"
                                             data-ambito-fijo="{{ $puesto->designaciones > 0 ? 'Ya tiene designaciones, así que el cargo y el ámbito no cambian. Si el puesto cambió, desactívalo y registra otro.' : '' }}"
-                                            data-valores="{{ json_encode(['cargo' => $puesto->cargo_id, 'zona' => $puesto->zona_id ?? '', 'coordinacion' => $puesto->coordinacion_id ?? '', 'institucion' => $puesto->institucion_id ?? '', 'titular' => (bool) $puesto->titular, '_id' => $id]) }}">
+                                            data-valores="{{ json_encode(['cargo' => $puesto->cargo_id, 'zona' => $puesto->zona_id ?? '', 'coordinacion' => $puesto->coordinacion_id ?? '', 'institucion' => $puesto->institucion_id ?? '', 'organizacion' => $puesto->organizacion_id ?? '', 'titular' => (bool) $puesto->titular, '_id' => $id]) }}">
                                         <x-icono nombre="lapiz" />
                                         <span class="accion__texto">Editar <span class="solo-lectores">{{ $nombre }}</span></span>
                                     </button>

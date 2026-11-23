@@ -47,6 +47,7 @@ class PuestoController extends Controller
             'zonas' => $zonas,
             'coordinaciones' => $coordinaciones,
             'instituciones' => $this->puestos->instituciones(),
+            'organizaciones' => $this->puestos->organizaciones(),
             'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }

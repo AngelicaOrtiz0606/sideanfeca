@@ -36,7 +36,7 @@ class DesignacionService
      * del movimiento $idBitacora ("Designación: Presidenta · Nacional, desde
      * 20/11/2026"), y cada puesto creado como "Puesto creado".
      *
-     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
+     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion?: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
      */
     public function designar(int $persona, string $genero, array $designaciones, int $idBitacora): void
     {
@@ -44,7 +44,7 @@ class DesignacionService
 
         foreach ($designaciones as $designacion) {
             $creado = false;
-            $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion']);
+            $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion'], $designacion['organizacion'] ?? null);
             if ($puesto === null) {
                 $puesto = (int) DB::table('puesto')->insertGetId([
                     'pues_id_cargo' => $designacion['cargo'],
@@ -78,7 +78,7 @@ class DesignacionService
      * Agrega designaciones a una persona ya registrada: una sola línea en la
      * bitácora ("modificó las designaciones de la persona …") con cada una.
      *
-     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
+     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion?: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
      */
     public function agregar(Usuario $actor, int $persona, string $genero, array $designaciones): void
     {
