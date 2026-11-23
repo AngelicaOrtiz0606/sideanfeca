@@ -9,6 +9,7 @@ use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\NivelAcademicoController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\Designaciones\DesignacionController;
+use App\Http\Controllers\Directorios\OrdenDirectorioController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
@@ -112,6 +113,14 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
             ->whereNumber('designacion')->name('personas.designaciones.terminar');
         Route::delete('/personas/{persona}/designaciones/{designacion}', [DesignacionController::class, 'destroy'])
             ->whereNumber('designacion')->name('personas.designaciones.destroy');
+    });
+
+    // Directorios de puestos (M7): qué puestos aparecen en cada uno y en qué orden
+    Route::middleware(Privilegio::GestionarDirectorios->middleware())->group(function () {
+        Route::get('/directorios/orden', [OrdenDirectorioController::class, 'index'])->name('directorios.orden');
+        Route::post('/directorios/{tipo}/puestos', [OrdenDirectorioController::class, 'agregar'])->whereNumber('tipo')->name('directorios.agregar');
+        Route::delete('/directorios/{tipo}/puestos/{puesto}', [OrdenDirectorioController::class, 'quitar'])->whereNumber('tipo')->name('directorios.quitar');
+        Route::put('/directorios/{tipo}/orden', [OrdenDirectorioController::class, 'guardarOrden'])->whereNumber('tipo')->name('directorios.guardar-orden');
     });
 
     // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas

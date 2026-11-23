@@ -73,6 +73,11 @@ class BitacoraService
     ];
 
     /**
+     * Detalles con un solo valor (no son un cambio "de → a"): se dicen "Campo: valor".
+     */
+    private const CAMPOS_DE_UN_VALOR = ['Directorio', 'Agregado al directorio', 'Quitado del directorio'];
+
+    /**
      * Máximo de cambios de campo que se muestran por movimiento.
      */
     private const DETALLES_MAXIMOS = 3;
@@ -256,8 +261,9 @@ class BitacoraService
             return $nombre !== null ? "{$campo}: {$nombre}" : $campo;
         }
 
-        // Al registrar, el valor es solo el nuevo: "Campo: valor"
-        if ($movimiento->bita_accion === 'Registro' && $detalle->bide_anterior === null && $detalle->bide_nuevo !== null) {
+        // Al registrar (o en campos de un solo valor), el valor es solo el nuevo: "Campo: valor"
+        if (($movimiento->bita_accion === 'Registro' || in_array($detalle->bide_campo, self::CAMPOS_DE_UN_VALOR, true))
+            && $detalle->bide_anterior === null && $detalle->bide_nuevo !== null) {
             return "{$campo}: {$detalle->bide_nuevo}";
         }
 
@@ -317,6 +323,12 @@ class BitacoraService
             'PERSONA' => fn (Collection $ids) => $this->nombresDePersonas($ids),
             // "Presidente · Nacional", "Coordinador Regional · Zona 2 · Noreste"
             'PUESTO' => fn (Collection $ids) => $ids->mapWithKeys(function (int $id): array {
+                $puesto = app(PuestoService::class)->buscar($id);
+
+                return $puesto === null ? [] : [$id => app(PuestoService::class)->nombre($puesto)];
+            }),
+            // Al reordenar un directorio, cada cambio nombra el puesto que se movió
+            'PUESTO_DIRECTORIO' => fn (Collection $ids) => $ids->mapWithKeys(function (int $id): array {
                 $puesto = app(PuestoService::class)->buscar($id);
 
                 return $puesto === null ? [] : [$id => app(PuestoService::class)->nombre($puesto)];

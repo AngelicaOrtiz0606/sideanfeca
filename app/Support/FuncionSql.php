@@ -22,7 +22,9 @@ class FuncionSql
         $marcas = implode(', ', array_fill(0, count($parametros), '?'));
 
         try {
-            $fila = DB::selectOne("select {$funcion}({$marcas}) as resultado", $parametros);
+            // En su propia transacción (o punto de guardado, si ya hay una): si la base
+            // rechaza la acción, se deshace solo esto y lo de alrededor puede seguir
+            $fila = DB::transaction(fn () => DB::selectOne("select {$funcion}({$marcas}) as resultado", $parametros));
 
             return [$fila->resultado ?? null, null];
         } catch (QueryException $error) {
