@@ -1,7 +1,14 @@
 /*
- * Tablas de los catálogos. En teléfono cada fila se vuelve una ficha y cada
+ * Tablas de los catálogos. Cuando la tarjeta es angosta (teléfono, tableta o
+ * computadora pequeña con el menú abierto) cada fila se vuelve una ficha y cada
  * dato muestra su encabezado (atributo data-etiqueta), sin desplazamiento lateral.
+ * Se decide por el ancho de la tarjeta, no de la pantalla: así la tabla nunca
+ * se sale de su contenedor.
  */
+
+.tarjeta:has(.tabla) {
+    container: tabla / inline-size;
+}
 
 .tabla {
     width: 100%;
@@ -70,8 +77,23 @@
     padding-inline: 0.75rem;
 }
 
-@media (width < 40rem) {
-    /* En teléfono cada fila es una ficha compacta:
+/* Tarjeta mediana: celdas con menos relleno para que quepan las columnas
+   (la primera conserva su orilla, alineada con los filtros) */
+@container tabla (50rem <= width < 64rem) {
+    .tabla:not(.tabla--simple) thead th,
+    .tabla:not(.tabla--simple) tbody th,
+    .tabla:not(.tabla--simple) tbody td {
+        padding-inline: 0.875rem;
+    }
+
+    .tabla:not(.tabla--simple) thead th:first-child,
+    .tabla:not(.tabla--simple) tbody tr > :first-child {
+        padding-left: 1.5rem;
+    }
+}
+
+@container tabla (width < 50rem) {
+    /* Tarjeta angosta: cada fila es una ficha compacta:
        [número]  Nombre                 [Editar]
                  Entidades: 5
                  Instituciones: 0                */
@@ -145,6 +167,7 @@
     margin-top: 0.125rem;
     color: var(--color-texto-suave);
     font-size: 0.8125rem;
+    font-weight: 400;
 }
 
 /* Registro desactivado: se ve más tenue */
