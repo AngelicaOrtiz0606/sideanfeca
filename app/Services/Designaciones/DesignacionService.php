@@ -6,7 +6,7 @@ use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
 use App\Services\Personas\PersonaService;
 use App\Services\Puestos\PuestoService;
-use Illuminate\Database\QueryException;
+use App\Support\FuncionSql;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -92,7 +92,7 @@ class DesignacionService
      */
     public function terminar(Usuario $actor, int $designacion, string $fecha): ?string
     {
-        return $this->llamar('select desactivar_designacion(?, ?, ?::date)', [$actor->usua_id_usuario, $designacion, $fecha]);
+        return FuncionSql::llamar('desactivar_designacion', [$actor->usua_id_usuario, $designacion, $fecha])[1];
     }
 
     /**
@@ -101,7 +101,7 @@ class DesignacionService
      */
     public function borrar(Usuario $actor, int $designacion, string $motivo): ?string
     {
-        return $this->llamar('select eliminar_designacion_erronea(?, ?, ?)', [$actor->usua_id_usuario, $designacion, $motivo]);
+        return FuncionSql::llamar('eliminar_designacion_erronea', [$actor->usua_id_usuario, $designacion, $motivo])[1];
     }
 
     /**
@@ -127,25 +127,5 @@ class DesignacionService
             ->where('desi_id_designacion', $designacion)
             ->where('desi_id_persona', $persona)
             ->first(['desi_id_designacion as id', 'desi_id_puesto as puesto', 'desi_fecha_inicio as desde', 'desi_fecha_fin as hasta']);
-    }
-
-    /**
-     * Llama una función de la base. Si la rechaza (raise exception), devuelve
-     * su mensaje, que ya está escrito para la persona usuaria.
-     *
-     * @param  array<int, mixed>  $parametros
-     */
-    private function llamar(string $sql, array $parametros): ?string
-    {
-        try {
-            DB::select($sql, $parametros);
-        } catch (QueryException $error) {
-            if (preg_match('/ERROR:\s+(.+?)(\s+\(Connection:|\s+CONTEXT:|\n|$)/u', $error->getMessage(), $partes) === 1) {
-                return trim($partes[1]);
-            }
-            throw $error;
-        }
-
-        return null;
     }
 }

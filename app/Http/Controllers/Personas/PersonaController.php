@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Personas;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Personas\PersonaRequest;
 use App\Services\Designaciones\DesignacionService;
 use App\Services\Personas\PersonaService;
@@ -36,6 +37,7 @@ class PersonaController extends Controller
             'personas' => $this->personas->listado($filtros),
             'filtros' => $filtros,
             'cargos' => app(PuestoService::class)->cargos(),
+            'motivos' => EliminarRequest::MOTIVOS,
             'zonas' => app(PuestoService::class)->zonas(),
         ]);
     }
@@ -114,6 +116,9 @@ class PersonaController extends Controller
             'designaciones' => $this->personas->historialCargos($persona, $encontrada->genero),
             'motivosParaBorrar' => DesignacionService::MOTIVOS_PARA_BORRAR,
             'motivoParaNoBorrar' => app(DesignacionService::class)->motivoParaNoBorrar($persona),
+            'motivoParaNoBorrarPersona' => $this->personas->motivoParaNoBorrar($request->user(), $encontrada),
+            'efectoDeBorrar' => $this->personas->efectoDeBorrar($encontrada),
+            'motivosParaBorrarPersona' => EliminarRequest::MOTIVOS,
             'generos' => PersonaService::GENEROS,
         ]);
     }

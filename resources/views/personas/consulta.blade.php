@@ -28,6 +28,27 @@
         </div>
 
         <div class="pagina__acciones">
+            @can(\App\Enums\Privilegio::GestionarUsuarios->value)
+                @can(\App\Enums\Privilegio::EliminarDefinitivo->value)
+                    <button type="button" class="boton boton--discreto"
+                            data-abrir-dialogo="dialogo-arco"
+                            data-accion="{{ route('personas.arco', $persona->id) }}"
+                            data-texto="«{{ $nombre }}»"
+                            data-valores="{{ json_encode(['_id' => $persona->id, 'confirmacion' => '']) }}">
+                        Cancelación ARCO
+                    </button>
+                @endcan
+            @endcan
+            <button type="button" @class(['boton', 'boton--secundario', 'accion--bloqueada' => $motivoParaNoBorrarPersona])
+                    data-abrir-dialogo="dialogo-borrar-persona"
+                    data-accion="{{ route('personas.destroy', $persona->id) }}"
+                    data-titulo="¿Borrar a {{ $nombre }}?"
+                    data-texto="{{ $efectoDeBorrar }} Queda en la bitácora con su motivo."
+                    data-bloqueo="{{ $motivoParaNoBorrarPersona }}"
+                    data-valores="{{ json_encode(['_id' => $persona->id, 'motivo' => '']) }}">
+                <x-icono nombre="papelera" />
+                Borrar
+            </button>
             <a href="{{ route('personas.edit', $persona->id) }}" class="boton boton--primario">
                 <x-icono nombre="lapiz" />
                 Editar
@@ -219,6 +240,20 @@
             </div>
         </section>
     </div>
+
+    @include('catalogos._dialogo-borrar', [
+        'id' => 'dialogo-borrar-persona',
+        'motivos' => $motivosParaBorrarPersona,
+        'abrir' => $errors->has('motivo') && (int) old('_id') === (int) $persona->id,
+        'accion' => route('personas.destroy', $persona->id),
+        'titulo' => "¿Borrar a {$nombre}?",
+    ])
+    @can(\App\Enums\Privilegio::GestionarUsuarios->value)
+        @include('personas._dialogo-arco', [
+            'abrir' => $errors->has('confirmacion'),
+            'accion' => route('personas.arco', $persona->id),
+        ])
+    @endcan
 
     @can(\App\Enums\Privilegio::GestionarDesignaciones->value)
         @include('personas._dialogo-terminar')

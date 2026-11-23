@@ -4,12 +4,16 @@
     Filtros: el buscador (nombre, CURP, correo, institución u organización, o
     cargo vigente), el cargo, la zona (de su institución o de su cargo) y el
     estado (con o sin designación vigente).
-    Cada fila: Consultar (ficha de solo lectura) y Editar (el formulario
-    completo, ya lleno). Las personas ocultas no aparecen (M8).
+    Cada fila: Consultar (ficha), Editar (el formulario completo, ya lleno) y
+    Borrar (sin cuenta se elimina; con cuenta se oculta; no con una
+    designación vigente). Las ocultas solo las ve el superadministrador, en
+    "Personas ocultas".
 --}}
 @extends('layouts.admin')
 
 @section('titulo', 'Personas')
+
+@inject('servicioPersonas', 'App\Services\Personas\PersonaService')
 
 @php
     $hayFiltros = collect($filtros)->filter()->isNotEmpty();
@@ -24,6 +28,12 @@
         </div>
 
         <div class="pagina__acciones">
+            @can(\App\Enums\Privilegio::GestionarUsuarios->value)
+                <a href="{{ route('personas.ocultas') }}" class="boton boton--secundario">
+                    <x-icono nombre="ojo-tachado" />
+                    Personas ocultas
+                </a>
+            @endcan
             <a href="{{ route('personas.create') }}" class="boton boton--primario">
                 <x-icono nombre="mas" />
                 Nueva persona
@@ -97,7 +107,7 @@
                     <tr>
                         <th scope="col">Persona</th>
                         <th scope="col">Pertenece a</th>
-                        <th scope="col">Cargo vigente</th>
+                        <th scope="col">Designación vigente</th>
                         <th scope="col" class="tabla__acciones"><span class="solo-lectores">Acciones</span></th>
                     </tr>
                 </thead>
@@ -123,11 +133,11 @@
                                     <span class="tabla__vacio">—</span>
                                 @endif
                             </td>
-                            <td data-etiqueta="Cargo vigente">
+                            <td data-etiqueta="Designación vigente">
                                 @forelse ($persona->cargos as $cargo)
                                     <span class="tabla__linea">{{ $cargo }}</span>
                                 @empty
-                                    <span class="tabla__vacio">Sin cargo vigente</span>
+                                    <span class="tabla__vacio">Sin designación vigente</span>
                                 @endforelse
                             </td>
                             <td class="tabla__acciones">
@@ -140,6 +150,19 @@
                                         <x-icono nombre="lapiz" />
                                         <span class="accion__texto">Editar <span class="solo-lectores">{{ $nombre }}</span></span>
                                     </a>
+                                    @php
+                                        $bloqueo = $servicioPersonas->motivoParaNoBorrar(auth()->user(), $persona);
+                                    @endphp
+                                    <button type="button" @class(['accion', 'accion--borrar', 'accion--a-la-derecha', 'accion--bloqueada' => $bloqueo])
+                                            data-abrir-dialogo="dialogo-borrar"
+                                            data-accion="{{ route('personas.destroy', $persona->id) }}"
+                                            data-titulo="¿Borrar a {{ $nombre }}?"
+                                            data-texto="{{ $servicioPersonas->efectoDeBorrar($persona) }} Queda en la bitácora con su motivo."
+                                            data-bloqueo="{{ $bloqueo }}"
+                                            data-valores="{{ json_encode(['_id' => $persona->id, 'motivo' => '']) }}">
+                                        <x-icono nombre="papelera" />
+                                        <span class="accion__texto">Borrar <span class="solo-lectores">{{ $nombre }}</span></span>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -150,4 +173,14 @@
             <x-paginacion :paginas="$personas" />
         @endif
     </section>
+
+    @php
+        $borrarConError = $errors->has('motivo') ? $personas->getCollection()->firstWhere('id', (int) old('_id')) : null;
+    @endphp
+    @include('catalogos._dialogo-borrar', [
+        'motivos' => $motivos,
+        'abrir' => $borrarConError !== null,
+        'accion' => $borrarConError ? route('personas.destroy', $borrarConError->id) : '',
+        'titulo' => $borrarConError ? "¿Borrar a {$servicioPersonas->nombreCompleto($borrarConError)}?" : 'Borrar persona',
+    ])
 @endsection

@@ -429,6 +429,63 @@ class PersonaService
     }
 
     /**
+     * Si no se puede borrar a la persona, por qué (se muestra en lugar del diálogo).
+     */
+    public function motivoParaNoBorrar(Usuario $actor, object $persona): ?string
+    {
+        if ((int) $actor->usua_id_persona === (int) $persona->id) {
+            return 'Eres tú: no puedes borrar tu propia persona.';
+        }
+        if ($persona->cargos->isNotEmpty()) {
+            return 'Tiene una designación vigente. Primero termínala (en su ficha, pestaña Designaciones).';
+        }
+
+        return null;
+    }
+
+    /**
+     * Qué pasará al borrarla: sin cuenta se elimina por completo; con cuenta solo se oculta.
+     */
+    public function efectoDeBorrar(object $persona): string
+    {
+        return $persona->tiene_cuenta
+            ? 'Tiene cuenta de usuario: no se borra, se oculta. Deja de aparecer en Personas y un superadministrador puede volver a mostrarla.'
+            : 'Se borra por completo: sus datos, contactos, grados y designaciones. No se puede deshacer.';
+    }
+
+    /**
+     * Personas ocultas (las borró un administrador y tienen cuenta). Solo las ve el superadministrador.
+     *
+     * @return Collection<int, object>
+     */
+    public function ocultas(): Collection
+    {
+        return DB::table('persona as p')
+            ->leftJoin('usuario as u', 'u.usua_id_persona', '=', 'p.pers_id_persona')
+            ->where('p.pers_oculta_admin', true)
+            ->orderBy('p.pers_primer_apellido')->orderBy('p.pers_nombre')
+            ->get(['p.pers_id_persona as id', 'p.pers_nombre as nombre', 'p.pers_primer_apellido as primer_apellido',
+                'p.pers_segundo_apellido as segundo_apellido', 'u.usua_correo as correo', 'u.usua_activo as cuenta_activa'])
+            ->each(fn (object $p) => $p->nombre_completo = $this->nombreCompleto($p));
+    }
+
+    /**
+     * Una persona sin importar si está oculta o en los directorios (para el superadministrador:
+     * mostrarla, borrarla definitivamente o atender una cancelación ARCO).
+     */
+    public function cualquiera(int $id): ?object
+    {
+        $persona = DB::table('persona')->where('pers_id_persona', $id)
+            ->first(['pers_id_persona as id', 'pers_nombre as nombre', 'pers_primer_apellido as primer_apellido', 'pers_segundo_apellido as segundo_apellido', 'pers_oculta_admin as oculta']);
+        if ($persona !== null) {
+            $persona->nombre_completo = $this->nombreCompleto($persona);
+            $persona->tiene_cuenta = DB::table('usuario')->where('usua_id_persona', $id)->exists();
+        }
+
+        return $persona;
+    }
+
+    /**
      * Nombre completo, como se escribe.
      */
     public function nombreCompleto(object $persona): string
@@ -528,6 +585,7 @@ class PersonaService
                 'z.zore_nombre as zona_nombre',
                 'p.pers_id_organizacion as organizacion_id',
                 'o.orga_nombre as organizacion',
+                DB::raw('exists (select 1 from usuario u where u.usua_id_persona = p.pers_id_persona) as tiene_cuenta'),
             ]);
     }
 

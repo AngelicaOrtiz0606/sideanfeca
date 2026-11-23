@@ -13,6 +13,7 @@ use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
 use App\Http\Controllers\PantallaPendienteController;
+use App\Http\Controllers\Personas\PersonaBorradoController;
 use App\Http\Controllers\Personas\PersonaController;
 use App\Http\Controllers\Puestos\PuestoController;
 use Illuminate\Support\Facades\Route;
@@ -89,6 +90,18 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::get('/personas/{persona}', [PersonaController::class, 'show'])->name('personas.show');
         Route::get('/personas/{persona}/edit', [PersonaController::class, 'edit'])->name('personas.edit');
         Route::put('/personas/{persona}', [PersonaController::class, 'update'])->name('personas.update');
+        // Borrar (M8): sin cuenta se elimina; con cuenta se oculta
+        Route::delete('/personas/{persona}', [PersonaBorradoController::class, 'destroy'])->name('personas.destroy');
+    });
+
+    // Personas ocultas y cancelación ARCO (M8): solo el superadministrador
+    Route::middleware([Privilegio::GestionarPersonas->middleware(), Privilegio::GestionarUsuarios->middleware()])->group(function () {
+        Route::get('/personas-ocultas', [PersonaBorradoController::class, 'ocultas'])->name('personas.ocultas');
+        Route::patch('/personas/{persona}/mostrar', [PersonaBorradoController::class, 'mostrar'])->name('personas.mostrar');
+        Route::middleware(Privilegio::EliminarDefinitivo->middleware())->group(function () {
+            Route::delete('/personas/{persona}/definitiva', [PersonaBorradoController::class, 'definitiva'])->name('personas.definitiva');
+            Route::delete('/personas/{persona}/arco', [PersonaBorradoController::class, 'arco'])->name('personas.arco');
+        });
     });
 
     // Designaciones (M6) de una persona, desde su ficha: agregar, terminar (deja el puesto) y borrar la errónea
