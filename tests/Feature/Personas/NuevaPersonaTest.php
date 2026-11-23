@@ -86,7 +86,7 @@ class NuevaPersonaTest extends TestCase
         $this->registrar(['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'])->assertSessionHasNoErrors();
 
         $this->registrar(['cargo' => $presidente, 'nombre' => 'Beatriz', 'curp' => '', 'correo' => 'bea@caceca.org'])
-            ->assertSessionHasErrors(['designaciones.0.cargo' => 'Designación 1: ese puesto ya lo ocupa Anaís Pérez López en esa fecha. Primero termina esa designación.']);
+            ->assertSessionHasErrors(['designaciones.0.cargo' => 'Designación 1: ese puesto lo ocupa Anaís Pérez López en esas fechas. Primero termina esa designación.']);
         $this->assertDatabaseMissing('persona', ['pers_nombre' => 'Beatriz']);
     }
 
@@ -116,7 +116,7 @@ class NuevaPersonaTest extends TestCase
         $this->registrar(['designaciones' => [
             ['cargo' => $presidente, 'fecha_inicio' => '2025-01-15'],
             ['cargo' => $presidente, 'fecha_inicio' => '2025-02-01'],
-        ]])->assertSessionHasErrors(['designaciones.1.cargo' => 'Designación 2: es el mismo puesto que la designación 1.']);
+        ]])->assertSessionHasErrors(['designaciones.1.cargo' => 'Designación 2: es el mismo puesto que la designación 1, en fechas que se cruzan.']);
 
         // Dos puestos distintos (y una fila vacía, que no cuenta): dos designaciones
         $this->registrar(['designaciones' => [
@@ -129,6 +129,20 @@ class NuevaPersonaTest extends TestCase
         $this->assertSame(2, DB::table('designacion')->where('desi_id_persona', $persona)->count());
         $this->assertDatabaseHas('puesto', ['pues_id_cargo' => $consejero, 'pues_id_zona_regional' => $zona]);
 
+        // Con fecha de fin: el mismo puesto en dos periodos que no se cruzan (uno anterior y el actual)
+        $this->registrar(['designaciones' => [
+            ['cargo' => $presidente, 'fecha_inicio' => '2018-01-01', 'fecha_fin' => '2019-12-31'],
+            ['cargo' => $presidente, 'fecha_inicio' => '2018-06-01', 'fecha_fin' => '2018-12-31'],
+        ], 'nombre' => 'Elena', 'correo' => 'elena@caceca.org'])->assertSessionHasErrors('designaciones.1.cargo');
+        $this->registrar(['designaciones' => [
+            ['cargo' => $presidente, 'fecha_inicio' => '2018-01-01', 'fecha_fin' => '2019-12-31'],
+            ['cargo' => $presidente, 'fecha_inicio' => '2017-01-01', 'fecha_fin' => '2016-12-31'],
+        ], 'nombre' => 'Elena', 'correo' => 'elena@caceca.org'])->assertSessionHasErrors(['designaciones.1.fecha_fin' => 'La fecha de fin no puede ser anterior a la de inicio.']);
+        $this->registrar(['designaciones' => [['cargo' => $presidente, 'fecha_inicio' => '2018-01-01', 'fecha_fin' => '2019-12-31']], 'nombre' => 'Elena', 'correo' => 'elena@caceca.org'])
+            ->assertSessionHasNoErrors();
+        $elena = (int) DB::table('persona')->where('pers_nombre', 'Elena')->value('pers_id_persona');
+        $this->assertDatabaseHas('designacion', ['desi_id_persona' => $elena, 'desi_fecha_inicio' => '2018-01-01', 'desi_fecha_fin' => '2019-12-31']);
+
         // Sin ningún cargo, no
         $this->registrar(['designaciones' => [], 'nombre' => 'Carlos', 'correo' => 'carlos@caceca.org'])->assertSessionHasErrors(['designaciones' => 'Agrega al menos una designación.']);
     }
@@ -136,7 +150,7 @@ class NuevaPersonaTest extends TestCase
     public function test_sin_pertenencia_no_recibe_cargo(): void
     {
         $this->registrar(['cargo' => $this->cargo('Presidente', 'Nacional'), 'pertenencia' => 'ninguna'])
-            ->assertSessionHasErrors(['pertenencia' => 'Para recibir una designación debe pertenecer a una institución u organización.']);
+            ->assertSessionHasErrors(['pertenencia' => 'Elige a qué pertenece: una institución o una organización.']);
         $this->assertDatabaseMissing('persona', ['pers_nombre' => 'Anaís']);
     }
 

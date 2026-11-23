@@ -10,6 +10,7 @@ use Database\Seeders\CatalogosInicialesSeeder;
 use Database\Seeders\GradosAcademicosSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\Support\CreaCuentas;
 use Tests\Support\CreaInstituciones;
 use Tests\TestCase;
@@ -143,6 +144,42 @@ class DesignacionesTest extends TestCase
         $this->assertSame(['Persona: Teresa Gómez', 'Puesto: Vocal de prueba · Nacional'], $linea['detalles']);
     }
 
+    public function test_al_editar_se_terminan_borran_y_agregan_designaciones_en_la_misma_pantalla(): void
+    {
+        $designacion = $this->designacion();
+        $this->actingAs($this->admin)->get("/personas/{$this->persona}/edit")->assertOk()
+            ->assertSee('name="existentes['.$designacion.'][hasta]"', false)->assertSee('data-vue="designaciones"', false);
+
+        // Terminarla (su último día) y agregar otra, en un solo guardado
+        $vocal = $this->cargo('Vocal de prueba', 'Vocal de prueba', 'Nacional');
+        $this->guardar([
+            'existentes' => [$designacion => ['hasta' => '2025-05-31']],
+            'designaciones' => [['cargo' => $vocal, 'fecha_inicio' => '2025-06-01']],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('2025-05-31', DB::table('designacion')->where('desi_id_designacion', $designacion)->value('desi_fecha_fin'));
+        $this->assertSame(2, DB::table('designacion')->where('desi_id_persona', $this->persona)->count());
+
+        // La fecha de inicio también se corrige (error de captura), con su bitácora
+        $this->guardar(['existentes' => [$designacion => ['desde' => '2023-12-15', 'hasta' => '2025-05-31']]])->assertSessionHasNoErrors();
+        $this->assertSame('2023-12-15', DB::table('designacion')->where('desi_id_designacion', $designacion)->value('desi_fecha_inicio'));
+        $this->assertContains('Fecha de inicio: 01/01/2024 → 15/12/2023', app(BitacoraService::class)->recientes(1)->first()['detalles']);
+        $this->guardar(['existentes' => [$designacion => ['desde' => '2025-07-01', 'hasta' => '2025-05-31']]])->assertSessionHasErrors("existentes.{$designacion}.hasta");
+
+        // Ya terminada: la fecha de fin se corrige, pero no se quita
+        $this->guardar(['existentes' => [$designacion => ['hasta' => '']]])->assertSessionHasErrors("existentes.{$designacion}.hasta");
+        $this->guardar(['existentes' => [$designacion => ['hasta' => '2025-04-30']]])->assertSessionHasNoErrors();
+        $this->assertSame('2025-04-30', DB::table('designacion')->where('desi_id_designacion', $designacion)->value('desi_fecha_fin'));
+
+        // Borrar la capturada por error pide el motivo
+        $this->guardar(['existentes' => [$designacion => ['borrar' => '1']]])->assertSessionHasErrors("existentes.{$designacion}.motivo");
+        $this->guardar(['existentes' => [$designacion => ['borrar' => '1', 'motivo' => 'Error de captura']]])->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('designacion', ['desi_id_designacion' => $designacion]);
+
+        // No puede quedarse sin ninguna (no tiene cuenta)
+        $ultima = $this->designacion();
+        $this->guardar(['existentes' => [$ultima => ['borrar' => '1', 'motivo' => 'Duplicado']]])->assertSessionHasErrors('existentes');
+    }
+
     public function test_una_designacion_de_otra_persona_no_se_toca_y_sin_privilegio_responde_403(): void
     {
         $designacion = $this->designacion();
@@ -159,6 +196,20 @@ class DesignacionesTest extends TestCase
         $this->actingAs($this->admin)->delete("/personas/{$this->persona}/designaciones/{$designacion}", ['motivo' => 'Duplicado'])->assertForbidden();
         // La ficha se sigue viendo, pero sin las acciones
         $this->actingAs($this->admin)->get("/personas/{$this->persona}?pestana=designaciones")->assertOk()->assertDontSee('Terminar designación');
+    }
+
+    /**
+     * Guarda el formulario de edición con sus datos actuales y estos cambios.
+     *
+     * @param  array<string, mixed>  $cambios
+     */
+    private function guardar(array $cambios): TestResponse
+    {
+        return $this->actingAs($this->admin)->put("/personas/{$this->persona}", $cambios + [
+            'nombre' => 'Teresa', 'primer_apellido' => 'Gómez', 'segundo_apellido' => '', 'curp' => '', 'genero' => 'F',
+            'pertenencia' => 'organizacion', 'organizacion' => DB::table('persona')->where('pers_id_persona', $this->persona)->value('pers_id_organizacion'),
+            'grados' => [], 'correo' => 'teresa@caceca.org', 'telefono' => ['lada' => '55', 'valor' => '56228300', 'extension' => ''], 'contactos' => [],
+        ]);
     }
 
     private function designacion(): int

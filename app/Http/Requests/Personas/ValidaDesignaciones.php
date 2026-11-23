@@ -12,10 +12,12 @@ use Illuminate\Validation\Rule;
  * Nueva persona y en "Agregar designación" de la ficha). Cada fila: el nivel
  * del cargo, el cargo, su ámbito (zona y coordinación; un cargo institucional
  * es de la institución a la que pertenece la persona) y la fecha de inicio.
- * Con eso se busca el puesto (o se crea al guardar). Reglas:
+ * Con eso se busca el puesto (o se crea al guardar). La fecha de fin es
+ * opcional (su último día en el puesto), para registrar de una vez
+ * designaciones que ya terminaron. Reglas:
  * - la persona debe pertenecer a una institución u organización;
- * - el mismo puesto no se repite entre las filas;
- * - el puesto debe estar activo y libre en esa fecha.
+ * - el mismo puesto no se repite entre las filas en periodos que se cruzan;
+ * - el puesto debe estar activo y libre en todo ese periodo.
  * Los mensajes dicen de qué fila se trata ("Designación 2: ...").
  */
 trait ValidaDesignaciones
@@ -35,14 +37,15 @@ trait ValidaDesignaciones
     /**
      * @return array<string, array<int, mixed>>
      */
-    protected function reglasDesignaciones(): array
+    protected function reglasDesignaciones(bool $obligatorias = true): array
     {
         return [
-            'designaciones' => ['required', 'array', 'max:'.self::MAXIMO_DESIGNACIONES],
+            'designaciones' => [$obligatorias ? 'required' : 'nullable', 'array', 'max:'.self::MAXIMO_DESIGNACIONES],
             'designaciones.*.cargo' => ['required', 'integer', Rule::exists('cargo', 'carg_id_cargo')->where('carg_activo', true)],
             'designaciones.*.zona' => ['nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
             'designaciones.*.coordinacion' => ['nullable', 'integer', Rule::exists('coordinacion_nacional', 'cona_id_coordinacion_nacional')->where('cona_activo', true)],
             'designaciones.*.fecha_inicio' => ['required', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:today'],
+            'designaciones.*.fecha_fin' => ['nullable', 'date', 'after_or_equal:designaciones.*.fecha_inicio'],
         ];
     }
 
@@ -62,6 +65,8 @@ trait ValidaDesignaciones
             'designaciones.*.fecha_inicio.date' => 'Escribe una fecha válida.',
             'designaciones.*.fecha_inicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a 1950.',
             'designaciones.*.fecha_inicio.before_or_equal' => 'La fecha de inicio no puede ser posterior a hoy.',
+            'designaciones.*.fecha_fin.date' => 'Escribe una fecha de fin válida.',
+            'designaciones.*.fecha_fin.after_or_equal' => 'La fecha de fin no puede ser anterior a la de inicio.',
         ];
     }
 
@@ -69,7 +74,7 @@ trait ValidaDesignaciones
      * Las designaciones, listas para guardar: lo que no aplica al nivel del
      * cargo va vacío; un cargo institucional lleva la institución de la persona.
      *
-     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>
+     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin: ?string}>
      */
     public function designaciones(?int $institucion): array
     {
@@ -82,6 +87,7 @@ trait ValidaDesignaciones
                 'coordinacion' => $nivel !== 'Institucional' && filled($d['coordinacion'] ?? null) ? (int) $d['coordinacion'] : null,
                 'institucion' => $nivel === 'Institucional' ? $institucion : null,
                 'fecha_inicio' => (string) $d['fecha_inicio'],
+                'fecha_fin' => filled($d['fecha_fin'] ?? null) ? (string) $d['fecha_fin'] : null,
             ];
         }, (array) $this->input('designaciones', []));
     }
@@ -106,7 +112,7 @@ trait ValidaDesignaciones
         foreach ($this->designaciones($institucion) as $i => $designacion) {
             $n = $i + 1;
             $campo = "designaciones.{$i}.cargo";
-            if ($validator->errors()->has($campo) || $validator->errors()->has("designaciones.{$i}.fecha_inicio")) {
+            if ($validator->errors()->hasAny([$campo, "designaciones.{$i}.fecha_inicio", "designaciones.{$i}.fecha_fin"])) {
                 continue;
             }
             $nivel = $this->nivelDe($designacion['cargo']);
@@ -121,13 +127,16 @@ trait ValidaDesignaciones
                 continue;
             }
 
+            // El mismo puesto puede repetirse en periodos distintos (por ejemplo, dos periodos de presidencia)
             $clave = implode('|', [$designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion']]);
-            if (isset($vistas[$clave])) {
-                $validator->errors()->add($campo, "Designación {$n}: es el mismo puesto que la designación {$vistas[$clave]}.");
+            foreach ($vistas[$clave] ?? [] as [$otra, $inicio, $fin]) {
+                if ($designacion['fecha_inicio'] <= ($fin ?? '9999-12-31') && ($designacion['fecha_fin'] ?? '9999-12-31') >= $inicio) {
+                    $validator->errors()->add($campo, "Designación {$n}: es el mismo puesto que la designación {$otra}, en fechas que se cruzan.");
 
-                continue;
+                    continue 2;
+                }
             }
-            $vistas[$clave] = $n;
+            $vistas[$clave][] = [$n, $designacion['fecha_inicio'], $designacion['fecha_fin']];
 
             $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion']);
             if ($puesto === null) {
@@ -135,8 +144,8 @@ trait ValidaDesignaciones
             }
             if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
                 $validator->errors()->add($campo, "Designación {$n}: ese puesto está desactivado. Actívalo en Puestos o elige otro.");
-            } elseif (($ocupante = $servicio->ocupanteDesde($puesto, $designacion['fecha_inicio'])) !== null) {
-                $validator->errors()->add($campo, "Designación {$n}: ese puesto ya lo ocupa {$ocupante} en esa fecha. Primero termina esa designación.");
+            } elseif (($ocupante = $servicio->ocupanteEntre($puesto, $designacion['fecha_inicio'], $designacion['fecha_fin'])) !== null) {
+                $validator->errors()->add($campo, "Designación {$n}: ese puesto lo ocupa {$ocupante} en esas fechas. Primero termina esa designación.");
             }
         }
     }

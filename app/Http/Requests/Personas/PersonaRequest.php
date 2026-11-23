@@ -3,10 +3,12 @@
 namespace App\Http\Requests\Personas;
 
 use App\Rules\TextoSeguro;
+use App\Services\Designaciones\DesignacionService;
 use App\Services\Personas\PersonaService;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -67,9 +69,7 @@ class PersonaRequest extends FormRequest
 
         $telefono = is_array($this->input('telefono')) ? $this->input('telefono') : [];
 
-        if ($this->registrando()) {
-            $this->filtrarDesignaciones();
-        }
+        $this->filtrarDesignaciones();
 
         $this->merge([
             'correo' => is_string($this->input('correo')) ? mb_strtolower(trim($this->input('correo'))) : $this->input('correo'),
@@ -100,7 +100,8 @@ class PersonaRequest extends FormRequest
                 Rule::unique('persona', 'pers_curp')->ignore($id, 'pers_id_persona')],
             'genero' => ['required', Rule::in(array_keys(PersonaService::GENEROS))],
 
-            'pertenencia' => ['required', Rule::in(['institucion', 'organizacion', 'ninguna'])],
+            // Este formulario es de las personas de los directorios: siempre pertenecen a algo
+            'pertenencia' => ['required', Rule::in(['institucion', 'organizacion'])],
             'institucion' => [Rule::requiredIf($pertenencia === 'institucion'), 'nullable', 'integer',
                 Rule::exists('institucion_educativa', 'ined_id_institucion_educativa')->where(fn ($q) => $q->where('ined_activo', true)
                     ->when($actual?->pers_id_institucion_educativa, fn ($w, $i) => $w->orWhere('ined_id_institucion_educativa', $i)))],
@@ -118,7 +119,17 @@ class PersonaRequest extends FormRequest
             'telefono.lada' => ['nullable', 'string', 'regex:/^[0-9]{2,3}$/'],
             'telefono.extension' => ['nullable', 'string', 'regex:/^[0-9]{1,5}$/'],
 
-            ...($this->registrando() ? ['persona_existente' => ['nullable', 'integer'], ...$this->reglasDesignaciones()] : []),
+            ...($this->registrando()
+                ? ['persona_existente' => ['nullable', 'integer'], ...$this->reglasDesignaciones()]
+                : [
+                    // Al editar: las designaciones nuevas son opcionales; las guardadas se corrigen o se borran
+                    ...$this->reglasDesignaciones(false),
+                    'existentes' => ['nullable', 'array'],
+                    'existentes.*.desde' => ['nullable', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:today'],
+                    'existentes.*.hasta' => ['nullable', 'date'],
+                    'existentes.*.borrar' => ['nullable', 'boolean'],
+                    'existentes.*.motivo' => ['nullable', Rule::in(DesignacionService::MOTIVOS_PARA_BORRAR)],
+                ]),
 
             'contactos' => ['array', 'max:'.self::MAXIMO_CONTACTOS],
             'contactos.*.tipo' => ['required', 'integer', Rule::exists('tipo_contacto', 'tico_id_tipo_contacto')],
@@ -165,6 +176,11 @@ class PersonaRequest extends FormRequest
                     if (! $validator->errors()->hasAny(['pertenencia', 'institucion', 'organizacion'])) {
                         $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia');
                     }
+                } else {
+                    $this->revisarExistentes($validator, (int) $this->route('persona'));
+                    if ($this->input('designaciones', []) !== [] && ! $validator->errors()->hasAny(['pertenencia', 'institucion', 'organizacion'])) {
+                        $this->revisarDesignaciones($validator, (string) $this->input('pertenencia'), $this->pertenencia()['institucion'], 'pertenencia');
+                    }
                 }
 
                 // La pertenencia, si tiene un cargo vigente
@@ -192,7 +208,8 @@ class PersonaRequest extends FormRequest
             'curp.regex' => 'La CURP no tiene un formato válido. Revísala: 4 letras, 6 números (fecha), H o M, 5 letras y 2 caracteres finales.',
             'curp.unique' => 'Esa CURP ya pertenece a otra persona.',
             'genero.required' => 'Elige el género.',
-            'pertenencia.required' => 'Elige a qué pertenece: una institución, una organización o ninguna.',
+            'pertenencia.required' => 'Elige a qué pertenece: una institución o una organización.',
+            'pertenencia.in' => 'Elige a qué pertenece: una institución o una organización.',
             'institucion.required' => 'Elige la institución.',
             'institucion.exists' => 'Elige una institución activa de la lista.',
             'organizacion.required' => 'Elige la organización.',
@@ -207,6 +224,11 @@ class PersonaRequest extends FormRequest
             'telefono.extension.regex' => 'La extensión lleva hasta 5 dígitos.',
             'persona_existente.integer' => 'No encontramos a esa persona. Vuelve a buscarla.',
             ...$this->mensajesDesignaciones(),
+            'existentes.*.desde.date' => 'Escribe una fecha de inicio válida.',
+            'existentes.*.desde.after_or_equal' => 'La fecha de inicio no puede ser anterior a 1950.',
+            'existentes.*.desde.before_or_equal' => 'La fecha de inicio no puede ser posterior a hoy.',
+            'existentes.*.hasta.date' => 'Escribe una fecha de fin válida.',
+            'existentes.*.motivo.in' => 'Elige un motivo de la lista para borrar la designación.',
             'contactos.max' => 'Puede tener hasta '.self::MAXIMO_CONTACTOS.' contactos.',
             'contactos.*.tipo.required' => 'Elige el tipo de cada contacto.',
             'contactos.*.valor.required' => 'Escribe cada contacto o quita la fila.',
@@ -274,6 +296,110 @@ class PersonaRequest extends FormRequest
     private function registrando(): bool
     {
         return $this->route('persona') === null;
+    }
+
+    /**
+     * Al editar: qué pasa con las designaciones guardadas. Solo lo que cambió.
+     *
+     * @return array{borrar: array<int, string>, inicio: array<int, string>, terminar: array<int, string>} [designación => motivo], [designación => nuevo inicio] y [designación => último día]
+     */
+    public function cambiosDeDesignaciones(): array
+    {
+        $guardadas = $this->designacionesGuardadas();
+        $cambios = ['borrar' => [], 'inicio' => [], 'terminar' => []];
+
+        foreach ((array) $this->input('existentes', []) as $id => $datos) {
+            $guardada = $guardadas[(int) $id] ?? null;
+            if ($guardada === null || ! is_array($datos)) {
+                continue;
+            }
+            if (filter_var($datos['borrar'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $cambios['borrar'][(int) $id] = (string) $datos['motivo'];
+
+                continue;
+            }
+            if (filled($datos['desde'] ?? null) && $datos['desde'] !== $guardada->desde) {
+                $cambios['inicio'][(int) $id] = (string) $datos['desde'];
+            }
+            if (filled($datos['hasta'] ?? null) && $datos['hasta'] !== $guardada->hasta) {
+                $cambios['terminar'][(int) $id] = (string) $datos['hasta'];
+            }
+        }
+
+        return $cambios;
+    }
+
+    /**
+     * Revisa las designaciones guardadas que se corrigen o se borran: que sean
+     * de la persona, que la fecha de fin no se quite ni quede antes del inicio,
+     * que el puesto esté libre en el periodo corregido, y que no se quede sin
+     * ninguna designación si no tiene cuenta.
+     */
+    private function revisarExistentes(Validator $validator, int $persona): void
+    {
+        $guardadas = $this->designacionesGuardadas();
+        $servicio = app(PersonaService::class);
+        $quedan = 0;
+
+        foreach ((array) $this->input('existentes', []) as $id => $datos) {
+            $guardada = $guardadas[(int) $id] ?? null;
+            if ($guardada === null || ! is_array($datos)) {
+                $validator->errors()->add('existentes', 'Una de las designaciones ya no es de esta persona. Vuelve a abrir el formulario.');
+
+                continue;
+            }
+            $campo = "existentes.{$id}";
+            if (filter_var($datos['borrar'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                if (blank($datos['motivo'] ?? null)) {
+                    $validator->errors()->add("{$campo}.motivo", "Elige el motivo para borrar la designación {$guardada->nombre}.");
+                }
+
+                continue;
+            }
+            $quedan++;
+
+            if ($validator->errors()->hasAny(["{$campo}.desde", "{$campo}.hasta"])) {
+                continue;
+            }
+            $desde = filled($datos['desde'] ?? null) ? (string) $datos['desde'] : $guardada->desde;
+            $hasta = filled($datos['hasta'] ?? null) ? (string) $datos['hasta'] : null;
+            if ($hasta === null && $guardada->hasta !== null) {
+                $validator->errors()->add("{$campo}.hasta", "La designación {$guardada->nombre} ya terminó: su fecha de fin se puede corregir, pero no quitar. Si fue un error, bórrala.");
+
+                continue;
+            }
+            if ($hasta !== null && $hasta < $desde) {
+                $validator->errors()->add("{$campo}.hasta", "La fecha de fin de {$guardada->nombre} no puede ser anterior a su inicio.");
+
+                continue;
+            }
+            $cambio = $desde !== $guardada->desde || $hasta !== $guardada->hasta;
+            if ($cambio && ($ocupante = $servicio->ocupanteEntre($guardada->puesto, $desde, $hasta, $guardada->id)) !== null) {
+                $validator->errors()->add("{$campo}.desde", "Con esas fechas, {$guardada->nombre} se cruza con {$ocupante} en el mismo puesto.");
+            }
+        }
+
+        // Las que no se tocaron también se quedan
+        $quedan += $guardadas->keys()->diff(array_map('intval', array_keys((array) $this->input('existentes', []))))->count();
+        $nuevas = count((array) $this->input('designaciones', []));
+        if ($quedan + $nuevas === 0 && ! DB::table('usuario')->where('usua_id_persona', $persona)->exists()) {
+            $validator->errors()->add('existentes', 'No puede quedarse sin ninguna designación (no tiene cuenta). Si se capturó por error, borra a la persona.');
+        }
+    }
+
+    /**
+     * Las designaciones guardadas de la persona que se edita, por número.
+     *
+     * @return Collection<int, object>
+     */
+    private function designacionesGuardadas(): Collection
+    {
+        $persona = (int) $this->route('persona');
+        $genero = (string) DB::table('persona')->where('pers_id_persona', $persona)->value('pers_genero');
+
+        return app(PersonaService::class)->historialCargos($persona, $genero)
+            ->each(fn (object $d) => $d->puesto = (int) DB::table('designacion')->where('desi_id_designacion', $d->id)->value('desi_id_puesto'))
+            ->keyBy('id');
     }
 
     /**

@@ -3,7 +3,8 @@
     datos van en data-props: los cargos activos (con el nombre en ambos
     géneros), zonas, coordinaciones, las filas escritas antes (si hubo
     errores) y qué campos tuvieron error.
-    Parámetros: $cargos, $zonas, $coordinaciones y $notaInstitucional.
+    Parámetros: $cargos, $zonas, $coordinaciones, $notaInstitucional y
+    $minimo (filas que siempre quedan: 1 por omisión; 0 al editar a una persona).
 --}}
 @php
     $props = [
@@ -15,6 +16,7 @@
         'maximo' => \App\Http\Requests\Personas\PersonaRequest::MAXIMO_DESIGNACIONES,
         'hoy' => now()->toDateString(),
         'notaInstitucional' => $notaInstitucional,
+        'minimo' => $minimo ?? 1,
     ];
 @endphp
 <div data-vue="designaciones" data-props="{{ json_encode($props, JSON_UNESCAPED_UNICODE) }}">

@@ -26,10 +26,20 @@ class FuncionSql
 
             return [$fila->resultado ?? null, null];
         } catch (QueryException $error) {
-            if (preg_match('/ERROR:\s+(.+?)(\s+\(Connection:|\s+CONTEXT:|\n|$)/u', $error->getMessage(), $partes) === 1) {
-                return [null, trim($partes[1])];
-            }
-            throw $error;
+            return [null, self::mensaje($error)];
         }
+    }
+
+    /**
+     * El mensaje de la base en palabras (lo que dice su raise exception). Si
+     * no es un mensaje de la base, se vuelve a lanzar el error.
+     */
+    public static function mensaje(QueryException $error): string
+    {
+        if (preg_match('/ERROR:\s+(.+?)(\s+\(Connection:|\s+CONTEXT:|\s+DETAIL:|\n|$)/u', $error->getMessage(), $partes) === 1) {
+            return trim($partes[1]);
+        }
+
+        throw $error;
     }
 }

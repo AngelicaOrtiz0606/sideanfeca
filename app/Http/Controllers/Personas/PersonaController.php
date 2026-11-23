@@ -133,6 +133,8 @@ class PersonaController extends Controller
             'esNueva' => false,
             'nombre' => $this->personas->nombreCompleto($encontrada),
             'contactos' => $this->personas->contactosFormulario($persona),
+            'designacionesActuales' => $this->personas->historialCargos($persona, $encontrada->genero),
+            'motivosParaBorrarDesignacion' => DesignacionService::MOTIVOS_PARA_BORRAR,
             ...$this->catalogos($encontrada),
         ]);
     }
@@ -141,7 +143,7 @@ class PersonaController extends Controller
     {
         abort_if($this->personas->buscar($persona) === null, 404);
 
-        $this->personas->actualizar($request->user(), $persona, $request->datos());
+        $this->personas->actualizar($request->user(), $persona, $request->datos(), $request->cambiosDeDesignaciones(), $request->designacionesNuevas());
 
         return redirect()->route('personas.show', $persona)->with('estado', 'Se guardaron los cambios.');
     }

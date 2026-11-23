@@ -7,6 +7,7 @@ use App\Services\Catalogos\BitacoraCatalogo;
 use App\Services\Personas\PersonaService;
 use App\Services\Puestos\PuestoService;
 use App\Support\FuncionSql;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -35,7 +36,7 @@ class DesignacionService
      * del movimiento $idBitacora ("Designación: Presidenta · Nacional, desde
      * 20/11/2026"), y cada puesto creado como "Puesto creado".
      *
-     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>  $designaciones
+     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
      */
     public function designar(int $persona, string $genero, array $designaciones, int $idBitacora): void
     {
@@ -60,11 +61,13 @@ class DesignacionService
                 'desi_id_puesto' => $puesto,
                 'desi_id_persona' => $persona,
                 'desi_fecha_inicio' => $designacion['fecha_inicio'],
+                'desi_fecha_fin' => $designacion['fecha_fin'] ?? null,
             ], 'desi_id_designacion');
 
             $datosPuesto = $this->puestos->buscar($puesto);
             $this->detalle($idBitacora, $id, 'Designación',
-                null, $this->puestos->nombre($datosPuesto, $genero).', desde '.Carbon::parse($designacion['fecha_inicio'])->format('d/m/Y'));
+                null, $this->puestos->nombre($datosPuesto, $genero).', desde '.Carbon::parse($designacion['fecha_inicio'])->format('d/m/Y')
+                    .(($designacion['fecha_fin'] ?? null) ? ' hasta '.Carbon::parse($designacion['fecha_fin'])->format('d/m/Y') : ''));
             if ($creado) {
                 $this->detalle($idBitacora, $puesto, 'Puesto creado', null, $this->puestos->nombre($datosPuesto));
             }
@@ -75,7 +78,7 @@ class DesignacionService
      * Agrega designaciones a una persona ya registrada: una sola línea en la
      * bitácora ("modificó las designaciones de la persona …") con cada una.
      *
-     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string}>  $designaciones
+     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
      */
     public function agregar(Usuario $actor, int $persona, string $genero, array $designaciones): void
     {
@@ -93,6 +96,27 @@ class DesignacionService
     public function terminar(Usuario $actor, int $designacion, string $fecha): ?string
     {
         return FuncionSql::llamar('desactivar_designacion', [$actor->usua_id_usuario, $designacion, $fecha])[1];
+    }
+
+    /**
+     * Corrige la fecha de inicio de una designación (un error de captura). La
+     * base revisa sus reglas (puesto activo, pertenencia, que no se cruce con
+     * otra persona en el mismo puesto). Devuelve el error en palabras o null.
+     */
+    public function corregirInicio(Usuario $actor, int $designacion, string $desde): ?string
+    {
+        $anterior = DB::table('designacion')->where('desi_id_designacion', $designacion)->value('desi_fecha_inicio');
+
+        try {
+            DB::table('designacion')->where('desi_id_designacion', $designacion)->update(['desi_fecha_inicio' => $desde]);
+        } catch (QueryException $error) {
+            return FuncionSql::mensaje($error);
+        }
+
+        $idBitacora = $this->bitacora($actor, 'Modificacion', 'DESIGNACION', $designacion);
+        $this->detalle($idBitacora, $designacion, 'Fecha de inicio', $anterior, $desde);
+
+        return null;
     }
 
     /**

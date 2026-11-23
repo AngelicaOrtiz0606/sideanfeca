@@ -1,16 +1,16 @@
 {{--
     Formulario de una persona, en pantalla propia, por secciones numeradas:
     1. Datos personales (la CURP avisa en amarillo si su H/M no coincide con el género).
-    2. Pertenece a: una institución (buscador), una organización o ninguna.
-    3. Designaciones (solo al registrar): una o varias (componente Vue
-       FilasDesignacion); cada una con el nivel del cargo, el cargo, su ámbito
-       y desde cuándo. Si el puesto no existe, se crea.
+    2. Pertenece a: una institución (buscador) o una organización (siempre una).
+    3. Designaciones: al registrar, una o varias (componente Vue
+       FilasDesignacion), con nivel del cargo, cargo, ámbito, desde y hasta
+       (opcional). Al editar, además las guardadas: corregir su fecha de fin
+       o borrar la capturada por error. Si un puesto no existe, se crea.
     4. Grados académicos: varios o ninguno.
     5. Contactos: un correo y un teléfono obligatorios, que siempre se muestran
        en el sitio; aparte, otros contactos opcionales (filas que se agregan y
        se quitan; según el tipo aparecen la lada y la extensión, y cada uno
        dice si es visible en el sitio).
-    Al editar no hay sección de cargo (los cargos se llevan en la ficha).
     Al registrar, mientras se escribe el nombre o la CURP avisa si ya existe;
     si alguien solo tenía cuenta, llega con sus datos ($persona->id).
     Al final, Guardar y Cancelar. Comportamiento en persona-formulario.js.
@@ -19,8 +19,9 @@
 
 @php
     // Al registrar siempre pertenece a algo (lo pide el cargo): no se ofrece "Ninguna"
-    $pertenenciaActual = $persona->institucion_id ? 'institucion' : ($persona->organizacion_id ? 'organizacion' : ($esNueva ? 'institucion' : 'ninguna'));
-    $opcionesPertenencia = ['institucion' => 'Una institución', 'organizacion' => 'Una organización'] + ($esNueva ? [] : ['ninguna' => 'Ninguna']);
+    // Las personas de los directorios siempre pertenecen a algo: no se ofrece "Ninguna"
+    $pertenenciaActual = $persona->organizacion_id ? 'organizacion' : 'institucion';
+    $opcionesPertenencia = ['institucion' => 'Una institución', 'organizacion' => 'Una organización'];
     $pertenencia = old('pertenencia', $pertenenciaActual);
     $genero = old('genero', $persona->genero);
     $tiene = collect(old('grados', $persona->grados->pluck('id')->all()))->map(fn ($g) => (int) $g)->all();
@@ -32,7 +33,7 @@
     // Una fila nueva empieza como celular, que es lo que más se agrega
     $tipoNuevo = $tiposContacto->firstWhere('nombre', 'Celular')?->id ?? 0;
     // Al registrar: el número de cada sección después de "Pertenece a" se recorre por el cargo
-    $siguiente = $esNueva ? 4 : 3;
+    $siguiente = 4;
     $regresar = $esNueva ? route('personas.index') : route('personas.show', $persona->id);
 @endphp
 
@@ -154,12 +155,18 @@
                     </div>
                 </x-seccion-formulario>
 
-                @if ($esNueva)
-                    {{-- 3. Designaciones (una o varias) --}}
-                    <x-seccion-formulario id="seccion-designaciones" numero="3" titulo="Designaciones" descripcion="Los puestos que ocupa en ANFECA: el cargo y su ámbito. Si un puesto aún no existe, se crea al guardar.">
+                {{-- 3. Designaciones: al registrar, una o varias; al editar, las guardadas y las nuevas --}}
+                <x-seccion-formulario id="seccion-designaciones" numero="3" titulo="Designaciones"
+                                      :descripcion="$esNueva ? 'Los puestos que ocupa u ocupó en ANFECA: el cargo y su ámbito. Si un puesto aún no existe, se crea al guardar.' : 'Sus designaciones guardadas y las que quieras agregar. Si un puesto aún no existe, se crea al guardar.'">
+                    @if ($esNueva)
                         @include('personas._designaciones', ['notaInstitucional' => 'Es un cargo de la institución a la que pertenece (sección 2).'])
-                    </x-seccion-formulario>
-                @endif
+                    @else
+                        @if ($designacionesActuales->isNotEmpty())
+                            @include('personas._designaciones-actuales', ['designaciones' => $designacionesActuales, 'motivos' => $motivosParaBorrarDesignacion])
+                        @endif
+                        @include('personas._designaciones', ['notaInstitucional' => 'Es un cargo de la institución a la que pertenece (sección 2).', 'minimo' => 0])
+                    @endif
+                </x-seccion-formulario>
 
                 {{-- Grados académicos --}}
                 <x-seccion-formulario id="seccion-grados" :numero="$siguiente" titulo="Grados académicos" descripcion="Agrega los que tiene. La abreviatura va antes de su nombre en los directorios." opcional>

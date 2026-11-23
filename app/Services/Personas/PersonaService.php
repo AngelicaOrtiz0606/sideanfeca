@@ -9,8 +9,10 @@ use App\Support\Paginacion;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Personas: datos personales (nombre, CURP opcional, género), pertenencia
@@ -211,17 +213,39 @@ class PersonaService
      *
      * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array{tipo: int, valor: string, lada: ?string, extension: ?string, visible: bool}>}  $datos
      */
-    public function actualizar(Usuario $actor, int $id, array $datos): void
+    public function actualizar(Usuario $actor, int $id, array $datos, array $designaciones = ['borrar' => [], 'inicio' => [], 'terminar' => []], array $nuevas = []): void
     {
-        DB::transaction(function () use ($actor, $id, $datos): void {
+        DB::transaction(function () use ($actor, $id, $datos, $designaciones, $nuevas): void {
+            // Datos y designaciones nuevas: un solo movimiento en la bitácora
             $cambios = $this->guardarDatos($id, $datos);
-            if ($cambios === []) {
-                return;
+            if ($cambios !== [] || $nuevas !== []) {
+                $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
+                foreach ($cambios as $campo) {
+                    $this->detalle($idBitacora, $id, $campo, null, null);
+                }
+                app(DesignacionService::class)->designar($id, $datos['genero'], $nuevas, $idBitacora);
             }
 
-            $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
-            foreach ($cambios as $campo) {
-                $this->detalle($idBitacora, $id, $campo, null, null);
+            // Las guardadas que se borran o terminan: con las funciones de la base (cada una deja su bitácora).
+            // Si la base rechaza algo, no se guarda nada y se avisa en el formulario.
+            $servicio = app(DesignacionService::class);
+            foreach ($designaciones['borrar'] as $designacion => $motivo) {
+                if (($error = $servicio->borrar($actor, $designacion, $motivo)) !== null) {
+                    throw ValidationException::withMessages(["existentes.{$designacion}.borrar" => $error]);
+                }
+            }
+            // Corregir la fecha de inicio (un error de captura): no hay función de la base para esto;
+            // se actualiza aquí y se registra en la bitácora con sus fechas
+            foreach ($designaciones['inicio'] ?? [] as $designacion => $desde) {
+                if (($error = $servicio->corregirInicio($actor, $designacion, $desde)) !== null) {
+                    throw ValidationException::withMessages(["existentes.{$designacion}.desde" => $error]);
+                }
+            }
+            foreach ($designaciones['terminar'] as $designacion => $hasta) {
+                // La base recibe el primer día sin el puesto
+                if (($error = $servicio->terminar($actor, $designacion, Carbon::parse($hasta)->addDay()->toDateString())) !== null) {
+                    throw ValidationException::withMessages(["existentes.{$designacion}.hasta" => $error]);
+                }
             }
         });
     }
@@ -414,14 +438,17 @@ class PersonaService
     }
 
     /**
-     * Si el puesto ya está ocupado en esa fecha (o después), quién lo ocupa.
+     * Si el puesto está ocupado en algún día del periodo (sin fin: desde $inicio en adelante),
+     * quién lo ocupa. $excepto: una designación que no cuenta (la que se está corrigiendo).
      */
-    public function ocupanteDesde(int $puesto, string $fecha): ?string
+    public function ocupanteEntre(int $puesto, string $inicio, ?string $fin = null, ?int $excepto = null): ?string
     {
         $ocupante = DB::table('designacion as d')
             ->join('persona as p', 'p.pers_id_persona', '=', 'd.desi_id_persona')
             ->where('d.desi_id_puesto', $puesto)
-            ->where(fn (Builder $q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $fecha))
+            ->when($excepto, fn (Builder $q, int $id) => $q->where('d.desi_id_designacion', '!=', $id))
+            ->where(fn (Builder $q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $inicio))
+            ->when($fin, fn (Builder $q, string $hasta) => $q->where('d.desi_fecha_inicio', '<=', $hasta))
             ->orderBy('d.desi_fecha_inicio')
             ->first(['p.pers_nombre as nombre', 'p.pers_primer_apellido as primer_apellido', 'p.pers_segundo_apellido as segundo_apellido', 'p.pers_oculta_admin as oculta']);
 

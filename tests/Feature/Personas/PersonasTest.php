@@ -41,8 +41,9 @@ class PersonasTest extends TestCase
         $this->admin = $this->crearCuenta(Rol::ADMINISTRADOR);
         // La persona que se edita: tiene cuenta, así la base la acepta sin designación
         $this->persona = (int) $this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => 'María José', 'pers_primer_apellido' => 'Núñez', 'pers_segundo_apellido' => 'Álvarez', 'pers_genero' => 'F'])->usua_id_persona;
-        // Es de los directorios: tuvo un cargo (ya terminó, así hoy no pertenece a nada)
+        // Es de los directorios: tuvo un cargo (ya terminó) y pertenece a una organización
         $this->enDirectorio($this->persona);
+        DB::table('persona')->where('pers_id_persona', $this->persona)->update(['pers_id_organizacion' => DB::table('organizacion')->value('orga_id_organizacion')]);
         // Con su correo y su teléfono obligatorios, como los deja el formulario
         DB::table('contacto')->insert([
             ['cont_id_persona' => $this->persona, 'cont_id_tipo_contacto' => $this->tipo('Correo'), 'cont_valor' => 'maria@unam.mx', 'cont_lada' => null, 'cont_extension' => null, 'cont_visible' => true],
@@ -147,12 +148,14 @@ class PersonasTest extends TestCase
 
     // ---- Pertenencia ----
 
-    public function test_sin_institucion_ni_organizacion_se_guarda_pero_no_recibe_designacion(): void
+    public function test_siempre_pertenece_a_una_institucion_u_organizacion(): void
     {
-        $this->guardar(['pertenencia' => 'ninguna'])->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('persona', ['pers_id_persona' => $this->persona, 'pers_id_institucion_educativa' => null, 'pers_id_organizacion' => null]);
+        // El formulario no ofrece "Ninguna": las personas de los directorios siempre pertenecen a algo
+        $this->guardar(['pertenencia' => 'ninguna'])->assertSessionHasErrors(['pertenencia' => 'Elige a qué pertenece: una institución o una organización.']);
+        $this->actingAs($this->admin)->get("/personas/{$this->persona}/edit")->assertDontSee('value="ninguna"', false);
 
-        // La base no la deja recibir una designación
+        // Y la base no deja recibir una designación a quien no pertenece a nada
+        DB::table('persona')->where('pers_id_persona', $this->persona)->update(['pers_id_organizacion' => null]);
         $puesto = $this->puestoNacional();
         $this->expectException(QueryException::class);
         DB::table('designacion')->insert(['desi_id_puesto' => $puesto, 'desi_id_persona' => $this->persona, 'desi_fecha_inicio' => '2024-01-01']);
@@ -313,7 +316,7 @@ class PersonasTest extends TestCase
     private function datos(array $cambios = []): array
     {
         return $cambios + ['nombre' => 'María José', 'primer_apellido' => 'Núñez', 'segundo_apellido' => 'Álvarez', 'curp' => '', 'genero' => 'F',
-            'pertenencia' => 'ninguna', 'grados' => [],
+            'pertenencia' => 'organizacion', 'organizacion' => DB::table('organizacion')->value('orga_id_organizacion'), 'grados' => [],
             'correo' => 'maria@unam.mx', 'telefono' => ['lada' => '55', 'valor' => '56228300', 'extension' => ''], 'contactos' => []];
     }
 

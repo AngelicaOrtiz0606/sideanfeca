@@ -21,8 +21,17 @@
     $sector = $valor('sector', $institucion?->sector);
     $esMatriz = $participacion === 'Matriz';
     $fecha = fn (?string $dia) => $dia === null ? null : \Illuminate\Support\Carbon::parse($dia)->locale('es')->translatedFormat('j \d\e F \d\e Y');
-    $descripcionesTipo = ['Universidad' => 'Puede ser matriz o tener facultades y campus.', 'Facultad' => 'Pertenece a una universidad.', 'Campus' => 'Pertenece a una universidad.'];
-    $descripcionesParticipacion = ['Matriz' => 'Solo universidades. Sin número.', 'Afiliada' => 'Su número de afiliación se calcula solo; lo verás junto al botón Registrar.', 'Observadora' => 'Sin número de afiliación.'];
+    // Qué significa cada tipo y cada participación (no lo que hace el sistema)
+    $descripcionesTipo = [
+        'Universidad' => 'Puede ser matriz, si agrupa a sus facultades y campus; o participar por sí misma, como afiliada (con su número) u observadora.',
+        'Facultad' => 'Escuela o facultad que forma parte de una universidad.',
+        'Campus' => 'Sede de una universidad en otra ubicación.',
+    ];
+    $descripcionesParticipacion = [
+        'Matriz' => 'Universidad que agrupa a sus facultades y campus afiliados. No es miembro por sí misma ni tiene número de afiliación.',
+        'Afiliada' => 'Miembro de ANFECA, con su propio número de afiliación.',
+        'Observadora' => 'Participa en ANFECA como observadora, sin ser miembro y sin número de afiliación.',
+    ];
     $ventanaConError = $errors->any() ? old('_dialogo') : null;
 @endphp
 

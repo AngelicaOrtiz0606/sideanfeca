@@ -10,8 +10,10 @@
  *   otros contactos son filas que se agregan (desde la plantilla) y se quitan;
  *   según el tipo aparecen la lada y la extensión, y el campo pide número o
  *   correo. En los números solo quedan dígitos ("5622 8300" → "56228300").
- * - Las designaciones (al registrar) las maneja el componente Vue
- *   FilasDesignacion (resources/js/components).
+ * - Las designaciones nuevas las maneja el componente Vue FilasDesignacion
+ *   (resources/js/components). Al editar, en las guardadas, la papelera la
+ *   marca para borrar: muestra el motivo, desactiva sus fechas y se deshace
+ *   con el mismo botón.
  * - Grados: se agregan desde una lista (el grado elegido sale de la lista) y
  *   cada uno se quita con su ×.
  * - ¿Ya existe? (al registrar): al dejar de escribir el nombre o la CURP,
@@ -108,6 +110,31 @@ document.querySelectorAll('form[data-persona]').forEach((formulario) => {
             contar();
         });
     }
+
+    // ---- Designaciones guardadas (al editar): la papelera la marca para borrar (pide el motivo) y se puede deshacer ----
+    formulario.querySelectorAll('[data-designacion-actual]').forEach((fila) => {
+        const borrar = fila.querySelector('[data-designacion-borrar]');
+        const papelera = fila.querySelector('[data-designacion-papelera]');
+        const texto = papelera.querySelector('[data-designacion-papelera-texto]');
+        const nombre = texto.querySelector('.solo-lectores').outerHTML;
+        const ajustar = () => {
+            const marcada = borrar.value === '1';
+            mostrar(fila.querySelector('[data-designacion-motivo]'), marcada);
+            fila.querySelectorAll('[data-designacion-fecha]').forEach((fecha) => { fecha.disabled = marcada; });
+            fila.classList.toggle('designacion-actual--borrar', marcada);
+            papelera.setAttribute('aria-pressed', String(marcada));
+            papelera.querySelector('[data-si-no-borrar]').hidden = marcada;
+            papelera.querySelector('[data-si-borrar]').hidden = !marcada;
+            texto.innerHTML = `${marcada ? 'Deshacer: no borrar' : 'Borrar'} ${nombre}`;
+            avisarCambio(formulario);
+        };
+        papelera.addEventListener('click', () => {
+            borrar.value = borrar.value === '1' ? '0' : '1';
+            ajustar();
+            (borrar.value === '1' ? fila.querySelector('[data-designacion-motivo] select') : papelera).focus();
+        });
+        ajustar();
+    });
 
     // ---- ¿Ya existe? (al registrar) ----
     const coincidencias = formulario.querySelector('[data-coincidencias]');
