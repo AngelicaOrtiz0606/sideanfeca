@@ -14,8 +14,9 @@ use Illuminate\Validation\Validator;
  * Nuevo usuario y Editar usuario.
  * - Persona: nombre, apellidos, género y CURP (obligatoria para las cuentas;
  *   no se repite entre personas).
- * - Cuenta: correo (no se repite, sin importar mayúsculas), rol y contraseña
- *   (al crear, obligatoria; al editar, solo si se quiere cambiar).
+ * - Cuenta: correo (no se repite, sin importar mayúsculas), rol y, solo al
+ *   crear, una contraseña temporal. Al editar no se ve ni se cambia: es solo
+ *   de su dueño (Cambiar contraseña, o el enlace para recuperarla).
  * - Nadie cambia su propio rol (para no quedarse sin acceso por error).
  */
 class UsuarioRequest extends FormRequest
@@ -58,7 +59,8 @@ class UsuarioRequest extends FormRequest
                     }
                 }],
             'rol' => ['required', 'integer', Rule::exists('rol', 'rol_id_rol')],
-            'contrasenia' => [$cuenta === null ? 'required' : 'nullable', 'string', 'confirmed', Password::defaults()],
+            // Solo al crear: después, la contraseña es solo de su dueño
+            ...($cuenta === null ? ['contrasenia' => ['required', 'string', 'confirmed', Password::defaults()]] : []),
         ];
     }
 
@@ -116,7 +118,7 @@ class UsuarioRequest extends FormRequest
             'genero' => $this->input('genero'),
             'correo' => $this->input('correo'),
             'rol' => $this->integer('rol'),
-            'contrasenia' => $this->input('contrasenia') ?: null,
+            'contrasenia' => $this->cuenta() === null ? (string) $this->input('contrasenia') : null,
         ];
     }
 

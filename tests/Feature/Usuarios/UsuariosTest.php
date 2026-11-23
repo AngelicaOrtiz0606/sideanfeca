@@ -97,11 +97,14 @@ class UsuariosTest extends TestCase
         $cuenta = $this->crearCuenta(Rol::ADMINISTRADOR, ['usua_correo' => 'laura@anfeca.test'], ['pers_nombre' => 'Laura', 'pers_primer_apellido' => 'Gómez', 'pers_curp' => 'GOML800101MDFRRR09']);
         $superadmin = (int) DB::table('rol')->where('rol_nombre', Rol::SUPERADMINISTRADOR)->value('rol_id_rol');
 
-        $this->como($this->superadmin)->get("/usuarios/{$cuenta->usua_id_usuario}/edit")->assertOk()->assertSee('laura@anfeca.test');
+        $this->como($this->superadmin)->get("/usuarios/{$cuenta->usua_id_usuario}/edit")->assertOk()->assertSee('laura@anfeca.test')
+            ->assertDontSee('name="contrasenia"', false)->assertSee('solo su dueño la cambia');
 
         $this->como($this->superadmin)->put("/usuarios/{$cuenta->usua_id_usuario}", [
             'nombre' => 'Laurita', 'primer_apellido' => 'Gómez', 'segundo_apellido' => '', 'curp' => 'GOML800101MDFRRR09', 'genero' => 'F',
-            'correo' => 'laura@anfeca.test', 'rol' => $superadmin, 'contrasenia' => '', 'contrasenia_confirmation' => '',
+            'correo' => 'laura@anfeca.test', 'rol' => $superadmin,
+            // La contraseña no se cambia desde aquí aunque alguien la mande: es solo de su dueño
+            'contrasenia' => 'Otra-Clave-9', 'contrasenia_confirmation' => 'Otra-Clave-9',
         ])->assertSessionHasNoErrors()->assertSessionHas('estado');
 
         $this->assertSame($superadmin, (int) $cuenta->fresh()->usua_id_rol);
@@ -109,6 +112,7 @@ class UsuariosTest extends TestCase
         $detalles = app(BitacoraService::class)->recientes(1)->first()['detalles'];
         $this->assertContains('Rol: Administrador → Superadministrador', $detalles);
         $this->assertContains('Nombre', $detalles);
+        $this->assertNotContains('Contraseña', $detalles);
     }
 
     public function test_nadie_cambia_su_propio_rol_ni_desactiva_su_cuenta(): void

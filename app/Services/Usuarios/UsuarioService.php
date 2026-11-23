@@ -118,9 +118,10 @@ class UsuarioService
 
     /**
      * Guarda los cambios de la cuenta y de los datos de su persona. La
-     * contraseña solo cambia si se escribió una nueva.
+     * contraseña no se toca aquí: solo la cambia su dueño (Cambiar contraseña)
+     * o la recupera con el enlace de «¿Olvidaste tu contraseña?».
      *
-     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: string, genero: string, correo: string, rol: int, contrasenia: ?string}  $datos
+     * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: string, genero: string, correo: string, rol: int}  $datos
      * @return bool si hubo algún cambio
      */
     public function actualizar(Usuario $actor, int $id, array $datos): bool
@@ -146,20 +147,16 @@ class UsuarioService
             if ((int) $actual->usua_id_rol !== $datos['rol']) {
                 $cambios['Rol'] = [$actual->rol_nombre, DB::table('rol')->where('rol_id_rol', $datos['rol'])->value('rol_nombre')];
             }
-            if (filled($datos['contrasenia'])) {
-                $cambios['Contraseña'] = [null, null];
-            }
 
             if ($cambios === []) {
                 return false;
             }
 
             DB::table('persona')->where('pers_id_persona', $actual->usua_id_persona)->update($nuevos);
-            DB::table('usuario')->where('usua_id_usuario', $id)->update(array_filter([
+            DB::table('usuario')->where('usua_id_usuario', $id)->update([
                 'usua_correo' => $datos['correo'],
                 'usua_id_rol' => $datos['rol'],
-                'usua_contrasenia' => filled($datos['contrasenia']) ? Hash::make($datos['contrasenia']) : null,
-            ]));
+            ]);
 
             $idBitacora = $this->bitacora($actor, 'Modificacion', 'USUARIO', $id);
             foreach ($cambios as $campo => [$anterior, $nuevo]) {

@@ -10,8 +10,7 @@
 
     regla="nueva" muestra la lista de requisitos (8 caracteres, mayúscula, número
     y carácter especial) y la va marcando. igual-a="otro_id" avisa si coincide
-    con otro campo. :opcional="true" no la pide (por ejemplo, al editar una
-    cuenta: vacía no cambia) y :obligatorio="true" pone el asterisco rojo.
+    con otro campo. :obligatorio="true" pone el asterisco rojo.
 --}}
 @props([
     'id',
@@ -21,7 +20,6 @@
     'enlace' => null,
     'regla' => null,
     'igualA' => null,
-    'opcional' => false,
     'obligatorio' => false,
 ])
 
@@ -43,7 +41,7 @@
 
 <div class="campo">
     <div class="campo__encabezado">
-        <label for="{{ $id }}" class="campo__etiqueta">{{ $etiqueta }} @if ($obligatorio && ! $opcional)<x-obligatorio />@endif</label>
+        <label for="{{ $id }}" class="campo__etiqueta">{{ $etiqueta }} @if ($obligatorio)<x-obligatorio />@endif</label>
         {{ $enlace }}
     </div>
 
@@ -55,7 +53,7 @@
             class="campo__entrada"
             autocomplete="{{ $autocomplete }}"
             maxlength="{{ $regla === 'nueva' ? 72 : 255 }}"
-            @unless ($opcional) required @endunless
+            required
             data-contrasenia
             data-aviso="{{ $id }}-mayusculas"
             @if ($regla) data-regla="{{ $regla }}" @endif

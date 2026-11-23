@@ -103,7 +103,7 @@
 
         {{-- 2. Cuenta --}}
         <x-seccion-formulario id="seccion-cuenta" numero="2" titulo="Cuenta"
-                              :descripcion="$esNueva ? 'Con estos datos entra al sistema. Dale una contraseña temporal; al entrar la cambia en «Cambiar contraseña».' : 'Deja la contraseña vacía para no cambiarla.'">
+                              :descripcion="$esNueva ? 'Con estos datos entra al sistema. Dale una contraseña temporal; al entrar la cambia en «Cambiar contraseña».' : 'Su contraseña no se ve ni se cambia aquí: solo su dueño la cambia en «Cambiar contraseña». Si la olvidó, la recupera con «¿Olvidaste tu contraseña?» al entrar.'">
             <div class="formulario__rejilla">
                 <div class="campo campo--mitad">
                     <label for="usuario-correo" class="campo__etiqueta">Correo para entrar <x-obligatorio /></label>
@@ -130,16 +130,19 @@
                 </fieldset>
             </div>
 
-            <div class="formulario__rejilla">
-                <div class="campo--mitad">
-                    <x-campo-contrasenia id="contrasenia" name="contrasenia" :etiqueta="$esNueva ? 'Contraseña temporal' : 'Contraseña nueva (opcional)'"
-                                         autocomplete="new-password" regla="nueva" :opcional="! $esNueva" :obligatorio="true" />
+            {{-- La contraseña solo se pone al crear la cuenta; después es solo de su dueño --}}
+            @if ($esNueva)
+                <div class="formulario__rejilla">
+                    <div class="campo--mitad">
+                        <x-campo-contrasenia id="contrasenia" name="contrasenia" etiqueta="Contraseña temporal"
+                                             autocomplete="new-password" regla="nueva" :obligatorio="true" />
+                    </div>
+                    <div class="campo--mitad">
+                        <x-campo-contrasenia id="contrasenia_confirmation" name="contrasenia_confirmation" etiqueta="Confirma la contraseña"
+                                             autocomplete="new-password" igual-a="contrasenia" :obligatorio="true" />
+                    </div>
                 </div>
-                <div class="campo--mitad">
-                    <x-campo-contrasenia id="contrasenia_confirmation" name="contrasenia_confirmation" etiqueta="Confirma la contraseña"
-                                         autocomplete="new-password" igual-a="contrasenia" :opcional="! $esNueva" :obligatorio="true" />
-                </div>
-            </div>
+            @endif
         </x-seccion-formulario>
 
         <div class="tarjeta cierre-registro">
