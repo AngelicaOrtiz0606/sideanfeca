@@ -18,6 +18,8 @@ use App\Http\Controllers\PantallaPendienteController;
 use App\Http\Controllers\Personas\PersonaBorradoController;
 use App\Http\Controllers\Personas\PersonaController;
 use App\Http\Controllers\Puestos\PuestoController;
+use App\Http\Controllers\Usuarios\CuentaController;
+use App\Http\Controllers\Usuarios\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 // Los identificadores en las direcciones son siempre números
@@ -167,8 +169,14 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
             ->names('grados');
     });
 
-    Route::get('/usuarios', PantallaPendienteController::class)
-        ->defaults('titulo', 'Usuarios')
-        ->middleware(Privilegio::GestionarUsuarios->middleware())
-        ->name('usuarios.index');
+    // Usuarios (solo superadministrador): cuentas de las personas; no se borran, se desactivan
+    Route::middleware(Privilegio::GestionarUsuarios->middleware())->group(function () {
+        Route::get('/usuarios/coincidencias', [UsuarioController::class, 'coincidencias'])->name('usuarios.coincidencias');
+        Route::patch('/usuarios/{usuario}/estado', [UsuarioController::class, 'cambiarEstado'])->whereNumber('usuario')->name('usuarios.estado');
+        Route::resource('usuarios', UsuarioController::class)->only(['index', 'create', 'store', 'edit', 'update'])->whereNumber('usuario');
+    });
+
+    // Cambiar contraseña: cualquier cuenta, la propia
+    Route::get('/cuenta/contrasenia', [CuentaController::class, 'editarContrasenia'])->name('cuenta.contrasenia');
+    Route::put('/cuenta/contrasenia', [CuentaController::class, 'actualizarContrasenia'])->name('cuenta.contrasenia.actualizar');
 });

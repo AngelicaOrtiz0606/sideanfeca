@@ -25,6 +25,7 @@
  *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
  *   copiar-correos.js           copiar los correos de un directorio
+ *   usuario-formulario.js       cuenta de usuario: CURP y aviso de persona ya registrada
  *
  * vue.js va primero: monta las partes hechas con Vue (por ejemplo, las filas
  * de designación) antes de que la validación revise los campos.
@@ -50,3 +51,4 @@ import './modulos/numero-sugerido.js';
 import './modulos/puesto-formulario.js';
 import './modulos/persona-formulario.js';
 import './modulos/copiar-correos.js';
+import './modulos/usuario-formulario.js';

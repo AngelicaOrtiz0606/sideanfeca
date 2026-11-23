@@ -169,12 +169,13 @@ class LayoutTest extends TestCase
             ->assertSee('Usuarios');
     }
 
-    public function test_los_modulos_que_aun_no_existen_no_son_enlaces(): void
+    public function test_todos_los_modulos_del_menu_ya_son_enlaces(): void
     {
+        // Con Cambiar contraseña ya no queda ninguna opción en gris (sin pantalla todavía)
         $this->actingAs($this->crearCuenta(Rol::SUPERADMINISTRADOR))->get('/inicio')
-            ->assertSee('(próximamente)')
-            ->assertSee('aria-disabled="true"', false)
-            ->assertSee('Las opciones en gris se activan conforme se terminan sus módulos.');
+            ->assertDontSee('(próximamente)')
+            ->assertDontSee('menu-lateral__enlace--pendiente', false)
+            ->assertDontSee('Las opciones en gris se activan conforme se terminan sus módulos.');
     }
 
     public function test_un_privilegio_desactivado_oculta_su_enlace(): void
