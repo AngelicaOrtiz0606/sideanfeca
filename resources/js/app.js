@@ -24,6 +24,7 @@
  *   persona-formulario.js       formulario de persona: pertenencia, aviso de CURP y filas de contacto
  *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
+ *   copiar-correos.js           copiar los correos de un directorio
  *
  * vue.js va primero: monta las partes hechas con Vue (por ejemplo, las filas
  * de designación) antes de que la validación revise los campos.
@@ -48,3 +49,4 @@ import './modulos/pestanas.js';
 import './modulos/numero-sugerido.js';
 import './modulos/puesto-formulario.js';
 import './modulos/persona-formulario.js';
+import './modulos/copiar-correos.js';

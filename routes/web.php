@@ -9,6 +9,7 @@ use App\Http\Controllers\Catalogos\CoordinacionController;
 use App\Http\Controllers\Catalogos\NivelAcademicoController;
 use App\Http\Controllers\Catalogos\ZonaController;
 use App\Http\Controllers\Designaciones\DesignacionController;
+use App\Http\Controllers\Directorios\ConsultaDirectorioController;
 use App\Http\Controllers\Directorios\OrdenDirectorioController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
@@ -113,6 +114,12 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
             ->whereNumber('designacion')->name('personas.designaciones.terminar');
         Route::delete('/personas/{persona}/designaciones/{designacion}', [DesignacionController::class, 'destroy'])
             ->whereNumber('designacion')->name('personas.designaciones.destroy');
+    });
+
+    // Consultar directorios (M10): cada directorio en un año, para ver, copiar correos o exportar a CSV
+    Route::middleware(Privilegio::VerDirectorios->middleware())->group(function () {
+        Route::get('/directorios', [ConsultaDirectorioController::class, 'index'])->name('directorios.index');
+        Route::get('/directorios/csv', [ConsultaDirectorioController::class, 'csv'])->name('directorios.csv');
     });
 
     // Directorios de puestos (M7): qué puestos aparecen en cada uno y en qué orden
