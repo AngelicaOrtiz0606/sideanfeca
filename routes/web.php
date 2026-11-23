@@ -3,6 +3,7 @@
 use App\Enums\Privilegio;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
+use App\Http\Controllers\BitacoraController;
 use App\Http\Controllers\Catalogos\CargoController;
 use App\Http\Controllers\Catalogos\CodigoPostalController;
 use App\Http\Controllers\Catalogos\CoordinacionController;
@@ -14,7 +15,6 @@ use App\Http\Controllers\Directorios\OrdenDirectorioController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Instituciones\InstitucionController;
 use App\Http\Controllers\Organizaciones\OrganizacionController;
-use App\Http\Controllers\PantallaPendienteController;
 use App\Http\Controllers\Personas\PersonaBorradoController;
 use App\Http\Controllers\Personas\PersonaController;
 use App\Http\Controllers\Puestos\PuestoController;
@@ -64,10 +64,11 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
 
     // Pantallas con privilegio: quien no lo tiene recibe 403.
     // Mientras su módulo no exista, muestran la pantalla provisional.
-    Route::get('/bitacora', PantallaPendienteController::class)
-        ->defaults('titulo', 'Bitácora')
-        ->middleware(Privilegio::VerBitacora->middleware())
-        ->name('bitacora.index');
+    // Bitácora completa (solo superadministrador): solo se consulta
+    Route::middleware(Privilegio::VerBitacora->middleware())->group(function () {
+        Route::get('/bitacora', [BitacoraController::class, 'index'])->name('bitacora.index');
+        Route::get('/bitacora/csv', [BitacoraController::class, 'csv'])->name('bitacora.csv');
+    });
 
     // Instituciones (M4): pantalla propia para registrar, consultar y editar
     Route::middleware(Privilegio::GestionarInstituciones->middleware())->group(function () {

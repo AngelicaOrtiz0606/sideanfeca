@@ -387,12 +387,20 @@
     outline: none;
 }
 
-/* Filtro en uso */
+/* Fecha dentro de un filtro: sin la flecha de las listas */
+.filtros__selector--fecha .campo__entrada {
+    padding-right: 0.75rem;
+    background-image: none;
+}
+
+/* Filtro en uso (las fechas lo marcan desde el servidor) */
+.filtros__selector--en-uso,
 .filtros__selector:has(option:checked:not([value=''])) {
     border-color: var(--color-secundario);
     background: #e7edf6;
 }
 
+.filtros__selector--en-uso .filtros__etiqueta,
 .filtros__selector:has(option:checked:not([value=''])) .filtros__etiqueta {
     color: var(--color-secundario);
 }

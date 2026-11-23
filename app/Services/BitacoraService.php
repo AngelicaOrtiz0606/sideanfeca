@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Services\Puestos\PuestoService;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Lectura de la bitácora (BITACORA y BITACORA_DETALLE), solo consulta.
@@ -15,7 +18,8 @@ use Illuminate\Support\Facades\DB;
  * Los nombres se resuelven desde la ficha de cada registro; si ya no existe
  * (por ejemplo, tras ARCO), se dice "una persona eliminada (#n)".
  *
- * La usan la pantalla de inicio y, en M9, la consulta completa de la bitácora.
+ * La usan la pantalla de inicio (los últimos movimientos) y la consulta
+ * completa de la bitácora (con filtros, de 10 en 10 y en CSV).
  */
 class BitacoraService
 {
@@ -139,13 +143,99 @@ class BitacoraService
     }
 
     /**
-     * Convierte filas de BITACORA en movimientos listos para mostrar.
-     * La usará también la pantalla completa de bitácora (M9).
+     * La bitácora completa con filtros, de la más reciente a la más antigua,
+     * de 10 en 10. Cada movimiento trae todos sus cambios.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string}  $filtros
+     */
+    public function listado(array $filtros, int $porPagina = 10): LengthAwarePaginator
+    {
+        $pagina = $this->filtrada($filtros)->paginate($porPagina)->withQueryString();
+
+        return $pagina->setCollection($this->describir($pagina->getCollection(), todos: true));
+    }
+
+    /**
+     * Todos los movimientos filtrados, por partes (para el CSV): $hacer recibe
+     * cada parte ya descrita.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string}  $filtros
+     * @param  callable(Collection<int, array<string, mixed>>): void  $hacer
+     */
+    public function porPartes(array $filtros, callable $hacer): void
+    {
+        $this->filtrada($filtros)->chunk(500, fn (Collection $parte) => $hacer($this->describir($parte, todos: true)));
+    }
+
+    /**
+     * Acciones para el filtro: valor en la base => como se dice.
+     *
+     * @return array<string, string>
+     */
+    public function acciones(): array
+    {
+        return self::ACCIONES;
+    }
+
+    /**
+     * Qué se modificó, para el filtro: tabla => nombre en plural ("Personas", "Cuentas").
+     *
+     * @return array<string, string>
+     */
+    public function tablas(): array
+    {
+        return collect(self::TABLAS)
+            ->map(fn (array $nombres) => Str::ucfirst(preg_replace('/^(el|la|los|las) /u', '', $nombres[1])))
+            ->sort()
+            ->all();
+    }
+
+    /**
+     * Filtros: texto (quién lo hizo, la persona o cuenta de la que se trata,
+     * o el texto de un cambio, como el nombre de un puesto), acción, tabla y
+     * rango de fechas.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string}  $filtros
+     */
+    private function filtrada(array $filtros): Builder
+    {
+        $nombre = "translate(lower(concat_ws(' ', pe.pers_nombre, pe.pers_primer_apellido, pe.pers_segundo_apellido)), 'áéíóúü', 'aeiouu') like ?";
+        $texto = trim((string) ($filtros['texto'] ?? ''));
+        $patron = '%'.addcslashes(strtr(mb_strtolower($texto), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u']), '%_\\').'%';
+
+        return DB::table('bitacora as b')
+            ->select('b.*')
+            ->when($texto !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                // Quién lo hizo
+                ->whereExists(fn (Builder $e) => $e->from('usuario as u')->join('persona as pe', 'pe.pers_id_persona', '=', 'u.usua_id_persona')
+                    ->whereColumn('u.usua_id_usuario', 'b.bita_id_usuario')->whereRaw($nombre, [$patron]))
+                // La persona de la que se trata
+                ->orWhereExists(fn (Builder $e) => $e->from('persona as pe')->where('b.bita_tabla', 'PERSONA')
+                    ->whereColumn('pe.pers_id_persona', 'b.bita_referencia')->whereRaw($nombre, [$patron]))
+                // La cuenta de la que se trata
+                ->orWhereExists(fn (Builder $e) => $e->from('usuario as u')->join('persona as pe', 'pe.pers_id_persona', '=', 'u.usua_id_persona')
+                    ->where('b.bita_tabla', 'USUARIO')->whereColumn('u.usua_id_usuario', 'b.bita_referencia')->whereRaw($nombre, [$patron]))
+                // El texto de un cambio (puestos, designaciones, nombres de catálogos...)
+                ->orWhereExists(fn (Builder $e) => $e->from('bitacora_detalle as d')->whereColumn('d.bide_id_bitacora', 'b.bita_id_bitacora')
+                    ->where(fn (Builder $c) => $c
+                        ->whereRaw("translate(lower(coalesce(d.bide_nuevo, '')), 'áéíóúü', 'aeiouu') like ?", [$patron])
+                        ->orWhereRaw("translate(lower(coalesce(d.bide_anterior, '')), 'áéíóúü', 'aeiouu') like ?", [$patron])))))
+            ->when($filtros['accion'] ?? null, fn (Builder $q, string $accion) => $q->where('b.bita_accion', $accion))
+            ->when($filtros['tabla'] ?? null, fn (Builder $q, string $tabla) => $q->where('b.bita_tabla', $tabla))
+            ->when($filtros['desde'] ?? null, fn (Builder $q, string $desde) => $q->where('b.bita_fecha_hora', '>=', $desde))
+            ->when($filtros['hasta'] ?? null, fn (Builder $q, string $hasta) => $q->where('b.bita_fecha_hora', '<', Carbon::parse($hasta)->addDay()->toDateString()))
+            ->orderByDesc('b.bita_fecha_hora')
+            ->orderByDesc('b.bita_id_bitacora');
+    }
+
+    /**
+     * Convierte filas de BITACORA en movimientos listos para mostrar. Con
+     * $todos trae todos sus cambios (si no, los primeros y cuántos faltan).
      *
      * @param  Collection<int, object>  $movimientos
      * @return Collection<int, array{fecha: Carbon, quien: string, accion: string, tono: string, verbo: string, objeto: string, motivo: ?string, detalles: array<int, string>, mas_detalles: int}>
      */
-    public function describir(Collection $movimientos): Collection
+    public function describir(Collection $movimientos, bool $todos = false): Collection
     {
         $cuentas = $this->nombresDeCuentas(
             $movimientos->pluck('bita_id_usuario')
@@ -167,7 +257,10 @@ class BitacoraService
         $nombres = $this->nombresDeReferencias($movimientos, $detalles);
         $contextos = $this->contextos($movimientos);
 
-        return $movimientos->map(function (object $movimiento) use ($cuentas, $personas, $detalles, $nombres, $contextos): array {
+        // En el inicio se muestran unos cuantos cambios; en la bitácora completa, todos
+        $maximo = $todos ? PHP_INT_MAX : self::DETALLES_MAXIMOS;
+
+        return $movimientos->map(function (object $movimiento) use ($cuentas, $personas, $detalles, $nombres, $contextos, $maximo): array {
             $quien = $cuentas[$movimiento->bita_id_usuario] ?? "Cuenta #{$movimiento->bita_id_usuario}";
             $cambios = ($detalles[$movimiento->bita_id_bitacora] ?? collect())->map(
                 fn (object $d): string => $this->describirCambio($d, $movimiento, $nombres)
@@ -184,8 +277,8 @@ class BitacoraService
                     : (self::VERBOS[$movimiento->bita_accion] ?? mb_strtolower($movimiento->bita_accion)),
                 'objeto' => $this->describirRegistro($movimiento, $cuentas, $personas, $nombres, $contextos, $detalles[$movimiento->bita_id_bitacora] ?? collect()),
                 'motivo' => $movimiento->bita_motivo,
-                'detalles' => $cambios->take(self::DETALLES_MAXIMOS)->values()->all(),
-                'mas_detalles' => max(0, $cambios->count() - self::DETALLES_MAXIMOS),
+                'detalles' => $cambios->take($maximo)->values()->all(),
+                'mas_detalles' => max(0, $cambios->count() - $maximo),
             ];
         });
     }

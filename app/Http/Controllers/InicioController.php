@@ -14,12 +14,6 @@ use Illuminate\View\View;
  */
 class InicioController extends Controller
 {
-    /**
-     * ¿Ya existe la consulta completa de la bitácora (M9)? Mientras no, el
-     * inicio avisa que hay más movimientos en lugar de mostrar "Ver más".
-     */
-    private const CONSULTA_COMPLETA_DE_BITACORA = false;
-
     public function __invoke(Request $request, InicioService $inicio): View
     {
         /** @var Usuario $cuenta */
@@ -36,7 +30,6 @@ class InicioController extends Controller
             'verBitacora' => $verBitacora,
             'movimientos' => $bitacora['movimientos'],
             'hayMasMovimientos' => $bitacora['hayMas'],
-            'consultaCompleta' => self::CONSULTA_COMPLETA_DE_BITACORA,
         ]);
     }
 }

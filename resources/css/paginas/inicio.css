@@ -201,6 +201,17 @@
     list-style: none;
 }
 
+/* La misma lista en la bitácora completa: dentro de su tarjeta, con orilla */
+.bitacora-completa {
+    padding: 1rem 1.5rem;
+}
+
+@media (width < 40rem) {
+    .bitacora-completa {
+        padding: 0.75rem 1rem;
+    }
+}
+
 .actividad__item {
     display: flex;
     align-items: flex-start;

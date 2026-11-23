@@ -111,7 +111,7 @@ class InicioTest extends TestCase
 
         $this->actingAs($cuenta)->get('/inicio')
             ->assertViewHas('hayMasMovimientos', true)
-            ->assertSee('Se muestran los 5 movimientos más recientes.');
+            ->assertSee('Ver toda la bitácora');
     }
 
     public function test_con_cinco_movimientos_o_menos_no_ofrece_ver_mas(): void
@@ -124,7 +124,7 @@ class InicioTest extends TestCase
 
         $this->actingAs($cuenta)->get('/inicio')
             ->assertViewHas('hayMasMovimientos', false)
-            ->assertDontSee('Se muestran los 5 movimientos más recientes.');
+            ->assertDontSee('Ver toda la bitácora');
     }
 
     public function test_un_registro_de_persona_borrada_dice_persona_eliminada(): void
