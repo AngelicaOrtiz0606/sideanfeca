@@ -74,12 +74,21 @@ class InicioTest extends TestCase
             ->assertViewHas('contadores', fn (array $c): bool => $c['afiliadas'] === 1);
     }
 
-    public function test_el_admin_no_ve_el_bloque_de_bitacora_ni_vacio(): void
+    public function test_el_admin_ve_solo_su_propia_actividad(): void
     {
-        $this->actingAs($this->crearCuenta(Rol::ADMINISTRADOR))->get('/inicio')
-            ->assertDontSee('Actividad reciente')
-            ->assertDontSee('Todavía no hay movimientos registrados.')
-            ->assertViewHas('movimientos', fn ($movimientos): bool => $movimientos->isEmpty());
+        $admin = $this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => 'Luis', 'pers_primer_apellido' => 'Ramírez']);
+        $otra = $this->crearCuenta(Rol::SUPERADMINISTRADOR);
+
+        $this->actingAs($admin)->get('/inicio')
+            ->assertSee('Mi actividad reciente')
+            ->assertSee('Todavía no has hecho cambios en el sistema.')
+            ->assertDontSee('>Actividad reciente<', false);
+
+        DB::select('select bitacora_registrar(?, ?, ?, ?, ?)', [$admin->usua_id_usuario, 'Registro', 'ZONA_REGIONAL', 1, null]);
+        DB::select('select bitacora_registrar(?, ?, ?, ?, ?)', [$otra->usua_id_usuario, 'Registro', 'ZONA_REGIONAL', 2, null]);
+
+        $this->actingAs($admin)->get('/inicio')
+            ->assertViewHas('movimientos', fn ($movimientos): bool => $movimientos->count() === 1 && $movimientos->first()['quien'] === 'Luis Ramírez');
     }
 
     public function test_el_superadmin_ve_el_bloque_vacio_si_no_hay_movimientos(): void
@@ -111,7 +120,7 @@ class InicioTest extends TestCase
 
         $this->actingAs($cuenta)->get('/inicio')
             ->assertViewHas('hayMasMovimientos', true)
-            ->assertSee('Se muestran los 5 movimientos más recientes.');
+            ->assertSee('Ver toda la bitácora');
     }
 
     public function test_con_cinco_movimientos_o_menos_no_ofrece_ver_mas(): void
@@ -124,7 +133,7 @@ class InicioTest extends TestCase
 
         $this->actingAs($cuenta)->get('/inicio')
             ->assertViewHas('hayMasMovimientos', false)
-            ->assertDontSee('Se muestran los 5 movimientos más recientes.');
+            ->assertDontSee('Ver toda la bitácora');
     }
 
     public function test_un_registro_de_persona_borrada_dice_persona_eliminada(): void

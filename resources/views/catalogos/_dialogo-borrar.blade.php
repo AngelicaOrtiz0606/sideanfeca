@@ -3,9 +3,14 @@
     - Si se puede borrar: pide el motivo (la bitácora lo exige).
     - Si no se puede: explica por qué (data-bloqueo del botón) y no deja borrar.
     Parámetros: $motivos, $accion (dirección para borrar, si el servidor la reabre
-    tras un error), $titulo y $abrir (true si hubo error al borrar).
+    tras un error), $titulo, $abrir (true si hubo error al borrar) y, si hay dos
+    en la misma página, $dialogo (por omisión "dialogo-borrar"). No se llama $id
+    porque las listas usan $id en cada fila y Blade lo pasaría aquí sin querer.
 --}}
-<dialog id="dialogo-borrar" class="dialogo" aria-labelledby="dialogo-borrar-titulo" @if ($abrir) data-abrir-al-cargar @endif>
+@php
+    $dialogo ??= 'dialogo-borrar';
+@endphp
+<dialog id="{{ $dialogo }}" class="dialogo" aria-labelledby="{{ $dialogo }}-titulo" @if ($abrir) data-abrir-al-cargar @endif>
     <div data-si-bloqueo hidden>
         <h2 class="dialogo__titulo">No se puede borrar</h2>
         <p class="dialogo__texto dialogo__texto--separado" data-texto-bloqueo></p>
@@ -19,16 +24,17 @@
         @method('DELETE')
         <input type="hidden" name="_id" value="{{ old('_id') }}">
 
-        <h2 id="dialogo-borrar-titulo" class="dialogo__titulo" data-dialogo-titulo>{{ $titulo }}</h2>
-        <p class="dialogo__texto">No se puede deshacer. Queda en la bitácora con su motivo.</p>
+        <h2 id="{{ $dialogo }}-titulo" class="dialogo__titulo" data-dialogo-titulo>{{ $titulo }}</h2>
+        {{-- El botón Borrar puede cambiar este texto con data-texto (por ejemplo, si también se borran sus puestos vacíos) --}}
+        <p class="dialogo__texto" data-dialogo-texto>No se puede deshacer. Queda en la bitácora con su motivo.</p>
 
         @if ($abrir)
             <x-errores-formulario />
         @endif
 
         <div class="campo">
-            <label for="motivo" class="campo__etiqueta">Motivo <x-obligatorio /></label>
-            <select id="motivo" name="motivo" class="campo__entrada" required @if ($abrir && $errors->has('motivo')) aria-invalid="true" @endif>
+            <label for="{{ $dialogo }}-motivo" class="campo__etiqueta">Motivo <x-obligatorio /></label>
+            <select id="{{ $dialogo }}-motivo" name="motivo" class="campo__entrada" required @if ($abrir && $errors->has('motivo')) aria-invalid="true" @endif>
                 <option value="">Elige un motivo</option>
                 @foreach ($motivos as $motivo)
                     <option value="{{ $motivo }}" @selected(old('motivo') === $motivo)>{{ $motivo }}</option>

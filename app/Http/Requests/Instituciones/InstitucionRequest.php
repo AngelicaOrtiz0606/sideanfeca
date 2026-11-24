@@ -20,49 +20,10 @@ use Illuminate\Validation\Rule;
  *
  * Al editar, la participación no se cambia aquí (tiene su propia acción con
  * historial): se usa la que la institución tiene hoy.
- *
- * La consulta edita por secciones (_seccion): cada ventana envía solo sus
- * campos y el resto se toma de la base, así una sección nunca cambia otra.
  */
 class InstitucionRequest extends FormRequest
 {
-    /** Campos de cada sección de la consulta */
-    public const SECCIONES = [
-        'identificacion' => ['tipo', 'universidad', 'sector', 'numero'],
-        'ubicacion' => ['colonia', 'calle', 'num_ext', 'num_int', 'zona'],
-        'web' => ['sitio_web'],
-        'razon' => ['razon_social'],
-    ];
-
     private ?object $actual = null;
-
-    protected function prepareForValidation(): void
-    {
-        $seccion = (string) $this->input('_seccion');
-        $actual = $this->actual();
-
-        if ($actual === null || ! array_key_exists($seccion, self::SECCIONES)) {
-            return;
-        }
-
-        $domicilio = $actual->domicilio;
-        $actuales = [
-            'tipo' => $actual->tipo,
-            'universidad' => $actual->universidad_id,
-            'sector' => $actual->sector,
-            'numero' => $actual->numero,
-            'colonia' => $domicilio?->colonia_id,
-            'calle' => $domicilio?->calle,
-            'num_ext' => $domicilio?->num_ext,
-            'num_int' => $domicilio?->num_int,
-            'zona' => $actual->zona_id,
-            'sitio_web' => $actual->sitio_web,
-            'razon_social' => $actual->nombre,
-        ];
-
-        // Lo que no es de la sección se toma de la base (aunque se haya enviado)
-        $this->merge(array_diff_key($actuales, array_flip(self::SECCIONES[$seccion])));
-    }
 
     /**
      * La institución tal como está hoy (solo al editar).
@@ -72,18 +33,6 @@ class InstitucionRequest extends FormRequest
         $id = $this->idInstitucion();
 
         return $id === null ? null : ($this->actual ??= app(InstitucionService::class)->buscar($id));
-    }
-
-    public function seccion(): ?string
-    {
-        $seccion = (string) $this->input('_seccion');
-
-        return array_key_exists($seccion, self::SECCIONES) ? $seccion : null;
-    }
-
-    public function authorize(): bool
-    {
-        return true; // El privilegio ya lo revisa la ruta (can:gestionar_instituciones)
     }
 
     /**
@@ -119,9 +68,9 @@ class InstitucionRequest extends FormRequest
             'sitio_web' => ['nullable', 'string', 'max:200', 'url:http,https'],
             'zona' => [Rule::requiredIf($participacion !== 'Matriz'), 'nullable', 'integer', Rule::exists('zona_regional', 'zore_id_zona_regional')],
             'colonia' => [Rule::requiredIf($conDomicilio), 'nullable', 'integer', Rule::exists('colonia', 'colo_id_colonia')],
-            'calle' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:60'],
-            'num_ext' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:10'],
-            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:10'],
+            'calle' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:100'],
+            'num_ext' => [Rule::requiredIf($conDomicilio), 'nullable', 'string', new TextoSeguro, 'max:20'],
+            'num_int' => ['nullable', 'string', new TextoSeguro, 'max:60'],
         ];
     }
 

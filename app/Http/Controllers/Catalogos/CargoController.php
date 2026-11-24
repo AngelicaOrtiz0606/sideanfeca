@@ -7,6 +7,7 @@ use App\Http\Requests\Catalogos\CargoRequest;
 use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Models\Cargo;
 use App\Services\Catalogos\CargoService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,10 +21,20 @@ class CargoController extends Controller
 {
     public function __construct(private readonly CargoService $cargos) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
+        $cargos = $this->cargos->listado();
+        $filtros = [
+            'texto' => trim((string) $request->query('texto')) ?: null,
+            'nivel' => in_array($request->query('nivel'), Cargo::NIVELES, true) ? $request->query('nivel') : null,
+        ];
+        $filtrados = Paginacion::buscar($cargos, $filtros['texto'], fn ($c) => "{$c->carg_nombre_m} {$c->carg_nombre_f}")
+            ->when($filtros['nivel'], fn ($lista, $nivel) => $lista->where('carg_nivel', $nivel)->values());
+
         return view('catalogos.cargos.index', [
-            'cargos' => $this->cargos->listado(),
+            'cargos' => $cargos,
+            'pagina' => Paginacion::de($filtrados),
+            'filtros' => $filtros,
             'niveles' => Cargo::NIVELES,
             'motivos' => EliminarRequest::MOTIVOS,
         ]);

@@ -68,6 +68,7 @@ class Menu extends Component
         [
             'titulo' => 'Cuenta',
             'enlaces' => [
+                ['etiqueta' => 'Mi actividad', 'ruta' => 'actividad.index', 'privilegio' => null, 'icono' => 'historial'],
                 ['etiqueta' => 'Cambiar contraseña', 'ruta' => 'cuenta.contrasenia', 'privilegio' => null, 'icono' => 'llave'],
             ],
         ],

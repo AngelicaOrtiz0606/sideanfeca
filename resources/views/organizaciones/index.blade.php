@@ -35,15 +35,14 @@
 
     <x-aviso-estado />
 
-    <section class="tarjeta tarjeta--tabla" aria-label="Lista de organizaciones" data-filtro-tabla>
+    <section class="tarjeta tarjeta--tabla" aria-label="Lista de organizaciones">
         @if ($organizaciones->isEmpty())
             <p class="vacio vacio--en-tabla">Todavía no hay organizaciones. Registra la primera con <strong>Nueva organización</strong>.</p>
         @else
-            <div class="filtros">
-                <label for="buscar-organizacion" class="solo-lectores">Buscar organización</label>
-                <input id="buscar-organizacion" type="search" class="campo__entrada filtros__buscar" placeholder="Buscar por nombre o entidad" data-filtro-texto>
-            </div>
-
+            <x-filtros-lista ruta="organizaciones.index" :filtros="$filtros" id="buscar-organizacion" placeholder="Buscar por nombre o entidad" />
+            @if ($pagina->isEmpty())
+                <p class="vacio vacio--en-tabla">Ninguna organización coincide con la búsqueda.</p>
+            @else
             <table class="tabla">
                 <thead>
                     <tr>
@@ -55,12 +54,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($organizaciones as $organizacion)
+                    @foreach ($pagina as $organizacion)
                         @php
                             $id = $organizacion->id;
                         @endphp
-                        <tr @class(['tabla__fila--inactiva' => ! $organizacion->activa])
-                            data-filtro-fila data-texto="{{ $organizacion->nombre }} {{ $organizacion->municipio }} {{ $organizacion->entidad }}">
+                        <tr @class(['tabla__fila--inactiva' => ! $organizacion->activa])>
                             <th scope="row" data-etiqueta="Organización">
                                 <span class="tabla__principal">{{ $organizacion->nombre }}</span>
                                 @if ($organizacion->sitio_web)
@@ -124,7 +122,9 @@
                     @endforeach
                 </tbody>
             </table>
-            <p class="vacio vacio--en-tabla" data-filtro-vacio hidden>Ninguna organización coincide con la búsqueda.</p>
+
+            <x-paginacion :paginas="$pagina" />
+            @endif
         @endif
     </section>
 

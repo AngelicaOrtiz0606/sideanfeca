@@ -52,10 +52,11 @@ class OrganizacionService
                 'e.enfe_nombre as entidad',
             ])
             ->selectSub(fn ($q) => $q->from('persona')->whereColumn('pers_id_organizacion', 'o.orga_id_organizacion')->selectRaw('count(*)'), 'personas')
+            ->selectSub(fn ($q) => $q->from('puesto')->whereColumn('pues_id_organizacion', 'o.orga_id_organizacion')->selectRaw('count(*)'), 'puestos')
             ->orderBy('o.orga_nombre')
             ->get()
             ->each(function (object $organizacion): void {
-                $organizacion->motivo_para_no_borrar = $this->explicar((int) $organizacion->personas);
+                $organizacion->motivo_para_no_borrar = $this->explicar((int) $organizacion->personas, (int) $organizacion->puestos);
             });
     }
 
@@ -133,7 +134,7 @@ class OrganizacionService
 
     public function motivoParaNoBorrar(int $id): ?string
     {
-        return $this->explicar(DB::table('persona')->where('pers_id_organizacion', $id)->count());
+        return $this->explicar(DB::table('persona')->where('pers_id_organizacion', $id)->count(), DB::table('puesto')->where('pues_id_organizacion', $id)->count());
     }
 
     /**
@@ -158,9 +159,11 @@ class OrganizacionService
         });
     }
 
-    private function explicar(int $personas): ?string
+    private function explicar(int $personas, int $puestos = 0): ?string
     {
         return match (true) {
+            $personas === 0 && $puestos > 0 => 'No se puede borrar porque tiene '.($puestos === 1 ? 'un puesto' : "{$puestos} puestos")
+                .' (por ejemplo, su Director General). Si ya no participa, desactívala: su historial se conserva.',
             $personas === 0 => null,
             $personas === 1 => 'No se puede borrar porque 1 persona pertenece a esta organización. Si ya no participa, desactívala: su historial se conserva.',
             default => "No se puede borrar porque {$personas} personas pertenecen a esta organización. Si ya no participa, desactívala: su historial se conserva.",

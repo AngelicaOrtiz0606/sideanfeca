@@ -36,8 +36,13 @@ class CargosTest extends TestCase
             ->assertOk()
             ->assertSeeText('Presidenta')
             ->assertSee('nivel-cargo--institucional', false)
-            ->assertSee('data-filtro-valor="Regional"', false)
-            ->assertSee('data-grupo="Nacional"', false);
+            ->assertSee('href="'.route('cargos.index', ['nivel' => 'Regional']).'"', false);
+
+        // Filtros en el servidor: por nivel y por texto (sin importar acentos ni mayúsculas).
+        // Se revisan solo las filas: el aviso de nombre repetido conoce todos los cargos a propósito.
+        $this->assertSame(['Director'], $this->filas('/cargos?nivel=Institucional'));
+        $this->assertSame(['Presidente'], $this->filas(route('cargos.index', ['texto' => 'PRESIDÉNTA'])));
+        $this->actingAs($this->admin)->get('/cargos?texto=tesorero')->assertSee('Ningún cargo coincide con la búsqueda.');
     }
 
     public function test_sin_el_privilegio_responde_403(): void
@@ -96,7 +101,7 @@ class CargosTest extends TestCase
         ], $this->detalles($bitacora->bita_id_bitacora));
     }
 
-    public function test_con_puestos_el_nivel_no_cambia_y_no_se_borra(): void
+    public function test_con_puestos_el_nivel_no_cambia(): void
     {
         $id = $this->cargo('Presidente', 'Presidenta', 'Nacional');
         DB::table('puesto')->insert(['pues_id_cargo' => $id]);
@@ -108,15 +113,52 @@ class CargosTest extends TestCase
         $this->actingAs($this->admin)->put("/cargos/{$id}", ['masculino' => 'Presidente Nacional', 'femenino' => 'Presidenta Nacional', 'nivel' => 'Nacional'])
             ->assertSessionHasNoErrors();
 
+        $this->actingAs($this->admin)->get('/cargos')->assertSee('data-puestos="1"', false);
+        $this->assertDatabaseHas('cargo', ['carg_id_cargo' => $id, 'carg_nivel' => 'Nacional']);
+    }
+
+    public function test_un_cargo_con_puestos_vacios_se_borra_junto_con_ellos(): void
+    {
+        $id = $this->cargo('Tesorero', 'Tesorera', 'Nacional');
+        $puesto = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $id], 'pues_id_puesto');
+        DB::table('puesto_directorio')->insert(['pudi_id_puesto' => $puesto, 'pudi_id_tipo_directorio' => 1, 'pudi_orden' => 1]);
+
+        // La ventana avisa que también se borra su puesto
         $this->actingAs($this->admin)->get('/cargos')
-            ->assertSee('data-puestos="1"', false)
-            ->assertSee('No se puede borrar porque tiene 1 puesto.')
+            ->assertSee('También se borra su puesto, que nunca ha tenido personas.')
+            ->assertDontSee('accion--bloqueada', false);
+
+        $this->actingAs($this->admin)->delete("/cargos/{$id}", ['motivo' => 'Error de captura'])
+            ->assertSessionHas('estado', 'Se borró el cargo Tesorero.');
+
+        $this->assertDatabaseMissing('cargo', ['carg_id_cargo' => $id]);
+        $this->assertDatabaseMissing('puesto', ['pues_id_puesto' => $puesto]);
+        $this->assertDatabaseMissing('puesto_directorio', ['pudi_id_puesto' => $puesto]);
+        // Queda en la bitácora: el puesto y el cargo, con el mismo motivo
+        $this->assertSame(1, DB::table('bitacora')->where('bita_tabla', 'PUESTO')->where('bita_referencia', $puesto)->where('bita_accion', 'Eliminacion')->where('bita_motivo', 'Error de captura')->count());
+        $this->assertSame(['Puestos vacíos borrados con el cargo', '1', null], array_values(array_slice($this->detalles($this->ultimaBitacora()->bita_id_bitacora), -1))[0]);
+    }
+
+    public function test_un_cargo_cuyos_puestos_ya_tuvieron_personas_no_se_borra(): void
+    {
+        $id = $this->cargo('Director', 'Directora', 'Institucional');
+        $institucion = DB::table('institucion_educativa')->insertGetId([
+            'ined_id_tipo_institucion' => DB::table('tipo_institucion_educativa')->where('tiie_nombre', 'Universidad')->value('tiie_id_tipo_institucion'),
+            'ined_participacion' => 'Matriz', 'ined_sector' => 'Publica', 'ined_activo' => true,
+        ], 'ined_id_institucion_educativa');
+        $puesto = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $id, 'pues_id_institucion_educativa' => $institucion], 'pues_id_puesto');
+        DB::table('persona')->where('pers_id_persona', $this->admin->usua_id_persona)->update(['pers_id_institucion_educativa' => $institucion]);
+        DB::table('designacion')->insert(['desi_id_puesto' => $puesto, 'desi_id_persona' => $this->admin->usua_id_persona, 'desi_fecha_inicio' => '2024-01-01']);
+
+        $this->actingAs($this->admin)->get('/cargos')
+            ->assertSee('No se puede borrar porque sus puestos ya tuvieron 1 designación.')
             ->assertSee('accion--bloqueada', false);
 
         $this->actingAs($this->admin)->delete("/cargos/{$id}", ['motivo' => 'Duplicado'])
             ->assertRedirect('/cargos')
             ->assertSessionHas('aviso');
-        $this->assertDatabaseHas('cargo', ['carg_id_cargo' => $id, 'carg_nivel' => 'Nacional']);
+        $this->assertDatabaseHas('cargo', ['carg_id_cargo' => $id]);
+        $this->assertDatabaseHas('puesto', ['pues_id_puesto' => $puesto]);
     }
 
     public function test_desactivar_y_activar(): void
@@ -156,6 +198,18 @@ class CargosTest extends TestCase
             ->post('/cargos', ['masculino' => 'Presidente', 'femenino' => 'Otra', 'nivel' => 'Nacional', '_dialogo' => 'cargo', '_id' => ''])
             ->assertSeeText('Ya existe el cargo «Presidente».')
             ->assertSee('id="dialogo-cargo" class="dialogo dialogo--mediano" aria-labelledby="dialogo-cargo-titulo"  data-abrir-al-cargar', false);
+    }
+
+    /**
+     * Cargos (en masculino) que aparecen en las filas de la tabla.
+     *
+     * @return array<int, string>
+     */
+    private function filas(string $direccion): array
+    {
+        preg_match_all('/class="tabla__principal">([^<]*)</', $this->actingAs($this->admin)->get($direccion)->assertOk()->getContent(), $coincidencias);
+
+        return array_map('trim', $coincidencias[1]);
     }
 
     private function cargo(string $masculino, string $femenino, string $nivel): int

@@ -177,3 +177,54 @@
         grid-template-columns: auto minmax(0, 1fr) auto;
     }
 }
+
+/* Directorios: encabezado con "Agregar", la lista ordenable y el botón de guardar */
+.orden-directorio {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.orden-directorio__encabezado {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+}
+
+.orden-directorio__titulo {
+    color: var(--color-secundario);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.orden-directorio__texto {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+}
+
+.orden-directorio__agregar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: min(100%, 26rem);
+}
+
+.orden-directorio__agregar .campo__entrada {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.orden-directorio__acciones {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.lista-orden__detalle {
+    display: block;
+    flex-basis: 100%;
+    color: var(--color-texto-suave);
+    font-size: 0.8125rem;
+    font-weight: 400;
+}

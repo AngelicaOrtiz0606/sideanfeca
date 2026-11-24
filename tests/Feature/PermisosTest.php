@@ -46,7 +46,7 @@ class PermisosTest extends TestCase
         $this->actingAs($superadmin)->get('/bitacora')
             ->assertOk()
             ->assertSeeText('Bitácora')
-            ->assertSeeText('Esta sección estará disponible próximamente.');
+            ->assertSeeText('Solo se consulta; nadie la puede modificar.');
 
         $this->actingAs($superadmin)->get('/usuarios')
             ->assertOk()
@@ -164,7 +164,7 @@ class PermisosTest extends TestCase
             ->assertDontSee('This action is unauthorized');
     }
 
-    public function test_el_inicio_no_ofrece_ver_mas_mientras_no_exista_la_consulta_completa(): void
+    public function test_con_mas_de_cinco_movimientos_el_inicio_lleva_a_la_bitacora_completa(): void
     {
         $superadmin = $this->crearCuenta(Rol::SUPERADMINISTRADOR);
 
@@ -173,8 +173,8 @@ class PermisosTest extends TestCase
         }
 
         $this->actingAs($superadmin)->get('/inicio')
-            ->assertSeeText('La consulta completa de la bitácora estará disponible próximamente.')
-            ->assertDontSee('Ver más');
+            ->assertSee('Ver toda la bitácora')
+            ->assertDontSee('estará disponible próximamente');
     }
 
     public function test_las_pantallas_con_sesion_no_se_guardan_en_el_navegador(): void

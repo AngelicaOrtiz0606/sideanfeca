@@ -13,7 +13,6 @@
  *   dialogos.js                 ventanas de confirmación (borrar)
  *   cambio-de-zona.js           pregunta antes de pasar una entidad a otra zona
  *   ordenar-lista.js            cambiar el orden arrastrando o con flechas
- *   filtro-tabla.js             filtro rápido de una tabla (texto y grupo)
  *   cargo-nivel.js              nivel del cargo en su ventana
  *   nombres-unicos.js           aviso inmediato de nombres repetidos en catálogos
  *   domicilio.js                código postal → entidad, municipio, colonias y zona
@@ -21,9 +20,17 @@
  *   filtros-servidor.js         filtros de listas largas (se aplican al cambiar)
  *   buscador-universidad.js     buscar la universidad escribiendo (con zona y entidad)
  *   numero-sugerido.js          número de afiliación sugerido (año, zona y consecutivo)
+ *   puesto-formulario.js        ventana de puesto: muestra lo que aplica según el nivel del cargo
+ *   persona-formulario.js       formulario de persona: pertenencia, aviso de CURP y filas de contacto
  *   pestanas.js                 pestañas de una consulta (sin recargar, con flechas)
  *   regreso-seguro.js           la flecha de regreso no muestra pantallas con sesión ya cerrada
+ *   copiar-correos.js           copiar los correos de un directorio
+ *   usuario-formulario.js       cuenta de usuario: CURP y aviso de persona ya registrada
+ *
+ * vue.js va primero: monta las partes hechas con Vue (por ejemplo, las filas
+ * de designación) antes de que la validación revise los campos.
  */
+import './vue.js';
 import './modulos/menu-movil.js';
 import './modulos/campo-contrasenia.js';
 import './modulos/validacion-formularios.js';
@@ -33,7 +40,6 @@ import './modulos/regreso-seguro.js';
 import './modulos/dialogos.js';
 import './modulos/cambio-de-zona.js';
 import './modulos/ordenar-lista.js';
-import './modulos/filtro-tabla.js';
 import './modulos/cargo-nivel.js';
 import './modulos/nombres-unicos.js';
 import './modulos/domicilio.js';
@@ -42,3 +48,7 @@ import './modulos/filtros-servidor.js';
 import './modulos/buscador-universidad.js';
 import './modulos/pestanas.js';
 import './modulos/numero-sugerido.js';
+import './modulos/puesto-formulario.js';
+import './modulos/persona-formulario.js';
+import './modulos/copiar-correos.js';
+import './modulos/usuario-formulario.js';

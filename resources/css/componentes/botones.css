@@ -148,10 +148,10 @@
 }
 
 /*
- * Acciones de cada fila de una lista (Editar, Desactivar, Activar, Borrar):
- * cuadros con ícono y un color suave por acción, como en el prototipo.
- * El nombre de la acción aparece como globo al pasar el ratón o al llegar
- * con el teclado, y siempre lo leen los lectores de pantalla.
+ * Acciones de cada fila de una lista (Consultar, Editar, Desactivar, Activar,
+ * Borrar): solo el ícono, con un color suave por acción, como en el
+ * prototipo. El nombre aparece como globo al pasar el ratón o al llegar con
+ * el teclado, y siempre lo leen los lectores de pantalla.
  */
 .acciones-fila {
     display: inline-flex;
@@ -173,6 +173,15 @@
 .accion .icono {
     width: 1.125rem;
     height: 1.125rem;
+}
+
+.accion--consultar {
+    background: #eef2f7;
+    color: var(--color-secundario);
+}
+
+.accion--consultar:hover {
+    background: #dfe6ef;
 }
 
 .accion--editar {
@@ -211,10 +220,10 @@
     background: #f6d7d5;
 }
 
-/* No se puede borrar: gris; al dar clic explica por qué */
+/* No se puede borrar: gris (con contraste suficiente); al dar clic explica por qué */
 .accion--bloqueada {
     background: var(--color-fondo);
-    color: #9a9a9a;
+    color: #6b6b6b;
 }
 
 .accion--bloqueada:hover {

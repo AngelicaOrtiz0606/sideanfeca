@@ -10,7 +10,7 @@
 
     regla="nueva" muestra la lista de requisitos (8 caracteres, mayúscula, número
     y carácter especial) y la va marcando. igual-a="otro_id" avisa si coincide
-    con otro campo.
+    con otro campo. :obligatorio="true" pone el asterisco rojo.
 --}}
 @props([
     'id',
@@ -20,6 +20,7 @@
     'enlace' => null,
     'regla' => null,
     'igualA' => null,
+    'obligatorio' => false,
 ])
 
 @php
@@ -40,7 +41,7 @@
 
 <div class="campo">
     <div class="campo__encabezado">
-        <label for="{{ $id }}" class="campo__etiqueta">{{ $etiqueta }}</label>
+        <label for="{{ $id }}" class="campo__etiqueta">{{ $etiqueta }} @if ($obligatorio)<x-obligatorio />@endif</label>
         {{ $enlace }}
     </div>
 

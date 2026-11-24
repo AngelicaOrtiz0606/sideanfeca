@@ -39,85 +39,79 @@
             <p class="seccion__nota"><span class="punto punto--activo" aria-hidden="true"></span>Solo se cuentan las activas.</p>
         </div>
 
-        <dl class="contadores">
+        <ul class="contadores" role="list">
             @foreach ($tarjetas as $tarjeta)
                 @php
                     $activas = $contadores[$tarjeta['clave']];
                     $desactivadas = $contadores[$tarjeta['clave'].'_total'] - $activas;
                 @endphp
-                <div class="contador">
+                <li class="contador">
                     <span class="contador__icono" data-tono="{{ $tarjeta['tono'] }}" aria-hidden="true">
                         <x-icono :nombre="$tarjeta['icono']" />
                     </span>
                     <div class="contador__datos">
-                        <dt class="contador__etiqueta">{{ $tarjeta['etiqueta'] }}</dt>
-                        <dd class="contador__valor" data-contar="{{ $activas }}">{{ number_format($activas) }}</dd>
-                        <dd class="contador__detalle">
+                        <p class="contador__etiqueta">{{ $tarjeta['etiqueta'] }}</p>
+                        <p class="contador__valor" data-contar="{{ $activas }}">{{ number_format($activas) }}</p>
+                        <p class="contador__detalle">
                             <span class="punto" aria-hidden="true"></span>
                             Desactivadas: {{ number_format($desactivadas) }}
-                        </dd>
+                        </p>
                     </div>
-                </div>
+                </li>
             @endforeach
-        </dl>
+        </ul>
     </section>
 
-    @if ($verBitacora)
-        <section aria-labelledby="bitacora-titulo" class="inicio__seccion tarjeta-seccion">
+    @php $pendientes = collect($porAtender)->sum('cantidad'); @endphp
+    @if ($porAtender !== [])
+        <section aria-labelledby="atender-titulo" class="inicio__seccion tarjeta-seccion">
             <div class="tarjeta-seccion__encabezado">
-                <h2 id="bitacora-titulo" class="seccion__titulo">Actividad reciente</h2>
-                @if ($hayMasMovimientos && $consultaCompleta)
-                    <a href="{{ route('bitacora.index') }}" class="enlace-flecha">Ver más</a>
-                @endif
+                <h2 id="atender-titulo" class="seccion__titulo">Por atender</h2>
             </div>
 
-            @if ($movimientos->isEmpty())
-                <p class="vacio">Todavía no hay movimientos registrados.</p>
+            @if ($pendientes === 0)
+                <p class="vacio">Todo al día: no hay puestos vacantes, instituciones sin titular ni personas sin correo.</p>
             @else
-                <ol class="actividad" aria-label="Últimos {{ $movimientos->count() }} movimientos de la bitácora">
-                    @foreach ($movimientos as $movimiento)
-                        <li class="actividad__item">
-                            <div class="actividad__cuerpo">
-                                <p class="actividad__frase">
-                                    <strong>{{ $movimiento['quien'] }}</strong>
-                                    <span class="actividad__verbo" data-tono="{{ $movimiento['tono'] }}">{{ $movimiento['verbo'] }}</span>
-                                    {{ $movimiento['objeto'] }}.
-                                </p>
-
-                                <p class="actividad__meta">
-                                    <time datetime="{{ $movimiento['fecha']->toIso8601String() }}">{{ $movimiento['fecha']->format('d/m/Y') }} · {{ $movimiento['fecha']->format('H:i') }} hrs</time>
-                                    @if ($movimiento['motivo'])
-                                        <span>Motivo: {{ $movimiento['motivo'] }}</span>
-                                    @endif
-                                </p>
-
-                                {{-- Los cambios se muestran solo si la persona los abre, para no saturar la lista --}}
-                                @if ($movimiento['detalles'] !== [])
-                                    @php
-                                        $totalCambios = count($movimiento['detalles']) + $movimiento['mas_detalles'];
-                                    @endphp
-                                    <details class="actividad__cambios">
-                                        <summary>Ver {{ $totalCambios === 1 ? 'el cambio' : "los {$totalCambios} cambios" }}</summary>
-                                        <ul>
-                                            @foreach ($movimiento['detalles'] as $detalle)
-                                                <li>{{ $detalle }}</li>
-                                            @endforeach
-                                            @if ($movimiento['mas_detalles'] > 0)
-                                                <li>Y {{ $movimiento['mas_detalles'] }} más en la bitácora completa.</li>
-                                            @endif
-                                        </ul>
-                                    </details>
+                <ul class="pendientes">
+                    @foreach ($porAtender as $pendiente)
+                        @continue($pendiente['cantidad'] === 0)
+                        <li class="pendiente">
+                            <p class="pendiente__titulo">
+                                <span class="pendiente__cifra">{{ number_format($pendiente['cantidad']) }}</span>
+                                {{ $pendiente['texto'] }}
+                            </p>
+                            <ul class="pendiente__enlaces">
+                                @foreach ($pendiente['enlaces'] as $enlace)
+                                    <li><a href="{{ $enlace['url'] }}">{{ $enlace['texto'] }}</a></li>
+                                @endforeach
+                                @if ($pendiente['todos'])
+                                    <li><a href="{{ $pendiente['todos'] }}" class="enlace-flecha">Ver todas</a></li>
                                 @endif
-                            </div>
+                            </ul>
                         </li>
                     @endforeach
-                </ol>
-
-                {{-- Mientras no exista la consulta completa (M9), se avisa que hay más movimientos --}}
-                @if ($hayMasMovimientos && ! $consultaCompleta)
-                    <p class="actividad__mas">Se muestran los 5 movimientos más recientes. La consulta completa de la bitácora estará disponible próximamente.</p>
-                @endif
+                </ul>
             @endif
         </section>
     @endif
+
+    {{-- Quien ve la bitácora ve la actividad de todos; los demás, la suya --}}
+    <section aria-labelledby="bitacora-titulo" class="inicio__seccion tarjeta-seccion">
+        <div class="tarjeta-seccion__encabezado">
+            <h2 id="bitacora-titulo" class="seccion__titulo">{{ $verBitacora ? 'Actividad reciente' : 'Mi actividad reciente' }}</h2>
+            @if ($hayMasMovimientos)
+                <a href="{{ $verBitacora ? route('bitacora.index') : route('actividad.index') }}" class="enlace-flecha">{{ $verBitacora ? 'Ver toda la bitácora' : 'Ver toda mi actividad' }}</a>
+            @endif
+        </div>
+
+        @if ($movimientos->isEmpty())
+            <p class="vacio">{{ $verBitacora ? 'Todavía no hay movimientos registrados.' : 'Todavía no has hecho cambios en el sistema.' }}</p>
+        @else
+            <ol class="actividad" aria-label="Últimos {{ $movimientos->count() }} movimientos">
+                @foreach ($movimientos as $movimiento)
+                    @include('bitacora._movimiento')
+                @endforeach
+            </ol>
+        @endif
+    </section>
 @endsection

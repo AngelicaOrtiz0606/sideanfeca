@@ -30,11 +30,13 @@
 @import './componentes/pie.css';
 @import './componentes/boton-subir.css';
 @import './componentes/formularios.css';
+@import './componentes/formulario-secciones.css';
 @import './paginas/acceso.css';
 @import './paginas/inicio.css';
 @import './paginas/avisos.css';
 @import './paginas/catalogos.css';
 @import './paginas/instituciones.css';
+@import './paginas/directorios.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

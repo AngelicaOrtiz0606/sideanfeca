@@ -1,7 +1,14 @@
 /*
- * Tablas de los catálogos. En teléfono cada fila se vuelve una ficha y cada
+ * Tablas de los catálogos. Cuando la tarjeta es angosta (teléfono, tableta o
+ * computadora pequeña con el menú abierto) cada fila se vuelve una ficha y cada
  * dato muestra su encabezado (atributo data-etiqueta), sin desplazamiento lateral.
+ * Se decide por el ancho de la tarjeta, no de la pantalla: así la tabla nunca
+ * se sale de su contenedor.
  */
+
+.tarjeta:has(.tabla) {
+    container: tabla / inline-size;
+}
 
 .tabla {
     width: 100%;
@@ -70,8 +77,23 @@
     padding-inline: 0.75rem;
 }
 
-@media (width < 40rem) {
-    /* En teléfono cada fila es una ficha compacta:
+/* Tarjeta mediana: celdas con menos relleno para que quepan las columnas
+   (la primera conserva su orilla, alineada con los filtros) */
+@container tabla (50rem <= width < 64rem) {
+    .tabla:not(.tabla--simple) thead th,
+    .tabla:not(.tabla--simple) tbody th,
+    .tabla:not(.tabla--simple) tbody td {
+        padding-inline: 0.875rem;
+    }
+
+    .tabla:not(.tabla--simple) thead th:first-child,
+    .tabla:not(.tabla--simple) tbody tr > :first-child {
+        padding-left: 1.5rem;
+    }
+}
+
+@container tabla (width < 50rem) {
+    /* Tarjeta angosta: cada fila es una ficha compacta:
        [número]  Nombre                 [Editar]
                  Entidades: 5
                  Instituciones: 0                */
@@ -145,6 +167,7 @@
     margin-top: 0.125rem;
     color: var(--color-texto-suave);
     font-size: 0.8125rem;
+    font-weight: 400;
 }
 
 /* Registro desactivado: se ve más tenue */
@@ -204,6 +227,7 @@
 }
 
 .filtro {
+    text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -222,7 +246,8 @@
     border-color: var(--color-borde-control);
 }
 
-.filtro[aria-pressed='true'] {
+.filtro[aria-pressed='true'],
+.filtro[aria-current='true'] {
     border-color: var(--color-secundario);
     background: var(--color-secundario);
     color: #fff;
@@ -260,7 +285,7 @@
 
 /* Celda sin dato */
 .tabla__vacio {
-    color: var(--color-borde-control);
+    color: var(--color-texto-suave);
 }
 
 /* Número de afiliación (7 dígitos) */
@@ -299,33 +324,91 @@
     color: var(--color-secundario);
 }
 
-/* Filtros que se aplican en el servidor (listas largas) */
+/* Filtros que se aplican en el servidor (listas largas): en una sola fila,
+   el buscador con su lupa y cada filtro como una píldora compacta
+   ("Zona  Todas ▾"). La píldora se marca en azul cuando el filtro está en uso. */
 .filtros--servidor {
-    align-items: flex-end;
+    gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+}
+
+.filtros--servidor .filtros__buscar {
+    min-height: 2.5rem;
+    padding-left: 2.5rem;
+    border-radius: 999px;
+    background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23575757' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 0.875rem center / 1.125rem;
 }
 
 .filtros__selector {
-    display: grid;
-    gap: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding-left: 0.875rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 999px;
+    background: var(--color-superficie);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.filtros__selector .campo__entrada {
-    min-height: 2.5rem;
-    padding-block: 0;
-    font-size: 0.9375rem;
+.filtros__selector:hover {
+    border-color: var(--color-borde-control);
+}
+
+.filtros__selector:focus-within {
+    outline: 3px solid var(--color-marca);
+    outline-offset: 2px;
 }
 
 .filtros__etiqueta {
     color: var(--color-texto-suave);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.filtros__selector .campo__entrada {
+    width: auto;
+    max-width: 14rem;
+    min-height: 2.375rem;
+    padding: 0 2rem 0 0.375rem;
+    border: 0;
+    background-color: transparent;
+    background-position: right 0.75rem center;
+    box-shadow: none;
+    color: var(--color-tinta);
+    font-size: 0.875rem;
     font-weight: 600;
+    field-sizing: content;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.filtros__selector .campo__entrada:focus {
+    outline: none;
+}
+
+/* Fecha dentro de un filtro: sin la flecha de las listas */
+.filtros__selector--fecha .campo__entrada {
+    padding-right: 0.75rem;
+    background-image: none;
+}
+
+/* Filtro en uso (las fechas lo marcan desde el servidor) */
+.filtros__selector--en-uso,
+.filtros__selector:has(option:checked:not([value=''])) {
+    border-color: var(--color-secundario);
+    background: #e7edf6;
+}
+
+.filtros__selector--en-uso .filtros__etiqueta,
+.filtros__selector:has(option:checked:not([value=''])) .filtros__etiqueta {
+    color: var(--color-secundario);
 }
 
 .filtros__borrar {
     min-height: 2.5rem;
     font-size: 0.875rem;
 }
-
 
 /* Paginación debajo de una tabla */
 .paginacion {
@@ -422,8 +505,37 @@ a.paginacion__enlace:hover {
         gap: 0.75rem;
     }
 
+    /* En teléfonos angostos, un selector por renglón para leer bien su valor */
+    @media (width < 30rem) {
+        .filtros__opciones {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
     .filtros__opciones[data-cerrado] {
         display: none;
+    }
+
+    .filtros__selector {
+        justify-content: space-between;
+    }
+
+    /* Cada selector cabe en su columna aunque su valor sea largo ("Planes y Programas de Estudio") */
+    .filtros__selector {
+        min-width: 0;
+    }
+
+    .filtros__selector .filtros__etiqueta {
+        flex: none;
+    }
+
+    .filtros__selector .campo__entrada {
+        flex: 1;
+        min-width: 0;
+        max-width: none;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
     }
 
     .filtros__borrar {
@@ -440,4 +552,13 @@ a.paginacion__enlace:hover {
 
 .tabla__enlace-web:hover {
     text-decoration: underline;
+}
+
+/* Varias líneas en una celda (por ejemplo, dos cargos vigentes) */
+.tabla__linea {
+    display: block;
+}
+
+.tabla__linea + .tabla__linea {
+    margin-top: 0.25rem;
 }

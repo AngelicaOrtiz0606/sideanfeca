@@ -9,6 +9,7 @@ use App\Http\Requests\Instituciones\InstitucionRequest;
 use App\Http\Requests\Instituciones\ParticipacionRequest;
 use App\Http\Requests\Instituciones\RazonSocialRequest;
 use App\Services\Instituciones\InstitucionService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,19 @@ class InstitucionController extends Controller
 
     public function create(): View
     {
-        return $this->formulario();
+        return $this->formulario(null);
+    }
+
+    /**
+     * Editar: el mismo formulario del registro, ya lleno. Desde aquí también
+     * se registran el cambio de nombre y el paso a afiliada (con historial).
+     */
+    public function edit(int $institucion): View
+    {
+        $encontrada = $this->instituciones->buscar($institucion);
+        abort_if($encontrada === null, 404);
+
+        return $this->formulario($encontrada);
     }
 
     public function store(InstitucionRequest $request): RedirectResponse
@@ -62,8 +75,8 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Consulta: pestañas General, Participación, Razón social y (si es
-     * universidad) Sedes. Desde aquí se registran los cambios con historial.
+     * Consulta (solo lectura): pestañas General, Participación, Razón social
+     * y (si es universidad) Sedes.
      */
     public function show(Request $request, int $institucion): View
     {
@@ -80,16 +93,8 @@ class InstitucionController extends Controller
             'pestana' => $pestana,
             'participaciones' => $this->instituciones->historialParticipacion($institucion),
             'nombres' => $this->instituciones->historialNombres($institucion),
-            'sedes' => $esUniversidad ? $this->instituciones->sedes($institucion) : collect(),
-            'inicios' => $this->instituciones->iniciosVigentes($institucion),
-            'posibles' => $this->instituciones->participacionesPosibles($encontrada),
-            'motivoParticipacion' => $this->instituciones->motivoParaNoCambiarParticipacion($encontrada),
-            'numerosUsados' => $this->instituciones->numerosUsados(),
-            'motivoTipo' => $this->instituciones->motivoParaNoCambiarTipo($encontrada),
-            'tipos' => InstitucionService::TIPOS,
+            'sedes' => Paginacion::de($esUniversidad ? $this->instituciones->sedes($institucion) : collect(), 'pagina_sedes'),
             'sectores' => InstitucionService::SECTORES,
-            'universidades' => $this->instituciones->universidades()->reject(fn ($u) => $u->id === $encontrada->id)->values(),
-            'zonas' => $this->zonas(),
         ]);
     }
 
@@ -102,7 +107,7 @@ class InstitucionController extends Controller
         $desde = (string) $request->validated('desde');
         $this->instituciones->cambiarRazonSocial($request->user(), $institucion, $nombre, $desde);
 
-        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => 'razon-social'])
+        return redirect()->route('instituciones.edit', $institucion)
             ->with('estado', 'Se registró el cambio de razón social desde el '.date('d/m/Y', strtotime($desde)).'.');
     }
 
@@ -115,7 +120,7 @@ class InstitucionController extends Controller
         $desde = (string) $request->validated('desde');
         $this->instituciones->cambiarParticipacion($request->user(), $institucion, $participacion, $request->numero(), $desde);
 
-        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => 'participacion'])
+        return redirect()->route('instituciones.edit', $institucion)
             ->with('estado', 'Ahora es afiliada desde el '.date('d/m/Y', strtotime($desde)).', con el número de afiliación '.$this->instituciones->buscar($institucion)?->numero.'.');
     }
 
@@ -125,8 +130,7 @@ class InstitucionController extends Controller
 
         $this->instituciones->actualizar($request->user(), $institucion, $request->datos());
 
-        return redirect()->route('instituciones.show', ['institucion' => $institucion, 'pestana' => $request->seccion() === 'razon' ? 'razon-social' : null])
-            ->with('estado', $request->seccion() === 'razon' ? 'Se corrigió la razón social.' : 'Se guardaron los cambios.');
+        return redirect()->route('instituciones.show', $institucion)->with('estado', 'Se guardaron los cambios.');
     }
 
     public function cambiarEstado(EstadoInstitucionRequest $request, int $institucion): RedirectResponse
@@ -158,15 +162,20 @@ class InstitucionController extends Controller
         return redirect()->route('instituciones.index')->with('estado', "Se borró {$encontrada->nombre}.");
     }
 
-    private function formulario(): View
+    private function formulario(?object $institucion): View
     {
         return view('instituciones.formulario', [
+            'institucion' => $institucion,
             'tipos' => InstitucionService::TIPOS,
             'participaciones' => InstitucionService::PARTICIPACIONES,
             'sectores' => InstitucionService::SECTORES,
-            'universidades' => $this->instituciones->universidades(),
+            'universidades' => $this->instituciones->universidades()->reject(fn ($u) => $u->id === $institucion?->id)->values(),
             'numerosUsados' => $this->instituciones->numerosUsados(),
             'zonas' => $this->zonas(),
+            'motivoTipo' => $institucion ? $this->instituciones->motivoParaNoCambiarTipo($institucion) : null,
+            'inicios' => $institucion ? $this->instituciones->iniciosVigentes($institucion->id) : null,
+            'posibles' => $institucion ? $this->instituciones->participacionesPosibles($institucion) : [],
+            'motivoParticipacion' => $institucion ? $this->instituciones->motivoParaNoCambiarParticipacion($institucion) : null,
         ]);
     }
 

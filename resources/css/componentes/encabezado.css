@@ -161,6 +161,36 @@
     }
 }
 
+/* Teléfonos muy angostos (320 px): "Salir" queda solo con su ícono
+   (el texto sigue ahí para lectores de pantalla) y el logo se achica */
+@media (width < 23.5rem) {
+    .encabezado__contenido {
+        gap: 0.5rem;
+        padding: 0 0.75rem;
+    }
+
+    .encabezado__logo {
+        height: 2.25rem;
+    }
+
+    .encabezado__titulo {
+        font-size: 1.125rem;
+    }
+
+    .boton-salir {
+        padding: 0 0.625rem;
+    }
+
+    .boton-salir span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
 @media (width >= 64rem) {
     .encabezado__contenido {
         padding: 0 1.5rem;

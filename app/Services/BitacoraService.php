@@ -2,9 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\Privilegio;
+use App\Services\Puestos\PuestoService;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Lectura de la bitácora (BITACORA y BITACORA_DETALLE), solo consulta.
@@ -14,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  * Los nombres se resuelven desde la ficha de cada registro; si ya no existe
  * (por ejemplo, tras ARCO), se dice "una persona eliminada (#n)".
  *
- * La usan la pantalla de inicio y, en M9, la consulta completa de la bitácora.
+ * La usan la pantalla de inicio (los últimos movimientos) y la consulta
+ * completa de la bitácora (con filtros, de 10 en 10 y en CSV).
  */
 class BitacoraService
 {
@@ -51,6 +57,46 @@ class BitacoraService
         'Eliminacion' => 'eliminó',
         'Anonimizacion' => 'anonimizó',
     ];
+
+    /**
+     * Detalles que nombran un registro de otra tabla (su número va en
+     * BIDE_REFERENCIA): al registrar a una persona, cada designación y cada
+     * puesto creado; al borrar una designación, su persona y su puesto.
+     */
+    private const CAMPOS_DE_OTRA_TABLA = [
+        'Designación' => 'DESIGNACION',
+        'Puesto creado' => 'PUESTO',
+        'Persona' => 'PERSONA',
+        'Puesto' => 'PUESTO',
+    ];
+
+    /**
+     * Nombres de campo escritos por las funciones de la base, como se dicen en pantalla.
+     */
+    private const CAMPOS_EN_PANTALLA = [
+        'Fecha en que deja el cargo' => 'Deja el puesto desde',
+    ];
+
+    /**
+     * Detalles con un solo valor (no son un cambio "de → a"): se dicen "Campo: valor".
+     */
+    private const CAMPOS_DE_UN_VALOR = ['Directorio', 'Agregado al directorio', 'Quitado del directorio'];
+
+    /**
+     * Datos personales que la base guarda sin su valor (la bitácora no se borra
+     * y la cancelación ARCO exige borrar esos datos). Se dice que cambiaron y
+     * por qué no se ve el valor. El grado y la pertenencia sí lo guardan desde
+     * noviembre de 2026; los anteriores a eso tampoco lo tienen.
+     */
+    private const CAMPOS_SIN_VALOR = ['Nombre', 'Primer apellido', 'Segundo apellido', 'CURP', 'Género', 'Correo', 'Contacto',
+        'Grado académico', 'Pertenencia'];
+
+    /**
+     * Al borrar un registro se guarda cómo se llamaba (su detalle tiene el
+     * valor anterior): con eso la línea dice su nombre en lugar de "#7".
+     */
+    private const NOMBRE_AL_BORRAR = ['Nombre de la zona', 'Nombre de la coordinación', 'Nombre del grado', 'Nombre masculino',
+        'Razón social', 'Nombre de la organización', 'Puesto'];
 
     /**
      * Máximo de cambios de campo que se muestran por movimiento.
@@ -95,11 +141,12 @@ class BitacoraService
      * Cada movimiento se describe como una oración: "Marta Ruiz registró la cuenta
      * de Luis Ramírez", con los campos que cambiaron (BITACORA_DETALLE) y el motivo.
      *
-     * @return Collection<int, array{fecha: Carbon, quien: string, accion: string, tono: string, verbo: string, objeto: string, motivo: ?string, detalles: array<int, string>, mas_detalles: int}>
+     * @return Collection<int, array{fecha: Carbon, quien: string, accion: string, tono: string, verbo: string, objeto: string, motivo: ?string, detalles: array<int, string>, mas_detalles: int, ficha: ?string}>
      */
-    public function recientes(int $limite): Collection
+    public function recientes(int $limite, ?int $usuario = null): Collection
     {
         $movimientos = DB::table('bitacora')
+            ->when($usuario, fn (Builder $q, int $id) => $q->where('bita_id_usuario', $id))
             ->orderByDesc('bita_fecha_hora')
             ->orderByDesc('bita_id_bitacora')
             ->limit($limite)
@@ -108,19 +155,108 @@ class BitacoraService
         return $this->describir($movimientos);
     }
 
-    public function total(): int
+    /** Cuántos movimientos hay (de una cuenta, si se dice cuál). */
+    public function total(?int $usuario = null): int
     {
-        return DB::table('bitacora')->count();
+        return DB::table('bitacora')->when($usuario, fn (Builder $q, int $id) => $q->where('bita_id_usuario', $id))->count();
     }
 
     /**
-     * Convierte filas de BITACORA en movimientos listos para mostrar.
-     * La usará también la pantalla completa de bitácora (M9).
+     * La bitácora completa con filtros, de la más reciente a la más antigua,
+     * de 10 en 10. Cada movimiento trae todos sus cambios.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string, usuario?: ?int}  $filtros
+     */
+    public function listado(array $filtros, int $porPagina = 10): LengthAwarePaginator
+    {
+        $pagina = $this->filtrada($filtros)->paginate($porPagina)->withQueryString();
+
+        return $pagina->setCollection($this->describir($pagina->getCollection(), todos: true));
+    }
+
+    /**
+     * Todos los movimientos filtrados, por partes (para el CSV): $hacer recibe
+     * cada parte ya descrita.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string, usuario?: ?int}  $filtros
+     * @param  callable(Collection<int, array<string, mixed>>): void  $hacer
+     */
+    public function porPartes(array $filtros, callable $hacer): void
+    {
+        $this->filtrada($filtros)->chunk(500, fn (Collection $parte) => $hacer($this->describir($parte, todos: true)));
+    }
+
+    /**
+     * Acciones para el filtro: valor en la base => como se dice.
+     *
+     * @return array<string, string>
+     */
+    public function acciones(): array
+    {
+        return self::ACCIONES;
+    }
+
+    /**
+     * Qué se modificó, para el filtro: tabla => nombre en plural ("Personas", "Cuentas").
+     *
+     * @return array<string, string>
+     */
+    public function tablas(): array
+    {
+        return collect(self::TABLAS)
+            ->map(fn (array $nombres) => Str::ucfirst(preg_replace('/^(el|la|los|las) /u', '', $nombres[1])))
+            ->sort()
+            ->all();
+    }
+
+    /**
+     * Filtros: texto (quién lo hizo, la persona o cuenta de la que se trata,
+     * o el texto de un cambio, como el nombre de un puesto), acción, tabla y
+     * rango de fechas.
+     *
+     * @param  array{texto?: ?string, accion?: ?string, tabla?: ?string, desde?: ?string, hasta?: ?string, usuario?: ?int}  $filtros
+     */
+    private function filtrada(array $filtros): Builder
+    {
+        $nombre = "translate(lower(concat_ws(' ', pe.pers_nombre, pe.pers_primer_apellido, pe.pers_segundo_apellido)), 'áéíóúü', 'aeiouu') like ?";
+        $texto = trim((string) ($filtros['texto'] ?? ''));
+        $patron = '%'.addcslashes(strtr(mb_strtolower($texto), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u']), '%_\\').'%';
+
+        return DB::table('bitacora as b')
+            ->select('b.*')
+            ->when($texto !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                // Quién lo hizo
+                ->whereExists(fn (Builder $e) => $e->from('usuario as u')->join('persona as pe', 'pe.pers_id_persona', '=', 'u.usua_id_persona')
+                    ->whereColumn('u.usua_id_usuario', 'b.bita_id_usuario')->whereRaw($nombre, [$patron]))
+                // La persona de la que se trata
+                ->orWhereExists(fn (Builder $e) => $e->from('persona as pe')->where('b.bita_tabla', 'PERSONA')
+                    ->whereColumn('pe.pers_id_persona', 'b.bita_referencia')->whereRaw($nombre, [$patron]))
+                // La cuenta de la que se trata
+                ->orWhereExists(fn (Builder $e) => $e->from('usuario as u')->join('persona as pe', 'pe.pers_id_persona', '=', 'u.usua_id_persona')
+                    ->where('b.bita_tabla', 'USUARIO')->whereColumn('u.usua_id_usuario', 'b.bita_referencia')->whereRaw($nombre, [$patron]))
+                // El texto de un cambio (puestos, designaciones, nombres de catálogos...)
+                ->orWhereExists(fn (Builder $e) => $e->from('bitacora_detalle as d')->whereColumn('d.bide_id_bitacora', 'b.bita_id_bitacora')
+                    ->where(fn (Builder $c) => $c
+                        ->whereRaw("translate(lower(coalesce(d.bide_nuevo, '')), 'áéíóúü', 'aeiouu') like ?", [$patron])
+                        ->orWhereRaw("translate(lower(coalesce(d.bide_anterior, '')), 'áéíóúü', 'aeiouu') like ?", [$patron])))))
+            // "Mi actividad": solo lo que hizo esa cuenta
+            ->when($filtros['usuario'] ?? null, fn (Builder $q, int $usuario) => $q->where('b.bita_id_usuario', $usuario))
+            ->when($filtros['accion'] ?? null, fn (Builder $q, string $accion) => $q->where('b.bita_accion', $accion))
+            ->when($filtros['tabla'] ?? null, fn (Builder $q, string $tabla) => $q->where('b.bita_tabla', $tabla))
+            ->when($filtros['desde'] ?? null, fn (Builder $q, string $desde) => $q->where('b.bita_fecha_hora', '>=', $desde))
+            ->when($filtros['hasta'] ?? null, fn (Builder $q, string $hasta) => $q->where('b.bita_fecha_hora', '<', Carbon::parse($hasta)->addDay()->toDateString()))
+            ->orderByDesc('b.bita_fecha_hora')
+            ->orderByDesc('b.bita_id_bitacora');
+    }
+
+    /**
+     * Convierte filas de BITACORA en movimientos listos para mostrar. Con
+     * $todos trae todos sus cambios (si no, los primeros y cuántos faltan).
      *
      * @param  Collection<int, object>  $movimientos
-     * @return Collection<int, array{fecha: Carbon, quien: string, accion: string, tono: string, verbo: string, objeto: string, motivo: ?string, detalles: array<int, string>, mas_detalles: int}>
+     * @return Collection<int, array{fecha: Carbon, quien: string, accion: string, tono: string, verbo: string, objeto: string, motivo: ?string, detalles: array<int, string>, mas_detalles: int, ficha: ?string}>
      */
-    public function describir(Collection $movimientos): Collection
+    public function describir(Collection $movimientos, bool $todos = false): Collection
     {
         $cuentas = $this->nombresDeCuentas(
             $movimientos->pluck('bita_id_usuario')
@@ -142,7 +278,10 @@ class BitacoraService
         $nombres = $this->nombresDeReferencias($movimientos, $detalles);
         $contextos = $this->contextos($movimientos);
 
-        return $movimientos->map(function (object $movimiento) use ($cuentas, $personas, $detalles, $nombres, $contextos): array {
+        // En el inicio se muestran unos cuantos cambios; en la bitácora completa, todos
+        $maximo = $todos ? PHP_INT_MAX : self::DETALLES_MAXIMOS;
+
+        return $movimientos->map(function (object $movimiento) use ($cuentas, $personas, $detalles, $nombres, $contextos, $maximo): array {
             $quien = $cuentas[$movimiento->bita_id_usuario] ?? "Cuenta #{$movimiento->bita_id_usuario}";
             $cambios = ($detalles[$movimiento->bita_id_bitacora] ?? collect())->map(
                 fn (object $d): string => $this->describirCambio($d, $movimiento, $nombres)
@@ -157,18 +296,16 @@ class BitacoraService
                 'verbo' => $movimiento->bita_tabla === 'USUARIO' && $movimiento->bita_accion === 'Registro'
                     ? 'creó'
                     : (self::VERBOS[$movimiento->bita_accion] ?? mb_strtolower($movimiento->bita_accion)),
-                'objeto' => $this->describirRegistro($movimiento, $cuentas, $personas, $nombres, $contextos),
+                'objeto' => $this->describirRegistro($movimiento, $cuentas, $personas, $nombres, $contextos, $detalles[$movimiento->bita_id_bitacora] ?? collect()),
                 'motivo' => $movimiento->bita_motivo,
-                'detalles' => $cambios->take(self::DETALLES_MAXIMOS)->values()->all(),
-                'mas_detalles' => max(0, $cambios->count() - self::DETALLES_MAXIMOS),
+                'detalles' => $cambios->take($maximo)->values()->all(),
+                'mas_detalles' => max(0, $cambios->count() - $maximo),
+                // Los datos personales no guardan su valor: la ficha muestra el actual
+                'ficha' => $this->ficha($movimiento, $detalles[$movimiento->bita_id_bitacora] ?? collect()),
             ];
         });
     }
 
-    /**
-     * @param  Collection<int, string>  $cuentas
-     * @param  Collection<int, string>  $personas
-     */
     /**
      * Lo que se nombra después del verbo: "la cuenta de Luis Ramírez (Administrador)",
      * "a la persona Ana López, de la FCA UNAM", "la zona regional Ciudad de México".
@@ -176,7 +313,7 @@ class BitacoraService
      * @param  array<string, array<int, string>>  $nombres
      * @param  array<string, array<int, string>>  $contextos
      */
-    private function describirRegistro(object $movimiento, Collection $cuentas, Collection $personas, array $nombres = [], array $contextos = []): string
+    private function describirRegistro(object $movimiento, Collection $cuentas, Collection $personas, array $nombres = [], array $contextos = [], ?Collection $detalles = null): string
     {
         $referencia = $movimiento->bita_referencia;
         $generico = strtolower(str_replace('_', ' ', $movimiento->bita_tabla));
@@ -190,17 +327,27 @@ class BitacoraService
 
         $contexto = $contextos[$movimiento->bita_tabla][$referencia] ?? null;
 
+        // Agregar designaciones a una persona ya registrada: "modificó las designaciones de la persona …"
+        $soloDesignaciones = $detalles !== null && $detalles->isNotEmpty()
+            && $detalles->every(fn (object $d) => in_array($d->bide_campo, ['Designación', 'Puesto creado'], true));
+
         return match ($movimiento->bita_tabla) {
-            'PERSONA' => $this->describirPersona($movimiento, $personas[$referencia] ?? null, $referencia, $contexto),
+            'PERSONA' => $this->describirPersona($movimiento, $personas[$referencia] ?? null, $referencia, $contexto, $soloDesignaciones),
             'USUARIO' => 'la cuenta de '.($cuentas[$referencia] ?? "una persona eliminada (#{$referencia})")
                 .($contexto !== null ? " ({$contexto})" : ''),
-            default => isset($nombres[$movimiento->bita_tabla][$referencia])
-                ? "{$singular} {$nombres[$movimiento->bita_tabla][$referencia]}"
-                : "{$singular} #{$referencia}",
+            default => match (true) {
+                isset($nombres[$movimiento->bita_tabla][$referencia]) => "{$singular} {$nombres[$movimiento->bita_tabla][$referencia]}",
+                // Una designación borrada ya no tiene nombre: sus detalles dicen de quién y qué puesto
+                $movimiento->bita_tabla === 'DESIGNACION' => 'una designación',
+                // Ya no existe: se dice como se llamaba (lo guardó su detalle al borrarlo)
+                default => ($borrado = $detalles?->first(fn (object $d) => in_array($d->bide_campo, self::NOMBRE_AL_BORRAR, true) && $d->bide_anterior !== null)) !== null
+                    ? "{$singular} {$borrado->bide_anterior}"
+                    : "{$singular} #{$referencia}",
+            },
         };
     }
 
-    private function describirPersona(object $movimiento, ?string $nombre, int $referencia, ?string $pertenencia): string
+    private function describirPersona(object $movimiento, ?string $nombre, int $referencia, ?string $pertenencia, bool $soloDesignaciones = false): string
     {
         if ($nombre === null) {
             return "a una persona eliminada (#{$referencia})";
@@ -208,7 +355,11 @@ class BitacoraService
 
         $persona = "la persona {$nombre}".($pertenencia !== null ? ", de {$pertenencia}" : '');
 
-        return $movimiento->bita_accion === 'Modificacion' ? "los datos de {$persona}" : "a {$persona}";
+        if ($movimiento->bita_accion === 'Modificacion') {
+            return $soloDesignaciones ? "las designaciones de {$persona}" : "los datos de {$persona}";
+        }
+
+        return "a {$persona}";
     }
 
     /**
@@ -217,7 +368,36 @@ class BitacoraService
      */
     private function describirCambio(object $detalle, object $movimiento, array $nombres): string
     {
-        $campo = $detalle->bide_campo;
+        // Algunos campos los nombra la base con otras palabras; aquí se dicen como en las pantallas
+        $campo = self::CAMPOS_EN_PANTALLA[$detalle->bide_campo] ?? $detalle->bide_campo;
+
+        // Un detalle que nombra otro registro: "Designación: Presidenta · Nacional, desde 20/11/2026".
+        // Si guardó su texto se usa ese (no cambia aunque el registro se borre después)
+        if (isset(self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo])) {
+            $nombre = $detalle->bide_nuevo ?? $detalle->bide_anterior
+                ?? $nombres[self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo]][$detalle->bide_referencia] ?? null;
+
+            return $nombre !== null ? "{$campo}: {$nombre}" : $campo;
+        }
+
+        // Datos personales sin su valor: se dice que cambiaron y por qué no se ve
+        if ($detalle->bide_anterior === null && $detalle->bide_nuevo === null
+            && in_array($detalle->bide_campo, [...self::CAMPOS_SIN_VALOR, 'Contraseña'], true)) {
+            return $detalle->bide_campo === 'Contraseña'
+                ? 'Contraseña: cambió'
+                : "{$campo}: cambió (el valor no se guarda, por privacidad)";
+        }
+
+        // Al borrar, el valor es solo el que tenía: "Nombre de la zona: Ciudad de México"
+        if ($movimiento->bita_accion === 'Eliminacion' && $detalle->bide_anterior !== null && $detalle->bide_nuevo === null) {
+            return "{$campo}: {$this->valor($detalle->bide_anterior)}";
+        }
+
+        // Al registrar (o en campos de un solo valor), el valor es solo el nuevo: "Campo: valor"
+        if (($movimiento->bita_accion === 'Registro' || in_array($detalle->bide_campo, self::CAMPOS_DE_UN_VALOR, true))
+            && $detalle->bide_anterior === null && $detalle->bide_nuevo !== null) {
+            return "{$campo}: {$detalle->bide_nuevo}";
+        }
 
         // Si el cambio es de otro registro (por ejemplo, cada coordinación reordenada), se dice cuál
         $esDeOtro = $detalle->bide_referencia !== $movimiento->bita_referencia || $movimiento->bita_accion === 'Reordenamiento';
@@ -230,10 +410,51 @@ class BitacoraService
             return $campo;
         }
 
-        $anterior = $detalle->bide_anterior ?? 'sin valor';
-        $nuevo = $detalle->bide_nuevo ?? 'sin valor';
+        $anterior = $this->valor($detalle->bide_anterior) ?? 'sin valor';
+        $nuevo = $this->valor($detalle->bide_nuevo) ?? 'sin valor';
 
         return "{$campo}: {$anterior} → {$nuevo}";
+    }
+
+    /**
+     * La ficha donde se ve el dato actual, si el movimiento cambió datos
+     * personales (que no guardan su valor) y quien consulta puede abrirla.
+     *
+     * @param  Collection<int, object>  $detalles
+     */
+    private function ficha(object $movimiento, Collection $detalles): ?string
+    {
+        $sinValor = $detalles->contains(fn (object $d) => in_array($d->bide_campo, self::CAMPOS_SIN_VALOR, true) && $d->bide_nuevo === null && $d->bide_anterior === null);
+        $cuenta = auth()->user();
+        if (! $sinValor || $cuenta === null || $movimiento->bita_referencia === null) {
+            return null;
+        }
+
+        return match ($movimiento->bita_tabla) {
+            // En los directorios: su ficha; si solo tiene cuenta: su cuenta (para el superadministrador)
+            'PERSONA' => match (true) {
+                $cuenta->can(Privilegio::GestionarPersonas->value)
+                    && DB::table('persona')->where('pers_id_persona', $movimiento->bita_referencia)->where('pers_oculta_admin', false)->exists()
+                    && DB::table('designacion')->where('desi_id_persona', $movimiento->bita_referencia)->exists() => route('personas.show', $movimiento->bita_referencia),
+                $cuenta->can(Privilegio::GestionarUsuarios->value)
+                    && ($usuario = DB::table('usuario')->where('usua_id_persona', $movimiento->bita_referencia)->value('usua_id_usuario')) !== null => route('usuarios.edit', $usuario),
+                default => null,
+            },
+            'USUARIO' => $cuenta->can(Privilegio::GestionarUsuarios->value)
+                && DB::table('usuario')->where('usua_id_usuario', $movimiento->bita_referencia)->whereNotNull('usua_id_persona')->exists()
+                    ? route('usuarios.edit', $movimiento->bita_referencia) : null,
+            default => null,
+        };
+    }
+
+    /**
+     * Un valor guardado, como se lee: las fechas de la base (2026-11-21) van como 21/11/2026.
+     */
+    private function valor(?string $valor): ?string
+    {
+        return $valor !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) === 1
+            ? Carbon::parse($valor)->format('d/m/Y')
+            : $valor;
     }
 
     /**
@@ -262,21 +483,47 @@ class BitacoraService
             // La razón social vigente (la que no tiene fecha de fin)
             'INSTITUCION_EDUCATIVA' => fn (Collection $ids) => DB::table('institucion_nombre')
                 ->whereIn('instn_id_institucion', $ids)->whereNull('instn_fecha_fin')->pluck('instn_nombre', 'instn_id_institucion'),
+            'PERSONA' => fn (Collection $ids) => $this->nombresDePersonas($ids),
+            // "Presidente · Nacional", "Coordinador Regional · Zona 2 · Noreste"
+            'PUESTO' => fn (Collection $ids) => $ids->mapWithKeys(function (int $id): array {
+                $puesto = app(PuestoService::class)->buscar($id);
+
+                return $puesto === null ? [] : [$id => app(PuestoService::class)->nombre($puesto)];
+            }),
+            // Al reordenar un directorio, cada cambio nombra el puesto que se movió
+            'PUESTO_DIRECTORIO' => fn (Collection $ids) => $ids->mapWithKeys(function (int $id): array {
+                $puesto = app(PuestoService::class)->buscar($id);
+
+                return $puesto === null ? [] : [$id => app(PuestoService::class)->nombre($puesto)];
+            }),
+            // "de Ana López como Presidenta · Nacional" (el cargo en el género de la persona)
+            'DESIGNACION' => fn (Collection $ids) => DB::table('designacion as d')
+                ->join('persona as p', 'p.pers_id_persona', '=', 'd.desi_id_persona')
+                ->whereIn('d.desi_id_designacion', $ids)
+                ->get(['d.desi_id_designacion', 'd.desi_id_puesto', 'p.pers_genero', 'p.pers_nombre', 'p.pers_primer_apellido', 'p.pers_segundo_apellido'])
+                ->mapWithKeys(function (object $d): array {
+                    $puesto = app(PuestoService::class)->buscar((int) $d->desi_id_puesto);
+                    $cargo = $puesto === null ? '' : ' como '.app(PuestoService::class)->nombre($puesto, $d->pers_genero);
+
+                    return [$d->desi_id_designacion => 'de '.$this->nombre($d).$cargo];
+                }),
         ];
 
-        $nombres = [];
-
-        foreach ($movimientos->groupBy('bita_tabla') as $tabla => $deLaTabla) {
-            if (! isset($fuentes[$tabla])) {
-                continue;
+        // Qué números buscar en cada tabla: los de los movimientos y los de sus detalles
+        // (un detalle que nombra otro registro, como "Designación", va a la tabla de ese registro)
+        $ids = [];
+        foreach ($movimientos as $movimiento) {
+            $ids[$movimiento->bita_tabla][] = $movimiento->bita_referencia;
+            foreach ($detalles[$movimiento->bita_id_bitacora] ?? [] as $detalle) {
+                $ids[self::CAMPOS_DE_OTRA_TABLA[$detalle->bide_campo] ?? $movimiento->bita_tabla][] = $detalle->bide_referencia;
             }
+        }
 
-            $ids = $deLaTabla->pluck('bita_referencia')
-                ->merge($deLaTabla->flatMap(fn (object $m) => ($detalles[$m->bita_id_bitacora] ?? collect())->pluck('bide_referencia')))
-                ->filter()->unique()->values();
-
-            if ($ids->isNotEmpty()) {
-                $nombres[$tabla] = $fuentes[$tabla]($ids)->all();
+        $nombres = [];
+        foreach ($ids as $tabla => $deLaTabla) {
+            $deLaTabla = collect($deLaTabla)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+            if (isset($fuentes[$tabla]) && $deLaTabla->isNotEmpty()) {
+                $nombres[$tabla] = collect($fuentes[$tabla]($deLaTabla))->all();
             }
         }
 

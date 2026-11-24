@@ -4,6 +4,7 @@ namespace App\Services\Instituciones;
 
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
+use App\Support\Paginacion;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -26,8 +27,6 @@ use Illuminate\Validation\ValidationException;
 class InstitucionService
 {
     use BitacoraCatalogo;
-
-    public const POR_PAGINA = 25;
 
     public const PARTICIPACIONES = ['Matriz', 'Afiliada', 'Observadora'];
 
@@ -65,7 +64,7 @@ class InstitucionService
                 $q->when($filtros['participacion'] ?? null, fn (Builder $w, string $tipo) => $w->where('i.ined_participacion', $tipo));
             })
             ->orderBy('n.instn_nombre')
-            ->paginate(self::POR_PAGINA)
+            ->paginate(Paginacion::POR_PAGINA)
             ->withQueryString()
             ->through(function (object $institucion): object {
                 $institucion->motivo_para_no_borrar = $this->motivoParaNoBorrar((int) $institucion->id);

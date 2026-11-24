@@ -9,23 +9,19 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Pantalla de inicio (sección 10): saludo, contadores y, solo para quien
- * puede ver la bitácora (Superadmin), los últimos movimientos.
+ * Pantalla de inicio (sección 10): saludo, contadores, pendientes por atender
+ * y los últimos movimientos: de todos para quien ve la bitácora
+ * (superadministrador); los propios para los demás ("Mi actividad").
  */
 class InicioController extends Controller
 {
-    /**
-     * ¿Ya existe la consulta completa de la bitácora (M9)? Mientras no, el
-     * inicio avisa que hay más movimientos en lugar de mostrar "Ver más".
-     */
-    private const CONSULTA_COMPLETA_DE_BITACORA = false;
-
     public function __invoke(Request $request, InicioService $inicio): View
     {
         /** @var Usuario $cuenta */
         $cuenta = $request->user();
         $verBitacora = $cuenta->can(Privilegio::VerBitacora->value);
-        $bitacora = $verBitacora ? $inicio->bitacoraReciente() : ['movimientos' => collect(), 'hayMas' => false];
+        // Quien ve la bitácora ve la actividad de todos; los demás, la suya
+        $bitacora = $inicio->bitacoraReciente($verBitacora ? null : $cuenta->usua_id_usuario);
 
         return view('inicio', [
             'nombre' => $cuenta->persona?->nombre_completo,
@@ -36,7 +32,7 @@ class InicioController extends Controller
             'verBitacora' => $verBitacora,
             'movimientos' => $bitacora['movimientos'],
             'hayMasMovimientos' => $bitacora['hayMas'],
-            'consultaCompleta' => self::CONSULTA_COMPLETA_DE_BITACORA,
+            'porAtender' => $inicio->porAtender($cuenta),
         ]);
     }
 }

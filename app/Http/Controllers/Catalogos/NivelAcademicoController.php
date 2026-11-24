@@ -7,6 +7,7 @@ use App\Http\Requests\Catalogos\EliminarRequest;
 use App\Http\Requests\Catalogos\NivelAcademicoRequest;
 use App\Models\NivelAcademico;
 use App\Services\Catalogos\NivelAcademicoService;
+use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,8 +24,11 @@ class NivelAcademicoController extends Controller
 
     public function index(): View
     {
+        $grados = $this->grados->listado();
+
         return view('catalogos.grados.index', [
-            'grados' => $this->grados->listado(),
+            'grados' => $grados,
+            'pagina' => Paginacion::de($grados),
             'motivos' => EliminarRequest::MOTIVOS,
         ]);
     }
