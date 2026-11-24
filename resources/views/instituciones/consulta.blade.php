@@ -1,6 +1,7 @@
 {{--
     Consulta de una institución (solo lectura), por pestañas: General,
-    Participación, Razón social y, si es universidad, Sedes. Todo se cambia
+    Personas (de hoy y anteriores), Participación, Razón social y, si es
+    universidad, Sedes. Todo se cambia
     desde "Editar", que abre el mismo formulario del registro ya lleno.
     Las pestañas son enlaces (?pestana=…); pestanas.js las cambia sin recargar.
 --}}
@@ -48,6 +49,8 @@
                     {{ $titulo }}
                     @if ($clave === 'sedes')
                         <span class="pestanas__cifra">{{ $sedes->total() }}</span>
+                    @elseif ($clave === 'personas')
+                        <span class="pestanas__cifra">{{ $personas->total() }}</span>
                     @endif
                 </a>
             @endforeach
@@ -153,6 +156,59 @@
                         </li>
                     @endforeach
                 </ol>
+            </div>
+        </section>
+
+        {{-- Personas: quienes ocupan u ocuparon un puesto de la institución --}}
+        <section id="panel-personas" class="pestanas__panel" role="tabpanel" aria-labelledby="pestana-personas" @if ($pestana !== 'personas') hidden @endif>
+            <div class="tarjeta tarjeta--tabla">
+                <div class="tarjeta__barra">
+                    <p class="tarjeta__texto">Primero quienes están hoy (el titular va primero) y después quienes estuvieron antes.</p>
+                </div>
+
+                @if ($personas->isEmpty())
+                    <p class="vacio vacio--en-tabla">Nadie ha ocupado todavía un puesto de esta institución.</p>
+                @else
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Persona</th>
+                                <th scope="col">Cargo</th>
+                                <th scope="col">Periodo</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($personas as $persona)
+                                <tr>
+                                    <th scope="row" data-etiqueta="Persona">
+                                        @if ($persona->oculta)
+                                            <span class="tabla__vacio">Persona oculta</span>
+                                        @else
+                                            @can(\App\Enums\Privilegio::GestionarPersonas->value)
+                                                <a href="{{ route('personas.show', $persona->persona) }}" class="tabla__principal tabla__enlace">{{ $persona->nombre }}</a>
+                                            @else
+                                                <span class="tabla__principal">{{ $persona->nombre }}</span>
+                                            @endcan
+                                        @endif
+                                    </th>
+                                    <td data-etiqueta="Cargo">
+                                        {{ $persona->cargo }}
+                                        @if ($persona->titular)
+                                            <span class="insignia-titular">Titular</span>
+                                        @endif
+                                    </td>
+                                    <td data-etiqueta="Periodo">{{ $fecha($persona->desde) }} – {{ $persona->hasta ? $fecha($persona->hasta) : 'a la fecha' }}</td>
+                                    <td data-etiqueta="Estado">
+                                        <span @class(['estado', 'estado--activo' => $persona->vigente])>{{ $persona->vigente ? 'Vigente' : ($persona->por_iniciar ? 'Por iniciar' : 'Terminada') }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <x-paginacion :paginas="$personas" />
+                @endif
             </div>
         </section>
 

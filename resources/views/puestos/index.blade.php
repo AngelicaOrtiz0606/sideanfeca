@@ -122,7 +122,7 @@
                         @endphp
                         <tr @class(['tabla__fila--inactiva' => ! $puesto->activo])>
                             <th scope="row" data-etiqueta="Puesto">
-                                <span class="tabla__principal">{{ $puesto->cargo }}</span>
+                                <a href="{{ route('puestos.show', $id) }}" class="tabla__principal tabla__enlace">{{ $puesto->cargo }}</a>
                                 {{-- Debajo, solo lo que no va en otra columna: la zona o la institución --}}
                                 @if ($puesto->zona_numero || $puesto->institucion || $puesto->organizacion)
                                     <span class="tabla__detalle">
@@ -153,6 +153,11 @@
                             </td>
                             <td class="tabla__acciones">
                                 <div class="acciones-fila">
+                                    <a href="{{ route('puestos.show', $id) }}" class="accion accion--consultar">
+                                        <x-icono nombre="ojo" />
+                                        <span class="accion__texto">Consultar <span class="solo-lectores">{{ $nombre }}</span></span>
+                                    </a>
+
                                     <button type="button" class="accion accion--editar"
                                             data-abrir-dialogo="dialogo-puesto"
                                             data-accion="{{ route('puestos.update', $id) }}" data-metodo="PUT"

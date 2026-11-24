@@ -141,7 +141,7 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas
     Route::middleware(Privilegio::GestionarPuestos->middleware())->group(function () {
         Route::patch('/puestos/{puesto}/estado', [PuestoController::class, 'cambiarEstado'])->name('puestos.estado');
-        Route::resource('puestos', PuestoController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::resource('puestos', PuestoController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     });
 
     // Catálogos (M3)

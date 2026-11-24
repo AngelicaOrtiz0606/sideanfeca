@@ -157,6 +157,27 @@ class PuestosTest extends TestCase
         $this->actingAs($this->admin)->get('/puestos')->assertOk()->assertDontSee('Juan Pérez López')->assertSee('Vacante');
     }
 
+    public function test_la_consulta_muestra_el_historial_de_quienes_lo_han_ocupado(): void
+    {
+        $fca = $this->institucion();
+        $id = $this->puesto(['cargo' => $this->cargos['Director'], 'institucion' => $fca, 'titular' => '1']);
+        $antes = (int) DB::table('persona')->insertGetId(['pers_nombre' => 'Rosa', 'pers_primer_apellido' => 'Gómez', 'pers_genero' => 'F', 'pers_id_institucion_educativa' => $fca], 'pers_id_persona');
+        DB::table('designacion')->insert(['desi_id_puesto' => $id, 'desi_id_persona' => $antes, 'desi_fecha_inicio' => '2018-01-01', 'desi_fecha_fin' => '2023-12-31']);
+        $oculta = (int) DB::table('persona')->insertGetId(['pers_nombre' => 'Oculta', 'pers_primer_apellido' => 'Sin Nombre', 'pers_genero' => 'F', 'pers_id_institucion_educativa' => $fca, 'pers_oculta_admin' => true], 'pers_id_persona');
+        DB::table('designacion')->insert(['desi_id_puesto' => $id, 'desi_id_persona' => $oculta, 'desi_fecha_inicio' => '2015-01-01', 'desi_fecha_fin' => '2017-12-31']);
+        $this->designar($id, $fca);
+
+        $this->actingAs($this->admin)->get('/puestos')->assertOk()->assertSee(route('puestos.show', $id), false);
+
+        // De la más reciente a la más antigua; la oculta, sin su nombre
+        $this->actingAs($this->admin)->get("/puestos/{$id}")->assertOk()
+            ->assertSee('Titular de la institución')
+            ->assertSeeInOrder(['Quiénes lo han ocupado', 'Juan Pérez López', '1 de enero de 2024 – a la fecha', 'Vigente', 'Rosa Gómez', '1 de enero de 2018 – 31 de diciembre de 2023', 'Terminada', 'Persona oculta'])
+            ->assertDontSee('Sin Nombre');
+
+        $this->actingAs($this->admin)->get('/puestos/999999')->assertNotFound();
+    }
+
     public function test_la_lista_resalta_la_coordinacion_y_se_filtra_y_ordena(): void
     {
         $certificacion = (int) DB::table('coordinacion_nacional')->where('cona_nombre', 'Certificación Académica')->value('cona_id_coordinacion_nacional');
@@ -172,18 +193,18 @@ class PuestosTest extends TestCase
 
         // Por coordinación: solo los de Historia (el nacional y el regional)
         $this->actingAs($this->admin)->get("/puestos?coordinacion={$historia}")->assertOk()
-            ->assertSee('Mostrando 1–2 de 2')->assertDontSee('<span class="tabla__principal">Presidente</span>', false);
+            ->assertSee('Mostrando 1–2 de 2')->assertDontSee('tabla__enlace">Presidente</a>', false);
 
         // Ordenar por coordinación: Certificación (1.ª) antes que Historia; sin coordinación al final
         $this->actingAs($this->admin)->get('/puestos?orden=coordinacion')->assertOk()
-            ->assertSeeInOrder(['Certificación Académica</span>', 'Historia</span>', 'Historia</span>', '<span class="tabla__principal">Presidente</span>'], false);
+            ->assertSeeInOrder(['Certificación Académica</span>', 'Historia</span>', 'Historia</span>', 'tabla__enlace">Presidente</a>'], false);
 
         // Ordenar por zona: zona 1, zona 2 y después los que no tienen zona
         $this->actingAs($this->admin)->get('/puestos?orden=zona')->assertOk()
-            ->assertSeeInOrder(['Zona 1 · Noroeste', 'Zona 2 · Norte', '<span class="tabla__principal">Presidente</span>'], false);
+            ->assertSeeInOrder(['Zona 1 · Noroeste', 'Zona 2 · Norte', 'tabla__enlace">Presidente</a>'], false);
 
         // Un orden desconocido se ignora
-        $this->actingAs($this->admin)->get('/puestos?orden=nada&coordinacion=999999')->assertOk()->assertSee('<span class="tabla__principal">Presidente</span>', false);
+        $this->actingAs($this->admin)->get('/puestos?orden=nada&coordinacion=999999')->assertOk()->assertSee('tabla__enlace">Presidente</a>', false);
     }
 
     public function test_desactivar_activar_y_borrar_sin_designaciones(): void
@@ -211,6 +232,7 @@ class PuestosTest extends TestCase
             ->update(['ropr_activo' => false]);
 
         $this->actingAs($this->admin)->get('/puestos')->assertForbidden();
+        $this->actingAs($this->admin)->get('/puestos/1')->assertForbidden();
         $this->actingAs($this->admin)->post('/puestos', ['cargo' => $this->cargos['Presidente']])->assertForbidden();
         $this->assertSame(0, DB::table('puesto')->count());
     }

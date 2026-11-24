@@ -81,6 +81,11 @@
     margin-top: 0;
 }
 
+/* Una tarjeta debajo de la ficha (por ejemplo, el historial de un puesto) */
+.ficha + .tarjeta {
+    margin-top: 1.25rem;
+}
+
 .ficha__encabezado {
     display: flex;
     align-items: center;

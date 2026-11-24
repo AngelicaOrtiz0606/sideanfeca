@@ -84,7 +84,7 @@ class InstitucionController extends Controller
         abort_if($encontrada === null, 404);
 
         $esUniversidad = $encontrada->tipo === 'Universidad';
-        $pestanas = ['general' => 'General', 'participacion' => 'Participación', 'razon-social' => 'Razón social'] + ($esUniversidad ? ['sedes' => 'Sedes'] : []);
+        $pestanas = ['general' => 'General', 'personas' => 'Personas', 'participacion' => 'Participación', 'razon-social' => 'Razón social'] + ($esUniversidad ? ['sedes' => 'Sedes'] : []);
         $pestana = array_key_exists((string) $request->query('pestana'), $pestanas) ? (string) $request->query('pestana') : 'general';
 
         return view('instituciones.consulta', [
@@ -94,6 +94,7 @@ class InstitucionController extends Controller
             'participaciones' => $this->instituciones->historialParticipacion($institucion),
             'nombres' => $this->instituciones->historialNombres($institucion),
             'sedes' => Paginacion::de($esUniversidad ? $this->instituciones->sedes($institucion) : collect(), 'pagina_sedes'),
+            'personas' => Paginacion::de($this->instituciones->personas($institucion), 'pagina_personas'),
             'sectores' => InstitucionService::SECTORES,
         ]);
     }
