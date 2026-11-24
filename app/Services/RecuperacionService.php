@@ -7,8 +7,12 @@ use App\Mail\EnlaceRecuperacion;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
+
+use function Illuminate\Support\defer;
 
 /**
  * Recuperación de contraseña con un enlace enviado por correo
@@ -19,7 +23,9 @@ use Illuminate\Support\Str;
  * - Vence a los 15 minutos, medidos con la hora de la base de datos.
  * - Cada intento con un token equivocado cuenta; al quinto, la solicitud se bloquea.
  * - Un solo uso. Al pedir un enlace nuevo, los anteriores dejan de servir.
- * - Solo las cuentas activas con persona reciben correo.
+ * - Solo las cuentas activas con persona reciben correo. El correo se envía
+ *   después de responder: así la respuesta tarda lo mismo con un correo
+ *   registrado que con uno que no lo está (no revela qué correos existen).
  * - No se registra en la bitácora (decisión del proyecto).
  */
 class RecuperacionService
@@ -58,10 +64,14 @@ class RecuperacionService
             ], 'reco_id_recuperacion');
         });
 
-        Mail::to($cuenta->usua_correo)->send(new EnlaceRecuperacion(
-            $this->enlace($idSolicitud, $token),
-            self::MINUTOS_VIGENCIA,
-        ));
+        $correo = new EnlaceRecuperacion($this->enlace($idSolicitud, $token), self::MINUTOS_VIGENCIA);
+        defer(function () use ($cuenta, $correo): void {
+            try {
+                Mail::to($cuenta->usua_correo)->send($correo);
+            } catch (Throwable $error) {
+                Log::error('No se pudo enviar el enlace de recuperación.', ['error' => $error->getMessage()]);
+            }
+        });
     }
 
     /**

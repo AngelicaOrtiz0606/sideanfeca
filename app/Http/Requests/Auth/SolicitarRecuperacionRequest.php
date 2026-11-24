@@ -8,14 +8,20 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Formulario para pedir un código de recuperación.
- * Límite: 3 solicitudes cada 15 minutos por correo e IP.
+ * Formulario para pedir un código de recuperación. Límites:
+ * - 3 solicitudes cada 15 minutos por correo e IP;
+ * - 10 solicitudes por hora desde una misma IP, con cualquier correo (para que
+ *   nadie use el sistema para llenar de correos a otras personas).
  */
 class SolicitarRecuperacionRequest extends FormRequest
 {
     public const SOLICITUDES_PERMITIDAS = 3;
 
     public const VENTANA_SEGUNDOS = 900;
+
+    public const SOLICITUDES_POR_IP = 10;
+
+    public const VENTANA_IP_SEGUNDOS = 3600;
 
     public function authorize(): bool
     {
@@ -54,17 +60,23 @@ class SolicitarRecuperacionRequest extends FormRequest
      */
     public function asegurarLimite(): void
     {
-        $clave = $this->claveDeLimite();
+        foreach ([[$this->claveDeLimite(), self::SOLICITUDES_PERMITIDAS], [$this->claveDeIp(), self::SOLICITUDES_POR_IP]] as [$clave, $maximo]) {
+            if (RateLimiter::tooManyAttempts($clave, $maximo)) {
+                $minutos = (int) ceil(RateLimiter::availableIn($clave) / 60);
 
-        if (RateLimiter::tooManyAttempts($clave, self::SOLICITUDES_PERMITIDAS)) {
-            $minutos = (int) ceil(RateLimiter::availableIn($clave) / 60);
-
-            throw ValidationException::withMessages([
-                'correo' => "Ya pediste varios códigos. Espera {$minutos} minutos y vuelve a intentarlo.",
-            ]);
+                throw ValidationException::withMessages([
+                    'correo' => "Ya pediste varios códigos. Espera {$minutos} minutos y vuelve a intentarlo.",
+                ]);
+            }
         }
 
-        RateLimiter::hit($clave, self::VENTANA_SEGUNDOS);
+        RateLimiter::hit($this->claveDeLimite(), self::VENTANA_SEGUNDOS);
+        RateLimiter::hit($this->claveDeIp(), self::VENTANA_IP_SEGUNDOS);
+    }
+
+    private function claveDeIp(): string
+    {
+        return 'recuperacion-ip|'.$this->ip();
     }
 
     private function claveDeLimite(): string
