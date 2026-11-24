@@ -39,27 +39,27 @@
             <p class="seccion__nota"><span class="punto punto--activo" aria-hidden="true"></span>Solo se cuentan las activas.</p>
         </div>
 
-        <dl class="contadores">
+        <ul class="contadores" role="list">
             @foreach ($tarjetas as $tarjeta)
                 @php
                     $activas = $contadores[$tarjeta['clave']];
                     $desactivadas = $contadores[$tarjeta['clave'].'_total'] - $activas;
                 @endphp
-                <div class="contador">
+                <li class="contador">
                     <span class="contador__icono" data-tono="{{ $tarjeta['tono'] }}" aria-hidden="true">
                         <x-icono :nombre="$tarjeta['icono']" />
                     </span>
                     <div class="contador__datos">
-                        <dt class="contador__etiqueta">{{ $tarjeta['etiqueta'] }}</dt>
-                        <dd class="contador__valor" data-contar="{{ $activas }}">{{ number_format($activas) }}</dd>
-                        <dd class="contador__detalle">
+                        <p class="contador__etiqueta">{{ $tarjeta['etiqueta'] }}</p>
+                        <p class="contador__valor" data-contar="{{ $activas }}">{{ number_format($activas) }}</p>
+                        <p class="contador__detalle">
                             <span class="punto" aria-hidden="true"></span>
                             Desactivadas: {{ number_format($desactivadas) }}
-                        </dd>
+                        </p>
                     </div>
-                </div>
+                </li>
             @endforeach
-        </dl>
+        </ul>
     </section>
 
     @php $pendientes = collect($porAtender)->sum('cantidad'); @endphp

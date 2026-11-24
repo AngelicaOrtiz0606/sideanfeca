@@ -51,7 +51,9 @@
     color: var(--color-tinta);
 }
 
-.pestanas__pestana[aria-selected='true'] {
+/* Pestañas de la ficha (role=tab) o de navegación entre pantallas (enlaces con aria-current) */
+.pestanas__pestana[aria-selected='true'],
+.pestanas__pestana[aria-current='page'] {
     border-bottom-color: var(--color-marca);
     color: var(--color-marca);
 }

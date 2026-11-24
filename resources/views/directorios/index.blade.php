@@ -44,7 +44,7 @@
     <nav class="pestanas__lista" aria-label="Directorios">
         @foreach ($tipos as $tipo)
             <a href="{{ route('directorios.index', ['directorio' => $tipo->id, 'anio' => $filtros['anio']]) }}" class="pestanas__pestana"
-               @if ($elegido->id === $tipo->id) aria-current="page" aria-selected="true" @endif>
+               @if ($elegido->id === $tipo->id) aria-current="page" @endif>
                 {{ $tipo->nombre }}
             </a>
         @endforeach

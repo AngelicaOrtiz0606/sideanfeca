@@ -220,10 +220,10 @@
     background: #f6d7d5;
 }
 
-/* No se puede borrar: gris; al dar clic explica por qué */
+/* No se puede borrar: gris (con contraste suficiente); al dar clic explica por qué */
 .accion--bloqueada {
     background: var(--color-fondo);
-    color: #9a9a9a;
+    color: #6b6b6b;
 }
 
 .accion--bloqueada:hover {

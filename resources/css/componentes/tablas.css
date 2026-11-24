@@ -285,7 +285,7 @@
 
 /* Celda sin dato */
 .tabla__vacio {
-    color: var(--color-borde-control);
+    color: var(--color-texto-suave);
 }
 
 /* Número de afiliación (7 dígitos) */
