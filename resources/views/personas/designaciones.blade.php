@@ -43,7 +43,8 @@
             <x-seccion-formulario id="seccion-designaciones" numero="1" titulo="Designaciones" descripcion="El cargo y su ámbito, y desde cuándo. Si el puesto aún no existe, se crea al guardar.">
                 @include('personas._designaciones', ['notaInstitucional' => $persona->institucion
                     ? "Es un cargo de su institución: {$persona->institucion}."
-                    : 'Un cargo institucional necesita que pertenezca a una institución; hoy pertenece a una organización.'])
+                    : 'Un cargo institucional necesita que pertenezca a una institución; hoy pertenece a una organización.',
+                    'institucion' => $persona->institucion_id])
             </x-seccion-formulario>
 
             <div class="tarjeta cierre-registro">

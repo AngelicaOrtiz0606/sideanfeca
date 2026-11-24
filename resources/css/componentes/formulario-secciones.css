@@ -662,3 +662,10 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Titular de la institución: quién lo es hoy y qué pasa al cambiarlo */
+.aviso-titular {
+    display: grid;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+}

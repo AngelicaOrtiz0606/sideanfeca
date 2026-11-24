@@ -53,12 +53,14 @@ class InstitucionRequest extends FormRequest
                 Rule::exists('institucion_educativa', 'ined_id_institucion_educativa')
                     ->where('ined_id_tipo_institucion', DB::table('tipo_institucion_educativa')->where('tiie_nombre', 'Universidad')->value('tiie_id_tipo_institucion')),
             ],
-            'participacion' => $id === null ? ['required', Rule::in(InstitucionService::PARTICIPACIONES)] : ['prohibited'],
+            // Al editar se puede corregir (un error de captura); el cambio con historial tiene su propia acción
+            'participacion' => [$id === null ? 'required' : 'nullable', Rule::in(InstitucionService::PARTICIPACIONES)],
             'desde' => $id === null ? ['required', 'date', 'after_or_equal:1900-01-01', 'before_or_equal:today'] : ['prohibited'],
             'numero_modo' => ['nullable', Rule::in(['automatico', 'manual'])],
             'numero' => [
                 Rule::excludeIf($this->numeroAutomatico()),
-                Rule::requiredIf($participacion === 'Afiliada'),
+                // Al corregir a afiliada una que no lo era, el número puede ir vacío: se asigna el siguiente
+                Rule::requiredIf($participacion === 'Afiliada' && ($id === null || $this->actual()?->participacion === 'Afiliada')),
                 Rule::prohibitedIf($participacion !== 'Afiliada' && $participacion !== null),
                 'nullable', 'string', 'regex:/^[0-9]{7}$/',
                 new NoRepetidoEnCatalogo('institucion_educativa', 'ined_num_afiliacion', 'ined_id_institucion_educativa', $id, 'El número :existente ya pertenece a otra institución.'),
@@ -139,10 +141,10 @@ class InstitucionRequest extends FormRequest
         return [
             'tipo' => $datos['tipo'],
             'universidad' => in_array($datos['tipo'], ['Facultad', 'Campus'], true) ? (int) $datos['universidad'] : null,
-            'participacion' => $datos['participacion'] ?? null,
+            'participacion' => $this->participacion(),
             'desde' => $datos['desde'] ?? null,
             // Null en una afiliada nueva = el servicio asigna el siguiente consecutivo al guardar
-            'numero' => $this->participacion() === 'Afiliada' && ! $this->numeroAutomatico() ? $datos['numero'] : null,
+            'numero' => $this->participacion() === 'Afiliada' && ! $this->numeroAutomatico() ? (($datos['numero'] ?? null) ?: null) : null,
             'razon_social' => TextoCatalogo::limpiar($datos['razon_social']),
             'sector' => $datos['sector'],
             'sitio_web' => ($datos['sitio_web'] ?? null) ?: null,
@@ -157,19 +159,19 @@ class InstitucionRequest extends FormRequest
     }
 
     /**
-     * Participación que manda: la elegida al registrar o la actual al editar.
+     * Participación que manda: la elegida (al registrar o al corregirla al
+     * editar); si no viene una válida al editar, la actual.
      */
     public function participacion(): ?string
     {
-        $id = $this->idInstitucion();
-
-        if ($id === null) {
-            $elegida = $this->input('participacion');
-
-            return in_array($elegida, InstitucionService::PARTICIPACIONES, true) ? $elegida : null;
+        $elegida = $this->input('participacion');
+        if (in_array($elegida, InstitucionService::PARTICIPACIONES, true)) {
+            return $elegida;
         }
 
-        return DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->value('ined_participacion');
+        $id = $this->idInstitucion();
+
+        return $id === null ? null : DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->value('ined_participacion');
     }
 
     /**

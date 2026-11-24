@@ -190,12 +190,13 @@ class InstitucionesTest extends TestCase
         ], $this->detalles($bitacora->bita_id_bitacora));
     }
 
-    public function test_editar_no_cambia_la_participacion(): void
+    public function test_editar_corrige_la_participacion_pero_no_cambia_su_fecha(): void
     {
         $id = $this->registrar($this->observadora());
 
+        // La fecha es del historial (Pasar a afiliada); al editar solo se corrige la participación
         $this->actingAs($this->admin)->put("/instituciones/{$id}", ['participacion' => 'Afiliada', 'desde' => '2020-01-01'] + $this->observadora())
-            ->assertSessionHasErrors(['participacion', 'desde']);
+            ->assertSessionHasErrors(['desde']);
 
         $this->assertDatabaseHas('institucion_educativa', ['ined_id_institucion_educativa' => $id, 'ined_participacion' => 'Observadora']);
     }

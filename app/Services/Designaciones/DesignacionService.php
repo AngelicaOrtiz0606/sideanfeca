@@ -10,6 +10,7 @@ use App\Support\FuncionSql;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Designaciones: una persona ocupando un puesto (un cargo en su ámbito)
@@ -20,6 +21,10 @@ use Illuminate\Support\Facades\DB;
  *   movimiento de bitácora que pide quien llama (una sola línea por acción).
  * - Terminar (la persona deja el puesto): desactivar_designacion de la base.
  * - Borrar una designación capturada por error: eliminar_designacion_erronea.
+ * - Titular de la institución: al designar en un puesto institucional se
+ *   puede marcar como titular (el que sale en el directorio de Instituciones).
+ *   Si el titular era otro puesto, ese deja de serlo; si era el mismo puesto
+ *   y alguien lo ocupaba, su designación termina el día anterior.
  * Las dos funciones revisan el privilegio gestionar_designaciones y
  * escriben su propia bitácora.
  */
@@ -36,9 +41,9 @@ class DesignacionService
      * del movimiento $idBitacora ("Designación: Presidenta · Nacional, desde
      * 20/11/2026"), y cada puesto creado como "Puesto creado".
      *
-     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion?: ?int, fecha_inicio: string, fecha_fin?: ?string}>  $designaciones
+     * @param  array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion?: ?int, fecha_inicio: string, fecha_fin?: ?string, titular?: bool}>  $designaciones
      */
-    public function designar(int $persona, string $genero, array $designaciones, int $idBitacora): void
+    public function designar(int $persona, string $genero, array $designaciones, int $idBitacora, ?Usuario $actor = null): void
     {
         $servicio = app(PersonaService::class);
 
@@ -55,6 +60,10 @@ class DesignacionService
                     'pues_activo' => true,
                 ], 'pues_id_puesto');
                 $creado = true;
+            }
+
+            if (($designacion['titular'] ?? false) && $designacion['institucion'] !== null) {
+                $this->hacerTitular($actor, $puesto, $persona, $designacion['institucion'], $designacion['fecha_inicio'], $idBitacora);
             }
 
             $id = (int) DB::table('designacion')->insertGetId([
@@ -84,7 +93,7 @@ class DesignacionService
     {
         DB::transaction(function () use ($actor, $persona, $genero, $designaciones): void {
             $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $persona);
-            $this->designar($persona, $genero, $designaciones, $idBitacora);
+            $this->designar($persona, $genero, $designaciones, $idBitacora, $actor);
         });
     }
 
@@ -93,6 +102,67 @@ class DesignacionService
      * base guarda el día anterior como último día). Devuelve el error de la
      * base en palabras, o null si se registró.
      */
+    /**
+     * El titular de una institución en esa fecha: su puesto titular y, si
+     * alguien lo ocupa, quién y desde cuándo. Null si no tiene puesto titular.
+     */
+    public function titularDe(int $institucion, ?string $fecha = null): ?object
+    {
+        $fecha ??= now()->toDateString();
+        $puesto = DB::table('puesto as p')->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
+            ->where('p.pues_id_institucion_educativa', $institucion)->where('p.pues_titularidad', true)
+            ->first(['p.pues_id_puesto as id', 'p.pues_id_cargo as cargo_id', 'c.carg_nombre_m as cargo', 'c.carg_nombre_f as cargo_f']);
+        if ($puesto === null) {
+            return null;
+        }
+
+        $ocupante = DB::table('designacion as d')->join('persona as per', 'per.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('d.desi_id_puesto', $puesto->id)
+            ->where('d.desi_fecha_inicio', '<=', $fecha)
+            ->where(fn ($q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $fecha))
+            ->first(['d.desi_id_designacion as designacion', 'd.desi_id_persona as persona', 'd.desi_fecha_inicio as desde', 'per.pers_genero as genero',
+                DB::raw("concat_ws(' ', per.pers_nombre, per.pers_primer_apellido, per.pers_segundo_apellido) as nombre")]);
+
+        return (object) [
+            'puesto' => (int) $puesto->id,
+            'cargo_id' => (int) $puesto->cargo_id,
+            'cargo' => $ocupante?->genero === 'F' && filled($puesto->cargo_f) ? $puesto->cargo_f : $puesto->cargo,
+            'designacion' => $ocupante ? (int) $ocupante->designacion : null,
+            'persona' => $ocupante ? (int) $ocupante->persona : null,
+            'ocupante' => $ocupante?->nombre,
+            'desde' => $ocupante?->desde,
+        ];
+    }
+
+    /**
+     * Deja $puesto como titular de la institución desde $desde: si el titular
+     * era otro puesto, ese deja de serlo (quien lo ocupa conserva su cargo);
+     * si era este mismo y lo ocupaba otra persona, su designación termina el
+     * día anterior. Queda como detalle del movimiento $idBitacora.
+     */
+    private function hacerTitular(?Usuario $actor, int $puesto, int $persona, int $institucion, string $desde, int $idBitacora): void
+    {
+        $actual = $this->titularDe($institucion, $desde);
+
+        if ($actual !== null && $actual->puesto === $puesto) {
+            if ($actual->designacion !== null && $actual->persona !== $persona) {
+                if ($actor === null || ($error = $this->terminar($actor, $actual->designacion, $desde)) !== null) {
+                    throw ValidationException::withMessages(['designaciones' => 'No se pudo terminar la designación del titular anterior: '.($error ?? 'falta quién lo hace').'.']);
+                }
+                // desactivar_designacion deja su propia línea en la bitácora (sin nombres en los detalles)
+            }
+
+            return;
+        }
+
+        if ($actual !== null) {
+            DB::table('puesto')->where('pues_id_puesto', $actual->puesto)->update(['pues_titularidad' => false]);
+        }
+        DB::table('puesto')->where('pues_id_puesto', $puesto)->update(['pues_titularidad' => true]);
+        $this->detalle($idBitacora, $puesto, 'Titular de la institución', $actual?->cargo,
+            DB::table('puesto as p')->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')->where('p.pues_id_puesto', $puesto)->value('c.carg_nombre_m'));
+    }
+
     public function terminar(Usuario $actor, int $designacion, string $fecha): ?string
     {
         return FuncionSql::llamar('desactivar_designacion', [$actor->usua_id_usuario, $designacion, $fecha])[1];

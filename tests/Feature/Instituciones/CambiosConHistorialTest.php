@@ -306,6 +306,29 @@ class CambiosConHistorialTest extends TestCase
             ->get()->map(fn ($n) => [$n->instn_nombre, $n->instn_fecha_inicio, $n->instn_fecha_fin])->all());
     }
 
+    public function test_editar_corrige_la_participacion_sin_historial(): void
+    {
+        $udg = $this->registrarObservadora();
+
+        // Se capturó como observadora, pero era afiliada: sin número, se le asigna el siguiente (año y zona del periodo)
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Afiliada']))
+            ->assertSessionHasNoErrors();
+        $institucion = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->first();
+        $this->assertSame('Afiliada', $institucion->ined_participacion);
+        $this->assertMatchesRegularExpression('/^1004\d{3}$/', $institucion->ined_num_afiliacion);
+        // Se corrige su periodo vigente: el historial no gana un periodo nuevo
+        $this->assertSame([['Afiliada', '2010-08-15', null]], $this->periodos($udg));
+        $this->assertContains(['Participación (corrección)', 'Observadora', 'Afiliada'], $this->detalles($this->ultimaBitacora()->bita_id_bitacora));
+
+        // Y de regreso: una observadora no tiene número
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Observadora']))->assertSessionHasNoErrors();
+        $this->assertNull(DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->value('ined_num_afiliacion'));
+
+        // Solo una universidad puede ser matriz
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Matriz', 'tipo' => 'Facultad']))
+            ->assertSessionHasErrors('tipo');
+    }
+
     public function test_los_cambios_con_historial_regresan_a_editar(): void
     {
         $udg = $this->registrarObservadora();

@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Personas;
 
+use App\Services\Designaciones\DesignacionService;
 use App\Services\Personas\PersonaService;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +21,10 @@ use Illuminate\Validation\Rule;
  * - el mismo puesto no se repite entre las filas en periodos que se cruzan;
  * - el puesto debe estar activo y libre en todo ese periodo;
  * - un cargo nacional que es de una organización (el presidente de CACECA)
- *   solo lo ocupa alguien de esa organización, y se usa el puesto de ella.
+ *   solo lo ocupa alguien de esa organización, y se usa el puesto de ella;
+ * - un cargo institucional se puede marcar como titular de la institución:
+ *   si ya hay titular, hay que confirmar el cambio (reemplazar). Si es el
+ *   mismo puesto, la designación del titular anterior termina el día antes.
  * Los mensajes dicen de qué fila se trata ("Designación 2: ...").
  */
 trait ValidaDesignaciones
@@ -78,7 +83,7 @@ trait ValidaDesignaciones
      * y uno nacional sin coordinación, su organización (para usar el puesto de
      * su organización, si lo hay).
      *
-     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, fecha_inicio: string, fecha_fin: ?string}>
+     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, fecha_inicio: string, fecha_fin: ?string, titular: bool, reemplazar: bool}>
      */
     public function designaciones(?int $institucion, ?int $organizacion = null): array
     {
@@ -94,6 +99,8 @@ trait ValidaDesignaciones
                 'organizacion' => $nivel === 'Nacional' && $coordinacion === null ? $organizacion : null,
                 'fecha_inicio' => (string) $d['fecha_inicio'],
                 'fecha_fin' => filled($d['fecha_fin'] ?? null) ? (string) $d['fecha_fin'] : null,
+                'titular' => $nivel === 'Institucional' && filter_var($d['titular'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'reemplazar' => filter_var($d['reemplazar'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
         }, (array) $this->input('designaciones', []));
     }
@@ -156,12 +163,33 @@ trait ValidaDesignaciones
             $vistas[$clave][] = [$n, $designacion['fecha_inicio'], $designacion['fecha_fin']];
 
             $puesto = $servicio->puestoDe($designacion['cargo'], $designacion['zona'], $designacion['coordinacion'], $designacion['institucion'], $designacion['organizacion']);
+
+            // Titular de la institución: si ya hay alguien, se confirma el cambio
+            $reemplazada = null;
+            if ($designacion['titular'] && $designacion['institucion'] !== null) {
+                $titular = app(DesignacionService::class)->titularDe($designacion['institucion'], $designacion['fecha_inicio']);
+                if ($titular?->ocupante !== null && ! $designacion['reemplazar']) {
+                    $validator->errors()->add("designaciones.{$i}.reemplazar", "Designación {$n}: el titular de la institución es {$titular->ocupante} ({$titular->cargo}). Confirma el cambio de titular.");
+
+                    continue;
+                }
+                if ($titular?->ocupante !== null && $titular->puesto === $puesto) {
+                    // El mismo puesto: su designación termina el día anterior, así que debe haber empezado antes
+                    if ($titular->desde >= $designacion['fecha_inicio']) {
+                        $validator->errors()->add("designaciones.{$i}.fecha_inicio", "Designación {$n}: {$titular->ocupante} es titular desde el ".Carbon::parse($titular->desde)->format('d/m/Y').'; la nueva designación debe empezar después.');
+
+                        continue;
+                    }
+                    $reemplazada = $titular->designacion;
+                }
+            }
+
             if ($puesto === null) {
                 continue; // El puesto se creará al guardar
             }
             if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
                 $validator->errors()->add($campo, "Designación {$n}: ese puesto está desactivado. Actívalo en Puestos o elige otro.");
-            } elseif (($ocupante = $servicio->ocupanteEntre($puesto, $designacion['fecha_inicio'], $designacion['fecha_fin'])) !== null) {
+            } elseif (($ocupante = $servicio->ocupanteEntre($puesto, $designacion['fecha_inicio'], $designacion['fecha_fin'], $reemplazada)) !== null) {
                 $validator->errors()->add($campo, "Designación {$n}: ese puesto lo ocupa {$ocupante} en esas fechas. Primero termina esa designación.");
             }
         }

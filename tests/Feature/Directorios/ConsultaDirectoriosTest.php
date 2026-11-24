@@ -14,7 +14,7 @@ use Tests\Support\CreaInstituciones;
 use Tests\TestCase;
 
 /**
- * Consultar directorios (M10): cada directorio en un año, con sus filtros,
+ * Consultar directorios (M10): cada directorio como está hoy, con sus filtros,
  * los correos para copiar y el CSV. Una persona oculta aparece como
  * "Vacante" y solo se muestran los contactos visibles, en pantalla y en el CSV.
  */
@@ -63,17 +63,18 @@ class ConsultaDirectoriosTest extends TestCase
             ->assertSee('>rosa@anfeca.org</textarea>', false);
     }
 
-    public function test_cada_anio_muestra_a_quien_ocupaba_el_puesto(): void
+    public function test_solo_muestra_a_quien_ocupa_el_puesto_hoy(): void
     {
-        $anterior = (int) now()->subYears(2)->format('Y');
         $presidente = $this->enDirectorio('Consejo Nacional Directivo', $this->puesto('Presidente', 'Presidenta', 'Nacional'));
-        $this->designar($presidente, $this->persona('Rosa', 'F'), "{$anterior}-01-01", "{$anterior}-12-31");
-        $this->designar($presidente, $this->persona('Luis', 'M'), ($anterior + 1).'-01-01');
+        $vicepresidente = $this->enDirectorio('Consejo Nacional Directivo', $this->puesto('Vicepresidente', 'Vicepresidenta', 'Nacional'));
+        $this->designar($presidente, $this->persona('Rosa', 'F'), '2020-01-01', now()->subDay()->toDateString());
+        $this->designar($presidente, $this->persona('Luis', 'M'), now()->toDateString());
+        // Una designación que empieza mañana todavía no cuenta
+        $this->designar($vicepresidente, $this->persona('Eva', 'F'), now()->addDay()->toDateString());
 
-        $this->actingAs($this->admin)->get("/directorios?anio={$anterior}")->assertOk()->assertSee('Rosa Gómez')->assertSee('Presidenta')->assertDontSee('Luis Gómez');
-        $this->actingAs($this->admin)->get('/directorios')->assertOk()->assertSee('Luis Gómez')->assertDontSee('Rosa Gómez');
-        // Un año que no existe se cambia por el actual
-        $this->actingAs($this->admin)->get('/directorios?anio=1900')->assertOk()->assertSee('Luis Gómez');
+        $this->actingAs($this->admin)->get('/directorios')->assertOk()
+            ->assertSee('Luis Gómez')->assertDontSee('Rosa Gómez')->assertDontSee('Eva Gómez')
+            ->assertDontSee('name="anio"', false);
     }
 
     public function test_una_persona_oculta_es_vacante_en_pantalla_y_en_el_csv(): void
@@ -107,7 +108,7 @@ class ConsultaDirectoriosTest extends TestCase
             ->assertSee('Zona 1 · Noroeste')->assertSee('Mostrando 1–1 de 1');
 
         $csv = $this->actingAs($this->admin)->get("/directorios/csv?directorio={$regionales}&zona={$zona1}")->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename=consejos-regionales-'.now()->format('Y').'.csv')
+            ->assertHeader('Content-Disposition', 'attachment; filename=consejos-regionales-'.now()->format('Y-m-d').'.csv')
             ->streamedContent();
         $this->assertStringContainsString("'=HYPERLINK Gómez", $csv);
         $this->assertStringNotContainsString('Zona 2', $csv);
@@ -125,7 +126,7 @@ class ConsultaDirectoriosTest extends TestCase
             ->assertSee('Coordinador Nacional · Historia')->assertDontSee('Coordinador Nacional · Posgrado');
     }
 
-    public function test_instituciones_afiliadas_y_observadoras_de_ese_anio_con_su_titular(): void
+    public function test_instituciones_afiliadas_y_observadoras_de_hoy_con_su_titular(): void
     {
         $anio = (int) now()->format('Y');
         $afiliada = $this->institucion('Afiliada', 'Facultad de Contaduría', "{$anio}-01-01");

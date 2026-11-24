@@ -178,8 +178,11 @@ class InstitucionService
     }
 
     /**
-     * Guarda los cambios de Editar. La participación no cambia aquí (tiene su
-     * propia acción con historial); la razón social se corrige sin historial.
+     * Guarda los cambios de Editar. La razón social y la participación se
+     * corrigen aquí sin historial (un error de captura): la participación
+     * corrige su periodo vigente. Un cambio real de participación (de
+     * observadora a afiliada) tiene su propia acción, con historial.
+     * Al corregir a afiliada sin número, se le asigna el siguiente.
      *
      * @param  array<string, mixed>  $datos  validados por InstitucionRequest
      */
@@ -200,10 +203,25 @@ class InstitucionService
                 $domicilio = $this->domicilios->guardar($domicilio, $datos['domicilio']);
             }
 
+            // Participación: la corregida (o la misma) y su número
+            $participacion = $datos['participacion'] ?? $actual->ined_participacion;
+            $periodo = DB::table('institucion_participacion')->where('inpa_id_institucion', $id)
+                ->orderByRaw('inpa_fecha_fin is null desc')->orderByDesc('inpa_fecha_inicio')->lockForUpdate()->first();
+            $numero = match (true) {
+                $participacion !== 'Afiliada' => null,
+                $datos['numero'] !== null => $datos['numero'],
+                $actual->ined_num_afiliacion !== null => $actual->ined_num_afiliacion,
+                default => $this->asignarNumero($periodo->inpa_fecha_inicio ?? now()->toDateString(), (int) $datos['zona']),
+            };
+            if ($participacion !== $actual->ined_participacion && $periodo !== null) {
+                DB::table('institucion_participacion')->where('inpa_id_participacion', $periodo->inpa_id_participacion)->update(['inpa_tipo' => $participacion]);
+            }
+
             DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->update([
                 'ined_id_tipo_institucion' => $this->idTipo($datos['tipo']),
                 'ined_id_institucion_padre' => $datos['universidad'],
-                'ined_num_afiliacion' => $actual->ined_participacion === 'Afiliada' ? $datos['numero'] : null,
+                'ined_participacion' => $participacion,
+                'ined_num_afiliacion' => $numero,
                 'ined_sector' => $datos['sector'],
                 'ined_sitio_web' => $datos['sitio_web'],
                 'ined_id_domicilio' => $datos['domicilio'] !== null ? $domicilio : null,
@@ -223,7 +241,8 @@ class InstitucionService
                 'Razón social (corrección)' => [$nombre?->instn_nombre, $datos['razon_social']],
                 'Tipo' => [$actual->tiie_nombre, $datos['tipo']],
                 'Universidad' => [$this->nombreDe($actual->ined_id_institucion_padre), $this->nombreDe($datos['universidad'])],
-                'Número de afiliación' => [$actual->ined_num_afiliacion, $actual->ined_participacion === 'Afiliada' ? $datos['numero'] : null],
+                'Participación (corrección)' => [$actual->ined_participacion, $participacion],
+                'Número de afiliación' => [$actual->ined_num_afiliacion, $numero],
                 'Sector' => [self::SECTORES[$actual->ined_sector] ?? $actual->ined_sector, self::SECTORES[$datos['sector']]],
                 'Sitio web' => [$actual->ined_sitio_web, $datos['sitio_web']],
                 'Zona regional' => [$this->zonaDe($actual->ined_id_zona_regional), $this->zonaDe($datos['zona'])],
