@@ -29,7 +29,7 @@ class CargosBaseSeeder extends Seeder
         ['Coordinador Nacional', 'Coordinadora Nacional', 'Nacional'],
         ['Secretario Técnico General', 'Secretaria Técnica General', 'Nacional'],
         ['Representante de ANFECA ante ALAFEC', 'Representante de ANFECA ante ALAFEC', 'Nacional'],
-        ['Director General CACECA', 'Directora General CACECA', 'Nacional'],
+        ['Presidente del Consejo de Acreditación en la Enseñanza de la Contaduría y Administración, A.C. (CACECA)', 'Presidenta del Consejo de Acreditación en la Enseñanza de la Contaduría y Administración, A.C. (CACECA)', 'Nacional'],
 
         // Regionales
         ['Director Regional', 'Directora Regional', 'Regional'],

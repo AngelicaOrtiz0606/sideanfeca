@@ -23,10 +23,12 @@ use RuntimeException;
  *     7 coordinadores regionales de esa coordinación. En Maratones, después
  *     del Coordinador Nacional va el Secretario Técnico General (su secretario).
  *
- * También crea el puesto Director General CACECA (nacional), que no va en
- * ningún directorio, ligado a la organización CACECA: solo lo ocupa alguien
- * de CACECA. Si ya existía sin organización, se liga (con sus designaciones).
- * Si CACECA todavía no está registrada, avisa: corre antes OrganizacionesSeeder.
+ * Al final del Consejo Nacional Directivo va el Presidente del Consejo de
+ * Acreditación en la Enseñanza de la Contaduría y Administración, A.C.
+ * (CACECA): un puesto nacional ligado a la organización CACECA, así que solo
+ * lo ocupa alguien de CACECA. Si ya existía sin organización, se liga (con
+ * sus designaciones). Si CACECA todavía no está registrada, avisa y no lo
+ * crea: corre antes OrganizacionesSeeder.
  *
  * El Secretario Técnico Regional de cada coordinación ya no existe: no se crea.
  * Solo crea puestos (vacantes); las personas se designan desde la pantalla.
@@ -60,6 +62,9 @@ class PuestosDirectoriosSeeder extends Seeder
         'Desarrollo Académico Estudiantil',
     ];
 
+    /** El cargo del presidente de CACECA (va al final del Consejo Nacional Directivo). */
+    public const CARGO_CACECA = 'Presidente del Consejo de Acreditación en la Enseñanza de la Contaduría y Administración, A.C. (CACECA)';
+
     /** La coordinación del Secretario Técnico General. */
     private const COORDINACION_DEL_SECRETARIO_TECNICO = 'Maratones';
 
@@ -82,9 +87,6 @@ class PuestosDirectoriosSeeder extends Seeder
             $this->ordenar('Consejo Nacional Directivo', $this->consejoNacional());
             $this->ordenar('Consejos Regionales', $this->consejosRegionales());
             $this->ordenar('Coordinaciones Nacionales', $this->coordinacionesNacionales());
-
-            // Puestos que no van en ningún directorio publicado
-            $this->directorGeneralCaceca();
         });
     }
 
@@ -109,7 +111,8 @@ class PuestosDirectoriosSeeder extends Seeder
         $puestos[] = $this->secretarioTecnicoGeneral();
         $puestos[] = $this->puesto('Representante de ANFECA ante ALAFEC');
 
-        return $puestos;
+        // Al final, el presidente de CACECA (si CACECA ya está registrada)
+        return array_values(array_filter([...$puestos, $this->presidenteCaceca()]));
     }
 
     /** @return array<int, int> por zona: director, secretario y coordinadores regionales */
@@ -155,33 +158,39 @@ class PuestosDirectoriosSeeder extends Seeder
         return $this->puesto('Secretario Técnico General', coordinacion: $this->coordinaciones[self::COORDINACION_DEL_SECRETARIO_TECNICO]);
     }
 
-    /** Busca el puesto (cargo + ámbito) y, si no existe, lo crea. */
-    /** El puesto Director General CACECA, ligado a la organización CACECA. */
-    private function directorGeneralCaceca(): void
+    /** El puesto del presidente de CACECA, ligado a la organización CACECA (null si CACECA no está registrada). */
+    private function presidenteCaceca(): ?int
     {
         $caceca = DB::table('organizacion')->get(['orga_id_organizacion', 'orga_nombre'])
             ->first(fn (object $o) => TextoCatalogo::clave($o->orga_nombre) === TextoCatalogo::clave('CACECA'))
             ?->orga_id_organizacion;
 
         if ($caceca === null) {
-            $this->command?->warn('No se ligó Director General CACECA: falta la organización CACECA. Corre OrganizacionesSeeder y vuelve a correr este.');
+            $this->command?->warn('No se creó el puesto del presidente de CACECA: falta la organización CACECA. Corre OrganizacionesSeeder y vuelve a correr este.');
 
-            return;
+            return null;
         }
 
-        $cargo = $this->cargos['Director General CACECA'];
-        $ligado = DB::table('puesto')->where('pues_id_cargo', $cargo)->where('pues_id_organizacion', $caceca)->exists();
+        $cargo = $this->cargos[self::CARGO_CACECA];
+        $ligado = DB::table('puesto')->where('pues_id_cargo', $cargo)->where('pues_id_organizacion', $caceca)->value('pues_id_puesto');
+        if ($ligado !== null) {
+            return (int) $ligado;
+        }
+
+        // Si ya existía sin organización, se liga (con sus designaciones)
         $sinOrganizacion = DB::table('puesto')->where('pues_id_cargo', $cargo)->whereNull('pues_id_organizacion')
             ->whereNull('pues_id_zona_regional')->whereNull('pues_id_coordinacion_nacional')->whereNull('pues_id_institucion_educativa')
             ->value('pues_id_puesto');
-
-        if (! $ligado && $sinOrganizacion !== null) {
+        if ($sinOrganizacion !== null) {
             DB::table('puesto')->where('pues_id_puesto', $sinOrganizacion)->update(['pues_id_organizacion' => $caceca]);
-        } elseif (! $ligado) {
-            $this->puesto('Director General CACECA', organizacion: (int) $caceca);
+
+            return (int) $sinOrganizacion;
         }
+
+        return $this->puesto(self::CARGO_CACECA, organizacion: (int) $caceca);
     }
 
+    /** Busca el puesto (cargo + ámbito) y, si no existe, lo crea. */
     private function puesto(string $cargo, ?int $zona = null, ?int $coordinacion = null, ?int $organizacion = null): int
     {
         $ambito = [
@@ -232,7 +241,7 @@ class PuestosDirectoriosSeeder extends Seeder
     {
         $nombres = ['Presidente', 'Vicepresidente', 'Secretario General', 'Director Ejecutivo', 'Director Regional',
             'Secretario Regional', 'Coordinador Nacional', 'Coordinador Regional', 'Secretario Técnico General',
-            'Representante de ANFECA ante ALAFEC', 'Director General CACECA'];
+            'Representante de ANFECA ante ALAFEC', self::CARGO_CACECA];
 
         foreach ($nombres as $nombre) {
             $this->cargos[$nombre] = (int) (DB::table('cargo')->where('carg_nombre_m', $nombre)->value('carg_id_cargo')

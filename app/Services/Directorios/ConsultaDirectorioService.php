@@ -76,6 +76,7 @@ class ConsultaDirectorioService
             ->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
             ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'p.pues_id_zona_regional')
             ->leftJoin('coordinacion_nacional as cn', 'cn.cona_id_coordinacion_nacional', '=', 'p.pues_id_coordinacion_nacional')
+            ->leftJoin('organizacion as org', 'org.orga_id_organizacion', '=', 'p.pues_id_organizacion')
             ->leftJoinLateral($this->ultimaDesignacion('p.pues_id_puesto', $inicio, $corte), 'o')
             ->where('pd.pudi_id_tipo_directorio', $tipo)
             ->when($zona, fn (Builder $q, int $id) => $q->where('p.pues_id_zona_regional', $id))
@@ -85,7 +86,7 @@ class ConsultaDirectorioService
             ->orderBy('pd.pudi_orden')
             ->get([
                 'c.carg_nombre_m as cargo', 'c.carg_nombre_f as cargo_f', 'c.carg_nivel as nivel',
-                'z.zore_numero as zona_numero', 'z.zore_nombre as zona_nombre', 'cn.cona_nombre as coordinacion',
+                'z.zore_numero as zona_numero', 'z.zore_nombre as zona_nombre', 'cn.cona_nombre as coordinacion', 'org.orga_nombre as organizacion',
                 DB::raw('null as institucion'), 'o.persona',
             ]);
 

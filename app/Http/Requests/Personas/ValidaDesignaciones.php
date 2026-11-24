@@ -18,7 +18,7 @@ use Illuminate\Validation\Rule;
  * - la persona debe pertenecer a una institución u organización;
  * - el mismo puesto no se repite entre las filas en periodos que se cruzan;
  * - el puesto debe estar activo y libre en todo ese periodo;
- * - un cargo nacional que es de una organización (Director General CACECA)
+ * - un cargo nacional que es de una organización (el presidente de CACECA)
  *   solo lo ocupa alguien de esa organización, y se usa el puesto de ella.
  * Los mensajes dicen de qué fila se trata ("Designación 2: ...").
  */
@@ -133,7 +133,7 @@ trait ValidaDesignaciones
                 continue;
             }
 
-            // Un cargo de una organización (Director General CACECA) solo lo ocupa alguien de ella
+            // Un cargo de una organización (el presidente de CACECA) solo lo ocupa alguien de ella
             if ($nivel === 'Nacional' && $designacion['coordinacion'] === null) {
                 $deOrganizaciones = DB::table('puesto as p')->join('organizacion as o', 'o.orga_id_organizacion', '=', 'p.pues_id_organizacion')
                     ->where('p.pues_id_cargo', $designacion['cargo'])->pluck('o.orga_nombre', 'p.pues_id_organizacion');

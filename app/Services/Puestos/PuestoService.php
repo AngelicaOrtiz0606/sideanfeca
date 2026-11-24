@@ -304,7 +304,7 @@ class PuestoService
             default => [$puesto->coordinacion ?? $organizacion ?? 'Nacional'],
         };
 
-        // "Director General CACECA" ya dice su organización: no se repite
+        // "Presidente del Consejo de … (CACECA)" ya dice su organización: no se repite
         if ($conCargo && $organizacion !== null && str_contains(TextoCatalogo::clave($puesto->cargo), TextoCatalogo::clave($organizacion))) {
             return $puesto->cargo;
         }
