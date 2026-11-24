@@ -95,6 +95,7 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
         Route::get('/personas', [PersonaController::class, 'index'])->name('personas.index');
         Route::get('/personas/create', [PersonaController::class, 'create'])->name('personas.create');
         Route::get('/personas/coincidencias', [PersonaController::class, 'coincidencias'])->name('personas.coincidencias');
+        Route::get('/personas/titular-de/{institucion}', [PersonaController::class, 'titularDe'])->whereNumber('institucion')->name('personas.titular');
         Route::post('/personas', [PersonaController::class, 'store'])->name('personas.store');
         Route::get('/personas/{persona}', [PersonaController::class, 'show'])->name('personas.show');
         Route::get('/personas/{persona}/edit', [PersonaController::class, 'edit'])->name('personas.edit');
@@ -140,7 +141,7 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     // Puestos (M6): un cargo en un ámbito concreto; todo desde la lista, en ventanas
     Route::middleware(Privilegio::GestionarPuestos->middleware())->group(function () {
         Route::patch('/puestos/{puesto}/estado', [PuestoController::class, 'cambiarEstado'])->name('puestos.estado');
-        Route::resource('puestos', PuestoController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::resource('puestos', PuestoController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     });
 
     // Catálogos (M3)

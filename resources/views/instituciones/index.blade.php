@@ -107,6 +107,7 @@
                     <tr>
                         <th scope="col">Número</th>
                         <th scope="col">Institución</th>
+                        <th scope="col">Titular</th>
                         <th scope="col">Participación</th>
                         <th scope="col">Zona</th>
                         <th scope="col">Estado</th>
@@ -129,6 +130,14 @@
                                     <span class="tabla__detalle">{{ $institucion->tipo }} · {{ $institucion->universidad }}</span>
                                 @endif
                             </th>
+                            <td data-etiqueta="Titular">
+                                @if ($institucion->titular)
+                                    <span class="tabla__principal">{{ $institucion->titular->nombre }}</span>
+                                    <span class="tabla__detalle">{{ $institucion->titular->cargo }}</span>
+                                @else
+                                    <span class="tabla__vacio">Sin titular</span>
+                                @endif
+                            </td>
                             <td data-etiqueta="Participación">
                                 <span class="participacion participacion--{{ strtolower($institucion->participacion) }}">{{ $institucion->participacion }}</span>
                             </td>

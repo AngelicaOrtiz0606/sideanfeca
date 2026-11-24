@@ -32,9 +32,9 @@ class CargoRequest extends FormRequest
         $id = $this->cargo()?->carg_id_cargo;
 
         return [
-            'masculino' => ['required', 'string', new TextoSeguro, 'max:100',
+            'masculino' => ['required', 'string', new TextoSeguro, 'max:150',
                 new NoRepetidoEnCatalogo('cargo', 'carg_nombre_m', 'carg_id_cargo', $id, 'Ya existe el cargo «:existente».')],
-            'femenino' => ['required', 'string', new TextoSeguro, 'max:100',
+            'femenino' => ['required', 'string', new TextoSeguro, 'max:150',
                 new NoRepetidoEnCatalogo('cargo', 'carg_nombre_f', 'carg_id_cargo', $id, 'Ya existe el cargo «:existente».')],
             'nivel' => ['required', Rule::in(Cargo::NIVELES)],
         ];
@@ -62,8 +62,8 @@ class CargoRequest extends FormRequest
         return [
             'masculino.required' => 'Escribe el nombre del cargo en masculino.',
             'femenino.required' => 'Escribe el nombre del cargo en femenino.',
-            'masculino.max' => 'El nombre en masculino puede tener hasta 100 caracteres.',
-            'femenino.max' => 'El nombre en femenino puede tener hasta 100 caracteres.',
+            'masculino.max' => 'El nombre en masculino puede tener hasta 150 caracteres.',
+            'femenino.max' => 'El nombre en femenino puede tener hasta 150 caracteres.',
             'nivel.required' => 'Elige el nivel del cargo.',
             'nivel.in' => 'Elige el nivel del cargo: Nacional, Regional o Institucional.',
         ];

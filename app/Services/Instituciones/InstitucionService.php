@@ -72,6 +72,7 @@ class InstitucionService
                     ->where('inpa_id_institucion', $institucion->id)->whereNull('inpa_fecha_fin')->value('inpa_fecha_inicio');
                 $institucion->ultimo_fin = DB::table('institucion_participacion')
                     ->where('inpa_id_institucion', $institucion->id)->max('inpa_fecha_fin');
+                $institucion->titular = $this->titularHoy((int) $institucion->id);
 
                 return $institucion;
             });
@@ -178,8 +179,11 @@ class InstitucionService
     }
 
     /**
-     * Guarda los cambios de Editar. La participación no cambia aquí (tiene su
-     * propia acción con historial); la razón social se corrige sin historial.
+     * Guarda los cambios de Editar. La razón social y la participación se
+     * corrigen aquí sin historial (un error de captura): la participación
+     * corrige su periodo vigente. Un cambio real de participación (de
+     * observadora a afiliada) tiene su propia acción, con historial.
+     * Al corregir a afiliada sin número, se le asigna el siguiente.
      *
      * @param  array<string, mixed>  $datos  validados por InstitucionRequest
      */
@@ -200,10 +204,25 @@ class InstitucionService
                 $domicilio = $this->domicilios->guardar($domicilio, $datos['domicilio']);
             }
 
+            // Participación: la corregida (o la misma) y su número
+            $participacion = $datos['participacion'] ?? $actual->ined_participacion;
+            $periodo = DB::table('institucion_participacion')->where('inpa_id_institucion', $id)
+                ->orderByRaw('inpa_fecha_fin is null desc')->orderByDesc('inpa_fecha_inicio')->lockForUpdate()->first();
+            $numero = match (true) {
+                $participacion !== 'Afiliada' => null,
+                $datos['numero'] !== null => $datos['numero'],
+                $actual->ined_num_afiliacion !== null => $actual->ined_num_afiliacion,
+                default => $this->asignarNumero($periodo->inpa_fecha_inicio ?? now()->toDateString(), (int) $datos['zona']),
+            };
+            if ($participacion !== $actual->ined_participacion && $periodo !== null) {
+                DB::table('institucion_participacion')->where('inpa_id_participacion', $periodo->inpa_id_participacion)->update(['inpa_tipo' => $participacion]);
+            }
+
             DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $id)->update([
                 'ined_id_tipo_institucion' => $this->idTipo($datos['tipo']),
                 'ined_id_institucion_padre' => $datos['universidad'],
-                'ined_num_afiliacion' => $actual->ined_participacion === 'Afiliada' ? $datos['numero'] : null,
+                'ined_participacion' => $participacion,
+                'ined_num_afiliacion' => $numero,
                 'ined_sector' => $datos['sector'],
                 'ined_sitio_web' => $datos['sitio_web'],
                 'ined_id_domicilio' => $datos['domicilio'] !== null ? $domicilio : null,
@@ -223,7 +242,8 @@ class InstitucionService
                 'Razón social (corrección)' => [$nombre?->instn_nombre, $datos['razon_social']],
                 'Tipo' => [$actual->tiie_nombre, $datos['tipo']],
                 'Universidad' => [$this->nombreDe($actual->ined_id_institucion_padre), $this->nombreDe($datos['universidad'])],
-                'Número de afiliación' => [$actual->ined_num_afiliacion, $actual->ined_participacion === 'Afiliada' ? $datos['numero'] : null],
+                'Participación (corrección)' => [$actual->ined_participacion, $participacion],
+                'Número de afiliación' => [$actual->ined_num_afiliacion, $numero],
                 'Sector' => [self::SECTORES[$actual->ined_sector] ?? $actual->ined_sector, self::SECTORES[$datos['sector']]],
                 'Sitio web' => [$actual->ined_sitio_web, $datos['sitio_web']],
                 'Zona regional' => [$this->zonaDe($actual->ined_id_zona_regional), $this->zonaDe($datos['zona'])],
@@ -307,6 +327,73 @@ class InstitucionService
         return DB::table('institucion_nombre')->where('instn_id_institucion', $id)
             ->orderByDesc('instn_fecha_inicio')
             ->get(['instn_nombre as nombre', 'instn_fecha_inicio as desde', 'instn_fecha_fin as hasta']);
+    }
+
+    /**
+     * Quien es hoy el titular: la persona que ocupa el puesto marcado como
+     * titular. Una persona oculta no se muestra (queda como sin titular).
+     *
+     * @return object{persona: int, nombre: string, cargo: string}|null
+     */
+    public function titularHoy(int $id): ?object
+    {
+        $hoy = now()->toDateString();
+        $titular = DB::table('puesto as p')
+            ->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
+            ->join('designacion as d', 'd.desi_id_puesto', '=', 'p.pues_id_puesto')
+            ->join('persona as per', 'per.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('p.pues_id_institucion_educativa', $id)
+            ->where('p.pues_titularidad', true)
+            ->where('per.pers_oculta_admin', false)
+            ->where('d.desi_fecha_inicio', '<=', $hoy)
+            ->where(fn (Builder $q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $hoy))
+            ->orderByDesc('d.desi_fecha_inicio')
+            ->first([
+                'per.pers_id_persona as persona', 'per.pers_genero as genero', 'c.carg_nombre_m as cargo', 'c.carg_nombre_f as cargo_f',
+                DB::raw("concat_ws(' ', per.pers_nombre, per.pers_primer_apellido, per.pers_segundo_apellido) as nombre"),
+            ]);
+
+        return $titular === null ? null : (object) [
+            'persona' => (int) $titular->persona,
+            'nombre' => $titular->nombre,
+            'cargo' => $titular->genero === 'F' && filled($titular->cargo_f) ? $titular->cargo_f : $titular->cargo,
+        ];
+    }
+
+    /**
+     * Quienes ocupan u ocuparon un puesto de la institución: primero los de
+     * hoy (el titular antes que nadie) y después los anteriores, del más
+     * reciente al más antiguo. Una persona oculta se lista sin su nombre.
+     *
+     * @return Collection<int, object> {persona, nombre, oculta, cargo, titular, desde, hasta, vigente, por_iniciar}
+     */
+    public function personas(int $id): Collection
+    {
+        $hoy = now()->toDateString();
+
+        return DB::table('designacion as d')
+            ->join('puesto as p', 'p.pues_id_puesto', '=', 'd.desi_id_puesto')
+            ->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
+            ->join('persona as per', 'per.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('p.pues_id_institucion_educativa', $id)
+            ->get([
+                'per.pers_id_persona as persona', 'per.pers_oculta_admin as oculta', 'per.pers_genero as genero',
+                DB::raw("concat_ws(' ', per.pers_nombre, per.pers_primer_apellido, per.pers_segundo_apellido) as nombre"),
+                'c.carg_nombre_m as cargo', 'c.carg_nombre_f as cargo_f', 'p.pues_titularidad as titular',
+                'd.desi_fecha_inicio as desde', 'd.desi_fecha_fin as hasta', 'd.desi_id_designacion as id',
+            ])
+            ->map(function (object $d) use ($hoy): object {
+                $d->cargo = $d->genero === 'F' && filled($d->cargo_f) ? $d->cargo_f : $d->cargo;
+                $d->por_iniciar = $d->desde > $hoy;
+                $d->vigente = ! $d->por_iniciar && ($d->hasta === null || $d->hasta >= $hoy);
+                // Solo se dice "titular" de quien lo es hoy
+                $d->titular = $d->vigente && (bool) $d->titular;
+
+                return $d;
+            })
+            ->sort(fn (object $a, object $b) => [! $a->vigente && ! $a->por_iniciar, ! $a->titular, $b->desde, $b->id]
+                <=> [! $b->vigente && ! $b->por_iniciar, ! $b->titular, $a->desde, $a->id])
+            ->values();
     }
 
     /**

@@ -60,7 +60,6 @@
         @unless ($esNueva)
             @method('PUT')
             <input type="hidden" name="_id" value="{{ $institucion->id }}">
-            <input type="hidden" value="{{ $institucion->participacion }}" data-participacion-fija>
         @endunless
 
         @if ($conOld)
@@ -69,7 +68,11 @@
 
         {{-- 1. Tipo y participación --}}
         <x-seccion-formulario id="seccion-tipo" numero="1" titulo="Tipo y participación"
-                              :descripcion="$esNueva ? 'Primero el tipo; luego su participación en ANFECA.' : 'La participación guarda su historial: se cambia con su botón.'">
+                              :descripcion="match (true) {
+                                  $esNueva => 'Primero el tipo; luego su participación en ANFECA.',
+                                  $posibles !== [] => 'Si la participación se capturó mal, corrígela aquí. Si cambió (de observadora a afiliada), usa «Pasar a afiliada»: así queda en su historial.',
+                                  default => 'Si la participación se capturó mal, corrígela aquí.',
+                              }">
 
             <div class="campo">
                 <span class="campo__etiqueta" id="etiqueta-tipo">Tipo @unless ($motivoTipo ?? null)<x-obligatorio />@endunless</span>
@@ -126,38 +129,51 @@
                     {{ $tipo ? 'Ahora elige su participación para continuar.' : 'Elige el tipo de institución para continuar.' }}
                 </p>
             @else
-                <div class="formulario__rejilla">
-                    <div @class(['campo', 'campo--mitad' => $institucion->participacion === 'Afiliada', 'campo--completo' => $institucion->participacion !== 'Afiliada'])>
-                        <span class="campo__etiqueta">Participación</span>
-                        <div class="dato-con-accion">
-                            <p class="dato-con-accion__texto">
-                                <span class="participacion participacion--{{ strtolower($institucion->participacion) }}">{{ $institucion->participacion }}</span>
-                                @if ($inicios['participacion'])
-                                    <span>desde el {{ $fecha($inicios['participacion']) }}</span>
-                                @endif
-                            </p>
-                            @if ($posibles !== [])
-                                <button type="button" @class(['boton', 'boton--secundario', 'boton--bloqueado' => $motivoParticipacion])
-                                        data-abrir-dialogo="{{ $motivoParticipacion ? 'dialogo-sin-cambio' : 'dialogo-participacion' }}">
-                                    <x-icono nombre="historial" />
-                                    Pasar a afiliada
-                                </button>
-                            @endif
-                        </div>
+                @php $participacionElegida = $valor('participacion', $institucion->participacion); @endphp
+                <div class="campo">
+                    <span class="campo__etiqueta" id="etiqueta-participacion">Participación <x-obligatorio /></span>
+                    <div class="opciones-nivel__lista" role="radiogroup" aria-labelledby="etiqueta-participacion">
+                        @foreach ($participaciones as $opcion)
+                            <label class="opcion-nivel">
+                                <input type="radio" name="participacion" value="{{ $opcion }}" required @checked($participacionElegida === $opcion) data-participacion>
+                                <span class="opcion-nivel__nombre">{{ $opcion }}</span>
+                                <span class="opcion-nivel__ayuda">{{ $descripcionesParticipacion[$opcion] }}</span>
+                            </label>
+                        @endforeach
                     </div>
+                    <p class="campo__ayuda" data-aviso-matriz hidden>Solo una universidad puede ser matriz.</p>
+                    <div class="dato-con-accion">
+                        <p class="dato-con-accion__texto">
+                            Hoy: <span class="participacion participacion--{{ strtolower($institucion->participacion) }}">{{ $institucion->participacion }}</span>
+                            @if ($inicios['participacion'])
+                                <span>desde el {{ $fecha($inicios['participacion']) }}</span>
+                            @endif
+                        </p>
+                        @if ($posibles !== [])
+                            <button type="button" @class(['boton', 'boton--secundario', 'boton--bloqueado' => $motivoParticipacion])
+                                    data-abrir-dialogo="{{ $motivoParticipacion ? 'dialogo-sin-cambio' : 'dialogo-participacion' }}">
+                                <x-icono nombre="historial" />
+                                Pasar a afiliada
+                            </button>
+                        @endif
+                    </div>
+                </div>
 
-                    @if ($institucion->participacion === 'Afiliada')
-                        <div class="campo campo--mitad">
-                            <label for="numero" class="campo__etiqueta">Número de afiliación <x-obligatorio /></label>
-                            <input id="numero" name="numero" type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" required
-                                   class="campo__entrada campo__entrada--numerica" value="{{ $valor('numero', $institucion->numero) }}"
-                                   data-existentes="{{ json_encode($numerosUsados) }}"
-                                   data-mensaje-repetido="El número ya pertenece a :existente."
-                                   data-mensaje-formato="El número de afiliación tiene exactamente 7 dígitos."
-                                   @if ($conOld && $errors->has('numero')) aria-invalid="true" @endif>
-                            <p class="campo__ayuda">Corrígelo solo si se capturó mal: es su identificador permanente.</p>
-                        </div>
-                    @endif
+                <div class="campo campo--mitad" data-solo-afiliada @unless ($participacionElegida === 'Afiliada') hidden @endunless>
+                    <label for="numero" class="campo__etiqueta">Número de afiliación @if ($institucion->participacion === 'Afiliada')<x-obligatorio />@endif</label>
+                    <input id="numero" name="numero" type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" @if ($institucion->participacion === 'Afiliada') required @endif
+                           class="campo__entrada campo__entrada--numerica" value="{{ $valor('numero', $institucion->numero) }}"
+                           data-existentes="{{ json_encode($numerosUsados) }}"
+                           data-mensaje-repetido="El número ya pertenece a :existente."
+                           data-mensaje-formato="El número de afiliación tiene exactamente 7 dígitos."
+                           @if ($conOld && $errors->has('numero')) aria-invalid="true" @endif>
+                    <p class="campo__ayuda">
+                        @if ($institucion->participacion === 'Afiliada')
+                            Corrígelo solo si se capturó mal: es su identificador permanente.
+                        @else
+                            Si la corriges a afiliada, escribe su número o déjalo vacío para asignarle el siguiente.
+                        @endif
+                    </p>
                 </div>
             @endif
         </x-seccion-formulario>

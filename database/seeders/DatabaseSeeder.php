@@ -17,7 +17,7 @@ use Illuminate\Database\Seeder;
  *   4. CargosBaseSeeder: los cargos base de ANFECA (nacionales, regionales e institucionales).
  *   5. OrganizacionesSeeder: CACECA con su domicilio (necesita el catálogo de Correos).
  *   6. PuestosDirectoriosSeeder: los puestos de los tres directorios y su orden
- *      (y Director General CACECA, ligado a CACECA).
+ *      (con el presidente de CACECA al final del Consejo Nacional Directivo).
  *
  * Municipios y colonias no van aquí: se cargan con
  *   php artisan catalogos:importar-correos

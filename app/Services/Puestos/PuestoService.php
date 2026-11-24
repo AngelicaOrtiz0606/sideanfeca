@@ -112,6 +112,41 @@ class PuestoService
     }
 
     /**
+     * Quiénes han ocupado el puesto, de la más reciente a la más antigua.
+     * Una persona oculta se lista sin su nombre.
+     *
+     * @return Collection<int, object> {persona, nombre, oculta, desde, hasta}
+     */
+    public function historial(int $id): Collection
+    {
+        return DB::table('designacion as d')
+            ->join('persona as per', 'per.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('d.desi_id_puesto', $id)
+            ->orderByDesc('d.desi_fecha_inicio')
+            ->orderByDesc('d.desi_id_designacion')
+            ->get([
+                'per.pers_id_persona as persona', 'per.pers_oculta_admin as oculta',
+                DB::raw("concat_ws(' ', per.pers_nombre, per.pers_primer_apellido, per.pers_segundo_apellido) as nombre"),
+                'd.desi_fecha_inicio as desde', 'd.desi_fecha_fin as hasta',
+            ]);
+    }
+
+    /**
+     * Los directorios en los que aparece el puesto.
+     *
+     * @return array<int, string>
+     */
+    public function directoriosDe(int $id): array
+    {
+        return DB::table('puesto_directorio as pd')
+            ->join('tipo_directorio as t', 't.tidi_id_tipo_directorio', '=', 'pd.pudi_id_tipo_directorio')
+            ->where('pd.pudi_id_puesto', $id)
+            ->orderBy('t.tidi_id_tipo_directorio')
+            ->pluck('t.tidi_nombre')
+            ->all();
+    }
+
+    /**
      * Cargos activos para elegir (con su nivel), más el del puesto que se edita.
      *
      * @return Collection<int, object>
@@ -304,7 +339,7 @@ class PuestoService
             default => [$puesto->coordinacion ?? $organizacion ?? 'Nacional'],
         };
 
-        // "Director General CACECA" ya dice su organización: no se repite
+        // "Presidente del Consejo de … (CACECA)" ya dice su organización: no se repite
         if ($conCargo && $organizacion !== null && str_contains(TextoCatalogo::clave($puesto->cargo), TextoCatalogo::clave($organizacion))) {
             return $puesto->cargo;
         }

@@ -9,9 +9,14 @@
     Los campos se envían como designaciones[0][cargo], designaciones[0][zona]…
     con el formulario normal: el servidor valida todo (ValidaDesignaciones).
     Lo que no aplica al nivel no se dibuja, así no se envía ni se valida.
+
+    Un cargo de la institución se puede marcar como titular de la institución.
+    Al marcarlo se pregunta al servidor quién es el titular hoy: si hay alguien,
+    se dice qué pasa con él y se pide confirmar el cambio. La institución es la
+    de la persona: fija (prop "institucion") o la que se elige en el formulario.
 -->
 <script setup>
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     cargos: { type: Array, required: true }, // [{ id, nombre, nivel }]
@@ -23,6 +28,8 @@ const props = defineProps({
     hoy: { type: String, required: true },
     notaInstitucional: { type: String, default: 'Es un cargo de la institución a la que pertenece.' },
     minimo: { type: Number, default: 1 },
+    institucion: { type: Number, default: null }, // la de la persona, si ya está fija
+    urlTitular: { type: String, default: '' }, // dirección con __id__ en lugar del número de institución
 });
 
 const NIVELES = [
@@ -40,6 +47,8 @@ const nuevaFila = (datos = {}) => ({
     coordinacion: datos.coordinacion ? String(datos.coordinacion) : '',
     fecha_inicio: datos.fecha_inicio ?? props.hoy,
     fecha_fin: datos.fecha_fin ?? '',
+    titular: datos.titular === '1' || datos.titular === true,
+    reemplazar: datos.reemplazar === '1' || datos.reemplazar === true,
 });
 
 const filas = ref(props.iniciales.length > 0 ? props.iniciales.map(nuevaFila) : Array.from({ length: props.minimo }, () => nuevaFila()));
@@ -66,6 +75,45 @@ const agregar = async () => {
     await nextTick();
     raiz.value.querySelector('[data-fila]:last-of-type input[type="radio"]')?.focus();
 };
+
+// ---- Titular de la institución ----
+const institucionActual = ref(props.institucion);
+const titulares = reactive({}); // número de institución → { cargo_id, cargo, ocupante, desde } | null | 'cargando'
+const titularDe = computed(() => titulares[institucionActual.value]);
+
+onMounted(() => {
+    if (props.institucion !== null) {
+        return;
+    }
+    // Sin institución fija: la que esté elegida en "Pertenece a" (si pertenece a una institución)
+    const formulario = raiz.value?.closest('form');
+    const leer = () => {
+        const tipo = formulario?.querySelector('input[name="pertenencia"]:checked')?.value;
+        const campo = formulario?.querySelector('input[name="institucion"]');
+        institucionActual.value = tipo === 'institucion' && campo && !campo.disabled && campo.value ? Number(campo.value) : null;
+    };
+    formulario?.addEventListener('change', leer);
+    leer();
+});
+
+const pedirTitular = async (institucion) => {
+    if (!props.urlTitular || institucion in titulares) {
+        return;
+    }
+    titulares[institucion] = 'cargando';
+    try {
+        const respuesta = await fetch(props.urlTitular.replace('__id__', institucion), { headers: { Accept: 'application/json' } });
+        titulares[institucion] = respuesta.ok ? await respuesta.json() : null;
+    } catch {
+        delete titulares[institucion];
+    }
+};
+
+watch([institucionActual, () => filas.value.some((f) => f.nivel === 'Institucional' && f.titular)], ([institucion, alguno]) => {
+    if (institucion && alguno) {
+        pedirTitular(institucion);
+    }
+}, { immediate: true });
 
 const quitar = async (indice) => {
     filas.value.splice(indice, 1);
@@ -137,7 +185,33 @@ const quitar = async (indice) => {
                         <option v-for="coordinacion in coordinaciones" :key="coordinacion.id" :value="String(coordinacion.id)">{{ coordinacion.nombre }}</option>
                     </select>
                 </div>
-                <p v-if="fila.nivel === 'Institucional'" class="campo--completo campo__ayuda">{{ notaInstitucional }}</p>
+                <template v-if="fila.nivel === 'Institucional'">
+                    <p class="campo--completo campo__ayuda">{{ notaInstitucional }}</p>
+                    <div class="campo--completo">
+                        <label class="opcion-en-linea opcion-en-linea--casilla">
+                            <input v-model="fila.titular" type="checkbox" :name="`designaciones[${i}][titular]`" value="1" @change="avisarCambio">
+                            Es el titular de la institución <span class="campo__opcional">(aparece en el directorio de Instituciones)</span>
+                        </label>
+                        <div v-if="fila.titular" class="aviso aviso--atencion aviso-titular" aria-live="polite">
+                            <p v-if="!institucionActual">Primero elige la institución a la que pertenece.</p>
+                            <p v-else-if="titularDe === 'cargando'">Revisando quién es el titular…</p>
+                            <p v-else-if="!titularDe || !titularDe.ocupante">
+                                {{ titularDe ? `El puesto titular (${titularDe.cargo}) está vacante hoy.` : 'La institución todavía no tiene titular.' }}
+                                Esta persona será su titular.
+                            </p>
+                            <template v-else>
+                                <p>Hoy el titular es <strong>{{ titularDe.ocupante }}</strong> ({{ titularDe.cargo }}, desde el {{ titularDe.desde }}).</p>
+                                <p v-if="String(titularDe.cargo_id) === fila.cargo">Es el mismo puesto: su designación termina el día anterior a la fecha de inicio de esta.</p>
+                                <p v-else>Sigue en su cargo, pero ya no como titular: el titular pasa a ser este cargo.</p>
+                                <label class="opcion-en-linea opcion-en-linea--casilla">
+                                    <input v-model="fila.reemplazar" type="checkbox" :name="`designaciones[${i}][reemplazar]`" value="1" required
+                                           :aria-invalid="conError(i, 'reemplazar') ? 'true' : null">
+                                    Sí, cambiar el titular
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
 

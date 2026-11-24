@@ -1,6 +1,6 @@
 {{--
-    Consultar directorios (M10): el directorio elegido tal como estaba en un
-    año, con sus filtros. Desde aquí se copian sus correos o se exporta a CSV
+    Consultar directorios (M10): el directorio elegido como está hoy (solo lo
+    vigente), con sus filtros. Desde aquí se copian sus correos o se exporta a CSV
     (todo lo filtrado, no solo la página). Las personas ocultas aparecen como
     "Vacante" y solo se muestran los contactos visibles, igual que en el sitio.
 --}}
@@ -9,17 +9,16 @@
 @section('titulo', 'Consultar directorios')
 
 @php
-    $base = ['directorio' => $elegido->id, 'anio' => $filtros['anio']];
+    $base = ['directorio' => $elegido->id];
     $consulta = array_filter($filtros + ['directorio' => $elegido->id]);
-    $hayFiltros = collect($filtros)->except('anio')->filter()->isNotEmpty();
-    $etiquetaAnio = $filtros['anio'] === (int) now()->format('Y') ? "{$filtros['anio']} (a hoy)" : (string) $filtros['anio'];
+    $hayFiltros = collect($filtros)->filter()->isNotEmpty();
 @endphp
 
 @section('contenido')
     <header class="pagina__encabezado">
         <div>
             <h1 class="pagina__titulo">Directorios</h1>
-            <p class="pagina__texto">Cada directorio como estaba en el año que elijas. Las personas ocultas aparecen como «Vacante» y solo se muestran los contactos visibles.</p>
+            <p class="pagina__texto">Cada directorio como está hoy: quién ocupa cada puesto. Las personas ocultas aparecen como «Vacante» y solo se muestran los contactos visibles.</p>
         </div>
 
         <div class="pagina__acciones">
@@ -43,7 +42,7 @@
 
     <nav class="pestanas__lista" aria-label="Directorios">
         @foreach ($tipos as $tipo)
-            <a href="{{ route('directorios.index', ['directorio' => $tipo->id, 'anio' => $filtros['anio']]) }}" class="pestanas__pestana"
+            <a href="{{ route('directorios.index', ['directorio' => $tipo->id]) }}" class="pestanas__pestana"
                @if ($elegido->id === $tipo->id) aria-current="page" @endif>
                 {{ $tipo->nombre }}
             </a>
@@ -51,20 +50,10 @@
     </nav>
 
     <section class="tarjeta tarjeta--tabla" aria-labelledby="directorio-titulo">
-        <h2 id="directorio-titulo" class="solo-lectores">{{ $elegido->nombre }} {{ $filtros['anio'] }}</h2>
+        <h2 id="directorio-titulo" class="solo-lectores">{{ $elegido->nombre }}</h2>
 
         <form method="GET" action="{{ route('directorios.index') }}" class="filtros filtros--servidor" data-filtros-servidor>
             <input type="hidden" name="directorio" value="{{ $elegido->id }}">
-
-            <label class="filtros__selector">
-                <span class="filtros__etiqueta">Año</span>
-                <select name="anio" class="campo__entrada">
-                    {{-- El año en curso va sin valor: es el de siempre y no se marca como filtro elegido --}}
-                    @foreach ($anios as $anio)
-                        <option value="{{ $loop->first ? '' : $anio }}" @selected($filtros['anio'] === $anio)>{{ $anio }}</option>
-                    @endforeach
-                </select>
-            </label>
 
             @isset($usa['coordinacion'])
                 <label class="filtros__selector">
@@ -125,14 +114,14 @@
         @if ($filas->isEmpty())
             <p class="vacio vacio--en-tabla">
                 @if ($esInstituciones)
-                    Ninguna institución {{ $hayFiltros ? 'coincide con los filtros' : 'fue afiliada u observadora' }} en {{ $filtros['anio'] }}.
+                    Ninguna institución {{ $hayFiltros ? 'coincide con los filtros' : 'es afiliada u observadora' }} hoy.
                 @else
                     {{ $hayFiltros ? 'Ningún puesto coincide con los filtros.' : 'Este directorio todavía no tiene puestos. Agrégalos en Ordenar puestos.' }}
                 @endif
             </p>
         @else
             <table class="tabla tabla--directorio">
-                <caption class="solo-lectores">{{ $elegido->nombre }}, {{ $etiquetaAnio }}</caption>
+                <caption class="solo-lectores">{{ $elegido->nombre }}, hoy</caption>
                 <thead>
                     <tr>
                         @if ($esInstituciones)
@@ -218,7 +207,7 @@
         <div class="formulario">
             <h2 id="dialogo-correos-titulo" class="dialogo__titulo">Copiar correos</h2>
             <p class="dialogo__texto">
-                {{ count($correos) === 1 ? '1 correo' : count($correos).' correos' }} de {{ $elegido->nombre }}, {{ $etiquetaAnio }}, separados por punto y coma para pegarlos en tu correo.
+                {{ count($correos) === 1 ? '1 correo' : count($correos).' correos' }} de {{ $elegido->nombre }}, separados por punto y coma para pegarlos en tu correo.
             </p>
             <label for="correos-texto" class="solo-lectores">Correos</label>
             <textarea id="correos-texto" class="campo__entrada correos-copiar" rows="6" readonly data-correos>{{ implode('; ', $correos) }}</textarea>

@@ -11,6 +11,8 @@ use App\Services\Puestos\PuestoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -80,6 +82,23 @@ class PersonaController extends Controller
         $id = $this->personas->registrar($request->user(), $datos, $request->existente());
 
         return redirect()->route('personas.show', $id)->with('estado', 'Se registró '.$this->personas->nombreCompleto((object) $datos).(count($datos['designaciones']) > 1 ? ' con sus designaciones.' : ' con su designación.'));
+    }
+
+    /**
+     * Al marcar "Es el titular de la institución": quién lo es hoy (si alguien).
+     * Una persona oculta se dice "otra persona".
+     */
+    public function titularDe(int $institucion): JsonResponse
+    {
+        $titular = app(DesignacionService::class)->titularDe($institucion);
+        $oculta = $titular?->persona !== null && DB::table('persona')->where('pers_id_persona', $titular->persona)->value('pers_oculta_admin');
+
+        return response()->json($titular === null ? null : [
+            'cargo_id' => $titular->cargo_id,
+            'cargo' => $titular->cargo,
+            'ocupante' => $titular->ocupante === null ? null : ($oculta ? 'otra persona' : $titular->ocupante),
+            'desde' => $titular->desde === null ? null : Carbon::parse($titular->desde)->format('d/m/Y'),
+        ]);
     }
 
     /**

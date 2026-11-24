@@ -39,14 +39,14 @@ class PuestosDirectoriosSeederTest extends TestCase
 
         // 4 del consejo + 7 directores + 7 secretarios regionales + 14 coordinadores
         // nacionales + secretario técnico general + ALAFEC + 14 × 7 coordinadores regionales
-        // + Director General CACECA (que no va en ningún directorio)
+        // + el presidente de CACECA (al final del Consejo Nacional Directivo)
         $this->assertSame(133, DB::table('puesto')->count());
 
         $nacional = $this->directorio('Consejo Nacional Directivo');
-        $this->assertCount(27, $nacional);
+        $this->assertCount(28, $nacional);
         $this->assertSame(['Presidente', 'Vicepresidente', 'Secretario General', 'Director Ejecutivo', 'Director Regional · Zona 1'], array_slice($nacional, 0, 5));
         $this->assertSame('Coordinador Nacional · Certificación Académica', $nacional[11]);
-        $this->assertSame(['Secretario Técnico General · Maratones', 'Representante de ANFECA ante ALAFEC'], array_slice($nacional, -2));
+        $this->assertSame(['Secretario Técnico General · Maratones', 'Representante de ANFECA ante ALAFEC', PuestosDirectoriosSeeder::CARGO_CACECA], array_slice($nacional, -3));
 
         $regionales = $this->directorio('Consejos Regionales');
         $this->assertCount(112, $regionales);
@@ -64,7 +64,7 @@ class PuestosDirectoriosSeederTest extends TestCase
         // El Secretario Técnico Regional ya no existe: ni cargo ni puestos
         $this->assertDatabaseMissing('cargo', ['carg_nombre_m' => 'Secretario Técnico']);
 
-        // Director General CACECA es de la organización CACECA
+        // El presidente de CACECA es de la organización CACECA
         $this->assertSame($this->caceca, (int) $this->puestoDeCaceca()->pues_id_organizacion);
     }
 
@@ -83,7 +83,7 @@ class PuestosDirectoriosSeederTest extends TestCase
 
     private function puestoDeCaceca(): object
     {
-        return DB::table('puesto')->join('cargo', 'carg_id_cargo', '=', 'pues_id_cargo')->where('carg_nombre_m', 'Director General CACECA')->first(['pues_id_puesto', 'pues_id_organizacion']);
+        return DB::table('puesto')->join('cargo', 'carg_id_cargo', '=', 'pues_id_cargo')->where('carg_nombre_m', PuestosDirectoriosSeeder::CARGO_CACECA)->first(['pues_id_puesto', 'pues_id_organizacion']);
     }
 
     public function test_es_repetible_y_respeta_los_puestos_que_agrego_el_usuario(): void
@@ -92,17 +92,18 @@ class PuestosDirectoriosSeederTest extends TestCase
 
         // El usuario agregó al final del Consejo Nacional un puesto que el seeder no pone ahí
         $cnd = (int) DB::table('tipo_directorio')->where('tidi_nombre', 'Consejo Nacional Directivo')->value('tidi_id_tipo_directorio');
-        $propio = (int) DB::table('puesto')->join('cargo', 'carg_id_cargo', '=', 'pues_id_cargo')->where('carg_nombre_m', 'Director General CACECA')->value('pues_id_puesto');
-        DB::table('puesto_directorio')->insert(['pudi_id_puesto' => $propio, 'pudi_id_tipo_directorio' => $cnd, 'pudi_orden' => 28]);
+        $asesor = (int) DB::table('cargo')->insertGetId(['carg_nombre_m' => 'Asesor', 'carg_nombre_f' => 'Asesora', 'carg_nivel' => 'Nacional', 'carg_activo' => true], 'carg_id_cargo');
+        $propio = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $asesor], 'pues_id_puesto');
+        DB::table('puesto_directorio')->insert(['pudi_id_puesto' => $propio, 'pudi_id_tipo_directorio' => $cnd, 'pudi_orden' => 29]);
 
         $this->seed(PuestosDirectoriosSeeder::class);
 
-        $this->assertSame(133, DB::table('puesto')->count());
+        $this->assertSame(134, DB::table('puesto')->count());
         $nacional = $this->directorio('Consejo Nacional Directivo');
-        $this->assertCount(28, $nacional);
+        $this->assertCount(29, $nacional);
         $this->assertSame('Presidente', $nacional[0]);
-        $this->assertSame('Director General CACECA', end($nacional));
-        $this->assertSame(range(1, 28), DB::table('puesto_directorio')->where('pudi_id_tipo_directorio', $cnd)->orderBy('pudi_orden')->pluck('pudi_orden')->map(fn ($o) => (int) $o)->all());
+        $this->assertSame([PuestosDirectoriosSeeder::CARGO_CACECA, 'Asesor'], array_slice($nacional, -2));
+        $this->assertSame(range(1, 29), DB::table('puesto_directorio')->where('pudi_id_tipo_directorio', $cnd)->orderBy('pudi_orden')->pluck('pudi_orden')->map(fn ($o) => (int) $o)->all());
     }
 
     /**

@@ -223,7 +223,7 @@ class PersonaService
                 foreach ($cambios as $campo => [$anterior, $nuevo]) {
                     $this->detalle($idBitacora, $id, $campo, $anterior, $nuevo);
                 }
-                app(DesignacionService::class)->designar($id, $datos['genero'], $nuevas, $idBitacora);
+                app(DesignacionService::class)->designar($id, $datos['genero'], $nuevas, $idBitacora, $actor);
             }
 
             // Las guardadas que se borran o terminan: con las funciones de la base (cada una deja su bitácora).
@@ -436,7 +436,7 @@ class PersonaService
                 $idBitacora = $this->bitacora($actor, 'Registro', 'PERSONA', $id);
             }
 
-            app(DesignacionService::class)->designar($id, $datos['genero'], $datos['designaciones'], $idBitacora);
+            app(DesignacionService::class)->designar($id, $datos['genero'], $datos['designaciones'], $idBitacora, $actor);
 
             return $id;
         });

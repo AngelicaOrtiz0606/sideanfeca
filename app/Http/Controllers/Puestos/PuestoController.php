@@ -52,6 +52,20 @@ class PuestoController extends Controller
         ]);
     }
 
+    /** Consulta de un puesto: sus datos y quiénes lo han ocupado. */
+    public function show(int $puesto): View
+    {
+        $encontrado = $this->puestos->buscar($puesto);
+        abort_if($encontrado === null, 404);
+
+        return view('puestos.consulta', [
+            'puesto' => $encontrado,
+            'nombre' => $this->puestos->ambito($encontrado, true),
+            'historial' => Paginacion::de($this->puestos->historial($puesto)),
+            'directorios' => $this->puestos->directoriosDe($puesto),
+        ]);
+    }
+
     public function store(PuestoRequest $request): RedirectResponse
     {
         $id = $this->puestos->registrar($request->user(), $request->datos());

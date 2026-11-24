@@ -5,20 +5,18 @@ namespace App\Services\Directorios;
 use App\Services\Puestos\PuestoService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Consultar directorios (M10, en la administración): arma cada directorio
- * tal como estaba en un año.
+ * Consultar directorios (M10, en la administración): cada directorio como
+ * está hoy (solo lo vigente).
  *
  * - Directorios de puestos (Consejo Nacional Directivo, Consejos Regionales,
  *   Coordinaciones Nacionales): sus puestos en el orden guardado; en cada uno,
- *   quien lo ocupó al final de ese año (o hasta hoy, si es el año en curso).
- *   Si lo ocupó otra persona antes en ese año, se muestra la más reciente.
- * - Instituciones: las que ese año fueron afiliadas u observadoras, con su
- *   titular (el puesto marcado como titular de la institución).
+ *   quien lo ocupa hoy, o "Vacante".
+ * - Instituciones: las que hoy son afiliadas u observadoras, con su titular
+ *   (quien ocupa hoy el puesto marcado como titular de la institución).
  *
  * Reglas del sitio público que se respetan aquí y en el CSV:
  * - Una persona oculta no aparece: su puesto se ve como "Vacante".
@@ -46,46 +44,30 @@ class ConsultaDirectorioService
     }
 
     /**
-     * Años que se pueden consultar: del primero con alguna designación o
-     * participación al actual (del más reciente al más antiguo).
-     *
-     * @return array<int, int>
-     */
-    public function anios(): array
-    {
-        $actual = (int) now()->format('Y');
-        $primero = collect([
-            DB::table('designacion')->min('desi_fecha_inicio'),
-            DB::table('institucion_participacion')->min('inpa_fecha_inicio'),
-        ])->filter()->map(fn ($fecha) => (int) substr((string) $fecha, 0, 4))->min() ?? $actual;
-
-        return range($actual, min($primero, $actual));
-    }
-
-    /**
-     * Los puestos del directorio con quien los ocupó ese año.
+     * Los puestos del directorio con quien los ocupa hoy.
      *
      * @return Collection<int, object> {puesto, nombre, grado, pertenencia, telefonos[], correos[], vacante}
      */
-    public function puestos(int $tipo, int $anio, ?int $zona = null, ?int $coordinacion = null): Collection
+    public function puestos(int $tipo, ?int $zona = null, ?int $coordinacion = null): Collection
     {
-        [$inicio, $corte] = $this->periodo($anio);
+        $hoy = now()->toDateString();
 
         $filas = DB::table('puesto_directorio as pd')
             ->join('puesto as p', 'p.pues_id_puesto', '=', 'pd.pudi_id_puesto')
             ->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
             ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'p.pues_id_zona_regional')
             ->leftJoin('coordinacion_nacional as cn', 'cn.cona_id_coordinacion_nacional', '=', 'p.pues_id_coordinacion_nacional')
-            ->leftJoinLateral($this->ultimaDesignacion('p.pues_id_puesto', $inicio, $corte), 'o')
+            ->leftJoin('organizacion as org', 'org.orga_id_organizacion', '=', 'p.pues_id_organizacion')
+            ->leftJoinLateral($this->ocupante('p.pues_id_puesto', $hoy), 'o')
             ->where('pd.pudi_id_tipo_directorio', $tipo)
             ->when($zona, fn (Builder $q, int $id) => $q->where('p.pues_id_zona_regional', $id))
             ->when($coordinacion, fn (Builder $q, int $id) => $q->where('p.pues_id_coordinacion_nacional', $id))
-            // Un puesto desactivado solo aparece en los años en que alguien lo ocupó
+            // Un puesto desactivado solo aparece si alguien todavía lo ocupa
             ->where(fn (Builder $q) => $q->where('p.pues_activo', true)->orWhereNotNull('o.persona'))
             ->orderBy('pd.pudi_orden')
             ->get([
                 'c.carg_nombre_m as cargo', 'c.carg_nombre_f as cargo_f', 'c.carg_nivel as nivel',
-                'z.zore_numero as zona_numero', 'z.zore_nombre as zona_nombre', 'cn.cona_nombre as coordinacion',
+                'z.zore_numero as zona_numero', 'z.zore_nombre as zona_nombre', 'cn.cona_nombre as coordinacion', 'org.orga_nombre as organizacion',
                 DB::raw('null as institucion'), 'o.persona',
             ]);
 
@@ -105,38 +87,38 @@ class ConsultaDirectorioService
     }
 
     /**
-     * Las instituciones que ese año fueron afiliadas u observadoras, con su titular.
+     * Las instituciones que hoy son afiliadas u observadoras, con su titular de hoy.
      *
      * @return Collection<int, object> {numero, institucion, universidad, participacion, zona, entidad, puesto, nombre, grado, telefonos[], correos[], vacante}
      */
-    public function instituciones(int $anio, ?int $zona = null, ?int $entidad = null, ?string $participacion = null): Collection
+    public function instituciones(?int $zona = null, ?int $entidad = null, ?string $participacion = null): Collection
     {
-        [$inicio, $corte] = $this->periodo($anio);
+        $hoy = now()->toDateString();
 
         $filas = DB::table('institucion_educativa as i')
-            // Su participación ese año (el periodo más reciente que toca el año)
+            // Su participación vigente hoy
             ->joinLateral(
                 DB::table('institucion_participacion as ip')
                     ->whereColumn('ip.inpa_id_institucion', 'i.ined_id_institucion_educativa')
-                    ->where('ip.inpa_fecha_inicio', '<=', $corte)
-                    ->where(fn (Builder $q) => $q->whereNull('ip.inpa_fecha_fin')->orWhere('ip.inpa_fecha_fin', '>=', $inicio))
+                    ->where('ip.inpa_fecha_inicio', '<=', $hoy)
+                    ->where(fn (Builder $q) => $q->whereNull('ip.inpa_fecha_fin')->orWhere('ip.inpa_fecha_fin', '>=', $hoy))
                     ->orderByDesc('ip.inpa_fecha_inicio')
                     ->limit(1)
                     ->select('ip.inpa_tipo as tipo'),
                 'pa',
             )
-            // Su nombre de ese año (y el de su universidad, si es facultad o campus)
-            ->joinLateral($this->nombreEn('i.ined_id_institucion_educativa', $corte), 'n')
-            ->leftJoinLateral($this->nombreEn('i.ined_id_institucion_padre', $corte), 'np')
+            // Su nombre actual (y el de su universidad, si es facultad o campus)
+            ->joinLateral($this->nombreEn('i.ined_id_institucion_educativa', $hoy), 'n')
+            ->leftJoinLateral($this->nombreEn('i.ined_id_institucion_padre', $hoy), 'np')
             ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'i.ined_id_zona_regional')
             ->leftJoin('domicilio as d', 'd.domi_id_domicilio', '=', 'i.ined_id_domicilio')
             ->leftJoin('colonia as col', 'col.colo_id_colonia', '=', 'd.domi_id_colonia')
             ->leftJoin('alcaldia_municipio as m', 'm.almu_id_alcaldia_municipio', '=', 'col.colo_id_alcaldia_municipio')
             ->leftJoin('entidad_federativa as e', 'e.enfe_id_entidad_federativa', '=', 'm.almu_id_entidad_federativa')
-            // Su titular: el puesto titular de la institución y quien lo ocupó ese año
+            // Su titular: el puesto titular de la institución y quien lo ocupa hoy
             ->leftJoin('puesto as p', fn (JoinClause $j) => $j->on('p.pues_id_institucion_educativa', '=', 'i.ined_id_institucion_educativa')->where('p.pues_titularidad', true))
             ->leftJoin('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')
-            ->leftJoinLateral($this->ultimaDesignacion('p.pues_id_puesto', $inicio, $corte), 'o')
+            ->leftJoinLateral($this->ocupante('p.pues_id_puesto', $hoy), 'o')
             ->whereIn('pa.tipo', $participacion ? [$participacion] : self::PARTICIPACIONES)
             ->when($zona, fn (Builder $q, int $id) => $q->where('i.ined_id_zona_regional', $id))
             ->when($entidad, fn (Builder $q, int $id) => $q->where('e.enfe_id_entidad_federativa', $id))
@@ -181,25 +163,13 @@ class ConsultaDirectorioService
             ->all();
     }
 
-    /**
-     * Del 1 de enero del año a su último día (o a hoy, si es el año en curso).
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function periodo(int $anio): array
-    {
-        $fin = Carbon::create($anio, 12, 31);
-
-        return ["{$anio}-01-01", ($fin->isFuture() ? now() : $fin)->toDateString()];
-    }
-
-    /** La designación más reciente del puesto que toca el periodo. */
-    private function ultimaDesignacion(string $puesto, string $inicio, string $corte): Builder
+    /** Quien ocupa el puesto en esa fecha (su designación vigente). */
+    private function ocupante(string $puesto, string $fecha): Builder
     {
         return DB::table('designacion as dd')
             ->whereColumn('dd.desi_id_puesto', $puesto)
-            ->where('dd.desi_fecha_inicio', '<=', $corte)
-            ->where(fn (Builder $q) => $q->whereNull('dd.desi_fecha_fin')->orWhere('dd.desi_fecha_fin', '>=', $inicio))
+            ->where('dd.desi_fecha_inicio', '<=', $fecha)
+            ->where(fn (Builder $q) => $q->whereNull('dd.desi_fecha_fin')->orWhere('dd.desi_fecha_fin', '>=', $fecha))
             ->orderByDesc('dd.desi_fecha_inicio')
             ->limit(1)
             ->select('dd.desi_id_persona as persona');
