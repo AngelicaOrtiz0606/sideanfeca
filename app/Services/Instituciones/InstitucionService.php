@@ -5,6 +5,7 @@ namespace App\Services\Instituciones;
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
 use App\Support\Paginacion;
+use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -107,6 +108,27 @@ class InstitucionService
             ->where('t.tiie_nombre', 'Universidad')
             ->orderBy('n.instn_nombre')
             ->get();
+    }
+
+    /**
+     * Otra institución con el mismo nombre vigente (sin importar mayúsculas,
+     * acentos ni espacios) y la misma universidad; sin universidad ($padre
+     * null), entre las universidades. Devuelve su nombre, o null. Dos
+     * facultades de universidades distintas sí pueden llamarse igual.
+     */
+    public function nombreRepetido(string $nombre, ?int $padre, ?int $excepto = null): ?string
+    {
+        $clave = TextoCatalogo::clave($nombre);
+
+        return DB::table('institucion_nombre as n')
+            ->join('institucion_educativa as i', 'i.ined_id_institucion_educativa', '=', 'n.instn_id_institucion')
+            ->join('tipo_institucion_educativa as t', 't.tiie_id_tipo_institucion', '=', 'i.ined_id_tipo_institucion')
+            ->whereNull('n.instn_fecha_fin')
+            ->when($padre === null, fn (Builder $q) => $q->whereNull('i.ined_id_institucion_padre')->where('t.tiie_nombre', 'Universidad'),
+                fn (Builder $q) => $q->where('i.ined_id_institucion_padre', $padre))
+            ->when($excepto, fn (Builder $q, int $id) => $q->where('i.ined_id_institucion_educativa', '!=', $id))
+            ->pluck('n.instn_nombre')
+            ->first(fn (string $otro) => TextoCatalogo::clave($otro) === $clave);
     }
 
     /**

@@ -96,6 +96,24 @@ class DesignacionesTest extends TestCase
             ->assertSessionHasErrors('designaciones.0.cargo');
     }
 
+    public function test_un_puesto_ocupado_se_puede_reemplazar_y_la_designacion_anterior_termina_el_dia_antes(): void
+    {
+        $otra = (int) DB::table('persona')->insertGetId(['pers_nombre' => 'Laura', 'pers_primer_apellido' => 'Pérez', 'pers_genero' => 'F',
+            'pers_id_organizacion' => DB::table('persona')->where('pers_id_persona', $this->persona)->value('pers_id_organizacion')], 'pers_id_persona');
+        // Ya estuvo en los directorios (un puesto que terminó), así tiene ficha
+        $vocal = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $this->cargo('Vocal nacional', 'Vocal nacional', 'Nacional')], 'pues_id_puesto');
+        DB::table('designacion')->insert(['desi_id_puesto' => $vocal, 'desi_id_persona' => $otra, 'desi_fecha_inicio' => '2020-01-01', 'desi_fecha_fin' => '2020-12-31']);
+
+        // Laura quiere la presidencia que ocupa Teresa desde 2024: se ofrece reemplazarla
+        $this->actingAs($this->admin)->post("/personas/{$otra}/designaciones", ['designaciones' => [['cargo' => $this->presidente, 'fecha_inicio' => '2026-03-01']]])
+            ->assertSessionHasErrors(['designaciones.0.reemplazar_ocupante' => 'Designación 1: ese puesto lo ocupa Teresa Gómez desde el 01/01/2024. Si deja el puesto, marca «Sí, reemplazar»: su designación terminará el 28/02/2026.']);
+
+        $this->actingAs($this->admin)->post("/personas/{$otra}/designaciones", ['designaciones' => [['cargo' => $this->presidente, 'fecha_inicio' => '2026-03-01', 'reemplazar_ocupante' => '1']]])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('2026-02-28', DB::table('designacion')->where('desi_id_persona', $this->persona)->value('desi_fecha_fin'));
+        $this->assertTrue(DB::table('designacion')->where('desi_id_persona', $otra)->where('desi_fecha_inicio', '2026-03-01')->exists());
+    }
+
     public function test_terminar_la_designacion_libera_el_puesto_desde_esa_fecha(): void
     {
         $designacion = $this->designacion();

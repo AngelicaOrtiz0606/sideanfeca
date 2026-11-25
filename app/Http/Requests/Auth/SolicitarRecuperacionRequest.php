@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Formulario para pedir un código de recuperación. Límites:
  * - 3 solicitudes cada 15 minutos por correo e IP;
- * - 10 solicitudes por hora desde una misma IP, con cualquier correo (para que
+ * - 5 solicitudes por hora desde una misma IP, con cualquier correo (para que
  *   nadie use el sistema para llenar de correos a otras personas).
  */
 class SolicitarRecuperacionRequest extends FormRequest
@@ -19,7 +19,7 @@ class SolicitarRecuperacionRequest extends FormRequest
 
     public const VENTANA_SEGUNDOS = 900;
 
-    public const SOLICITUDES_POR_IP = 10;
+    public const SOLICITUDES_POR_IP = 5;
 
     public const VENTANA_IP_SEGUNDOS = 3600;
 

@@ -66,6 +66,15 @@ class DesignacionService
                 $this->hacerTitular($actor, $puesto, $persona, $designacion['institucion'], $designacion['fecha_inicio'], $idBitacora);
             }
 
+            // Reemplaza a quien ocupaba el puesto: su designación termina el día anterior
+            if (! $creado && ($designacion['reemplazar_ocupante'] ?? false)) {
+                $ocupante = $this->ocupanteEn($puesto, $designacion['fecha_inicio']);
+                if ($ocupante !== null && $ocupante->persona !== $persona
+                    && ($actor === null || ($error = $this->terminar($actor, $ocupante->designacion, $designacion['fecha_inicio'])) !== null)) {
+                    throw ValidationException::withMessages(['designaciones' => $error ?? 'No se pudo terminar la designación de quien ocupaba el puesto.']);
+                }
+            }
+
             $id = (int) DB::table('designacion')->insertGetId([
                 'desi_id_puesto' => $puesto,
                 'desi_id_persona' => $persona,
@@ -161,6 +170,28 @@ class DesignacionService
         DB::table('puesto')->where('pues_id_puesto', $puesto)->update(['pues_titularidad' => true]);
         $this->detalle($idBitacora, $puesto, 'Titular de la institución', $actual?->cargo,
             DB::table('puesto as p')->join('cargo as c', 'c.carg_id_cargo', '=', 'p.pues_id_cargo')->where('p.pues_id_puesto', $puesto)->value('c.carg_nombre_m'));
+    }
+
+    /**
+     * Quien ocupa el puesto en esa fecha: {designacion, persona, nombre ("otra
+     * persona" si está oculta), desde}, o null si está vacante.
+     */
+    public function ocupanteEn(int $puesto, string $fecha): ?object
+    {
+        $ocupante = DB::table('designacion as d')->join('persona as per', 'per.pers_id_persona', '=', 'd.desi_id_persona')
+            ->where('d.desi_id_puesto', $puesto)
+            ->where('d.desi_fecha_inicio', '<=', $fecha)
+            ->where(fn ($q) => $q->whereNull('d.desi_fecha_fin')->orWhere('d.desi_fecha_fin', '>=', $fecha))
+            ->orderByDesc('d.desi_fecha_inicio')
+            ->first(['d.desi_id_designacion as designacion', 'd.desi_id_persona as persona', 'd.desi_fecha_inicio as desde', 'per.pers_oculta_admin as oculta',
+                DB::raw("concat_ws(' ', per.pers_nombre, per.pers_primer_apellido, per.pers_segundo_apellido) as nombre")]);
+
+        return $ocupante === null ? null : (object) [
+            'designacion' => (int) $ocupante->designacion,
+            'persona' => (int) $ocupante->persona,
+            'nombre' => $ocupante->oculta ? 'otra persona' : $ocupante->nombre,
+            'desde' => $ocupante->desde,
+        ];
     }
 
     public function terminar(Usuario $actor, int $designacion, string $fecha): ?string

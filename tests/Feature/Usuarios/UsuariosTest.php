@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Usuarios;
 
+use App\Http\Middleware\ConfirmarContrasenia;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\BitacoraService;
@@ -31,6 +32,8 @@ class UsuariosTest extends TestCase
         parent::setUp();
 
         $this->superadmin = $this->crearCuenta(Rol::SUPERADMINISTRADOR, [], ['pers_nombre' => 'Marta', 'pers_primer_apellido' => 'Ruiz']);
+        // Ya confirmó su contraseña (las pruebas de la confirmación están al final)
+        $this->withSession([ConfirmarContrasenia::CLAVE => time()]);
     }
 
     public function test_crear_la_cuenta_de_una_persona_nueva(): void
@@ -197,8 +200,46 @@ class UsuariosTest extends TestCase
         if (auth()->id() !== $cuenta->getAuthIdentifier()) {
             $this->flushSession();
             auth()->forgetGuards();
+            $this->withSession([ConfirmarContrasenia::CLAVE => time()]);
         }
 
         return $this->actingAs($cuenta);
+    }
+
+    public function test_crear_editar_o_desactivar_cuentas_pide_confirmar_la_contrasenia(): void
+    {
+        $this->flushSession();
+        $otra = $this->crearCuenta(Rol::ADMINISTRADOR);
+
+        // La lista se ve; abrir Editar pide la contraseña y después regresa a la pantalla
+        $this->actingAs($this->superadmin)->get('/usuarios')->assertOk();
+        $this->actingAs($this->superadmin)->get("/usuarios/{$otra->usua_id_usuario}/edit")->assertRedirect(route('contrasenia.confirmar'));
+        $this->actingAs($this->superadmin)->post('/confirmar-contrasenia', ['contrasenia' => 'equivocada'])
+            ->assertSessionHasErrors(['contrasenia' => 'La contraseña no es correcta.']);
+        $this->actingAs($this->superadmin)->post('/confirmar-contrasenia', ['contrasenia' => $this->contraseniaDePrueba])
+            ->assertRedirect("/usuarios/{$otra->usua_id_usuario}/edit");
+        $this->actingAs($this->superadmin)->get("/usuarios/{$otra->usua_id_usuario}/edit")->assertOk();
+    }
+
+    public function test_sin_confirmar_no_se_cambia_el_correo_ni_se_desactiva(): void
+    {
+        $this->flushSession();
+        $otra = $this->crearCuenta(Rol::ADMINISTRADOR);
+
+        $this->actingAs($this->superadmin)->from('/usuarios')->patch("/usuarios/{$otra->usua_id_usuario}/estado", ['activa' => '0'])
+            ->assertRedirect(route('contrasenia.confirmar'))
+            ->assertSessionHas('aviso', 'Por seguridad, confirma tu contraseña. Después vuelve a guardar.');
+        $this->assertTrue((bool) $otra->fresh()->usua_activo);
+    }
+
+    public function test_confirmar_la_contrasenia_se_bloquea_tras_cinco_errores(): void
+    {
+        $this->flushSession();
+        for ($i = 0; $i < 5; $i++) {
+            $this->actingAs($this->superadmin)->post('/confirmar-contrasenia', ['contrasenia' => "mala-{$i}"]);
+        }
+
+        $this->actingAs($this->superadmin)->post('/confirmar-contrasenia', ['contrasenia' => $this->contraseniaDePrueba])
+            ->assertSessionHasErrors(['contrasenia' => 'Escribiste mal tu contraseña varias veces. Espera 15 minutos y vuelve a intentarlo.']);
     }
 }

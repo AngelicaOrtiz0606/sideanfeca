@@ -195,10 +195,28 @@ class InstitucionesTest extends TestCase
         $id = $this->registrar($this->observadora());
 
         // La fecha es del historial (Pasar a afiliada); al editar solo se corrige la participación
-        $this->actingAs($this->admin)->put("/instituciones/{$id}", ['participacion' => 'Afiliada', 'desde' => '2020-01-01'] + $this->observadora())
+        $this->actingAs($this->admin)->put("/instituciones/{$id}", ['participacion' => 'Afiliada', 'desde' => '2020-01-01', 'correccion_participacion' => '1'] + $this->observadora())
             ->assertSessionHasErrors(['desde']);
 
         $this->assertDatabaseHas('institucion_educativa', ['ined_id_institucion_educativa' => $id, 'ined_participacion' => 'Observadora']);
+    }
+
+    public function test_el_mismo_nombre_solo_se_repite_en_universidades_distintas(): void
+    {
+        $unam = $this->registrar($this->matriz());
+        $this->registrar($this->afiliada($unam, '2607002', $this->zona(7)));
+
+        // Otra «Facultad de Contaduría y Administración» en la misma universidad: no
+        $this->actingAs($this->admin)->post('/instituciones', ['numero' => '2607003'] + $this->afiliada($unam, '2607003', $this->zona(7)))
+            ->assertSessionHasErrors(['razon_social' => 'Ya existe «Facultad de Contaduría y Administración» en esa universidad.']);
+
+        // En otra universidad sí
+        $otra = $this->registrar(['razon_social' => 'Universidad Autónoma de Prueba'] + $this->matriz());
+        $this->actingAs($this->admin)->post('/instituciones', $this->afiliada($otra, '2607004', $this->zona(7)))->assertSessionHasNoErrors();
+
+        // Dos universidades no se llaman igual (sin importar acentos ni mayúsculas)
+        $this->actingAs($this->admin)->post('/instituciones', ['razon_social' => 'universidad autonoma de prueba'] + $this->matriz())
+            ->assertSessionHasErrors(['razon_social' => 'Ya existe la universidad «Universidad Autónoma de Prueba».']);
     }
 
     public function test_desactivar_conserva_el_numero_y_cierra_su_periodo_de_participacion(): void

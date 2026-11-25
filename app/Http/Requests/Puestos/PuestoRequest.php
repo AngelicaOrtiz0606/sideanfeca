@@ -10,7 +10,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * Registro y edición de un puesto. Lo que se pide depende del nivel del cargo:
- * - Institucional: institución (y si es el titular de la institución).
+ * - Institucional: institución (y si es el titular de la institución; si ya
+ *   había otro puesto titular, se confirma el cambio con cambiar_titular).
  * - Regional: zona; coordinación opcional.
  * - Nacional: coordinación u organización (por ejemplo, Director General de
  *   CACECA), opcionales y nunca las dos.
@@ -48,6 +49,7 @@ class PuestoRequest extends FormRequest
                 Rule::exists('organizacion', 'orga_id_organizacion')->where(fn ($q) => $q->where('orga_activo', true)
                     ->when($actual?->organizacion_id, fn ($w, $id) => $w->orWhere('orga_id_organizacion', $id)))],
             'titular' => ['nullable', 'boolean'],
+            'cambiar_titular' => ['nullable', 'boolean'],
         ];
     }
 
@@ -99,8 +101,8 @@ class PuestoRequest extends FormRequest
                         ->where('p.pues_id_institucion_educativa', $datos['institucion'])->where('p.pues_titularidad', true)
                         ->when($actual, fn ($q) => $q->where('p.pues_id_puesto', '!=', $actual->id))
                         ->value('c.carg_nombre_m');
-                    if ($otro !== null) {
-                        $validator->errors()->add('titular', "La institución ya tiene su puesto titular: «{$otro}». Solo puede haber uno.");
+                    if ($otro !== null && ! $this->boolean('cambiar_titular')) {
+                        $validator->errors()->add('cambiar_titular', "La institución ya tiene su puesto titular: «{$otro}». Si este puesto pasa a ser el titular, confirma el cambio.");
                     }
                 }
             },
@@ -127,7 +129,7 @@ class PuestoRequest extends FormRequest
     /**
      * Datos listos para PuestoService: lo que no aplica al nivel del cargo va vacío.
      *
-     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, titular: bool}
+     * @return array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, titular: bool, cambiar_titular: bool}
      */
     public function datos(): array
     {
@@ -140,6 +142,7 @@ class PuestoRequest extends FormRequest
             'institucion' => $nivel === 'Institucional' ? $this->entero($this->input('institucion')) : null,
             'organizacion' => $nivel === 'Nacional' ? $this->entero($this->input('organizacion')) : null,
             'titular' => $nivel === 'Institucional' && $this->boolean('titular'),
+            'cambiar_titular' => $nivel === 'Institucional' && $this->boolean('titular') && $this->boolean('cambiar_titular'),
         ];
     }
 

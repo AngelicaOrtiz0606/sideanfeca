@@ -1,7 +1,8 @@
 {{--
-    Consulta de un puesto (solo lectura): sus datos y el historial de las
-    personas que lo han ocupado, de la más reciente a la más antigua.
-    Una persona oculta se lista sin su nombre. Se edita desde la lista.
+    Consulta de un puesto (solo lectura), por pestañas como la de instituciones:
+    General (sus datos) y Quiénes lo han ocupado (de la más reciente a la más
+    antigua; una persona oculta se lista sin su nombre). Se edita desde la lista.
+    Las pestañas son enlaces (?pestana=…); pestanas.js las cambia sin recargar.
 --}}
 @extends('layouts.admin')
 
@@ -33,97 +34,116 @@
 
     <x-aviso-estado />
 
-    <div class="ficha">
-        <section class="tarjeta" aria-labelledby="ficha-puesto">
-            <div class="ficha__encabezado">
-                <h2 id="ficha-puesto" class="ficha__titulo">Puesto</h2>
+    <div class="pestanas" data-pestanas>
+        <nav class="pestanas__lista" role="tablist" aria-label="Información del puesto">
+            @foreach ($pestanas as $clave => $titulo)
+                <a href="{{ route('puestos.show', ['puesto' => $puesto->id, 'pestana' => $clave]) }}"
+                   id="pestana-{{ $clave }}" class="pestanas__pestana" role="tab"
+                   aria-controls="panel-{{ $clave }}" aria-selected="{{ $pestana === $clave ? 'true' : 'false' }}"
+                   @if ($pestana !== $clave) tabindex="-1" @endif data-pestana="{{ $clave }}">
+                    {{ $titulo }}
+                    @if ($clave === 'personas')
+                        <span class="pestanas__cifra">{{ $historial->total() }}</span>
+                    @endif
+                </a>
+            @endforeach
+        </nav>
+
+        {{-- General --}}
+        <section id="panel-general" class="pestanas__panel" role="tabpanel" aria-labelledby="pestana-general" @if ($pestana !== 'general') hidden @endif>
+            <div class="ficha">
+                <section class="tarjeta" aria-labelledby="ficha-puesto">
+                    <div class="ficha__encabezado">
+                        <h2 id="ficha-puesto" class="ficha__titulo">Puesto</h2>
+                    </div>
+                    <dl class="ficha__datos">
+                        <div>
+                            <dt>Cargo</dt>
+                            <dd>{{ $puesto->cargo }}@if (filled($puesto->cargo_f) && $puesto->cargo_f !== $puesto->cargo) / {{ $puesto->cargo_f }}@endif</dd>
+                        </div>
+                        @if ($puesto->institucion)
+                            <div>
+                                <dt>Institución</dt>
+                                <dd><a href="{{ route('instituciones.show', $puesto->institucion_id) }}" class="ficha__enlace">{{ $puesto->institucion }}</a></dd>
+                            </div>
+                        @endif
+                        @if ($puesto->organizacion)
+                            <div>
+                                <dt>Organización</dt>
+                                <dd>{{ $puesto->organizacion }}</dd>
+                            </div>
+                        @endif
+                        @if ($puesto->zona_numero)
+                            <div>
+                                <dt>Zona</dt>
+                                <dd>Zona {{ $puesto->zona_numero }} · {{ $puesto->zona_nombre }}</dd>
+                            </div>
+                        @endif
+                        @if ($puesto->coordinacion)
+                            <div>
+                                <dt>Coordinación</dt>
+                                <dd><span class="etiqueta-coordinacion">{{ $puesto->coordinacion }}</span></dd>
+                            </div>
+                        @endif
+                        @if ($puesto->nivel !== 'Institucional')
+                            <div>
+                                <dt>Aparece en</dt>
+                                <dd>{{ $directorios === [] ? 'Ningún directorio' : implode(', ', $directorios) }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                </section>
             </div>
-            <dl class="ficha__datos">
-                <div>
-                    <dt>Cargo</dt>
-                    <dd>{{ $puesto->cargo }}@if (filled($puesto->cargo_f) && $puesto->cargo_f !== $puesto->cargo) / {{ $puesto->cargo_f }}@endif</dd>
+        </section>
+
+        {{-- Quiénes lo han ocupado --}}
+        <section id="panel-personas" class="pestanas__panel" role="tabpanel" aria-labelledby="pestana-personas" @if ($pestana !== 'personas') hidden @endif>
+            <div class="tarjeta tarjeta--tabla">
+                <div class="tarjeta__barra">
+                    <p class="tarjeta__texto">De la más reciente a la más antigua.</p>
                 </div>
-                @if ($puesto->institucion)
-                    <div>
-                        <dt>Institución</dt>
-                        <dd><a href="{{ route('instituciones.show', $puesto->institucion_id) }}" class="ficha__enlace">{{ $puesto->institucion }}</a></dd>
-                    </div>
+
+                @if ($historial->isEmpty())
+                    <p class="vacio vacio--en-tabla">Nadie ha ocupado este puesto todavía.</p>
+                @else
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Persona</th>
+                                <th scope="col">Periodo</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($historial as $designacion)
+                                @php
+                                    $vigente = $designacion->desde <= $hoy && ($designacion->hasta === null || $designacion->hasta >= $hoy);
+                                    $porVenir = $designacion->desde > $hoy;
+                                @endphp
+                                <tr>
+                                    <th scope="row" data-etiqueta="Persona">
+                                        @if ($designacion->oculta)
+                                            <span class="tabla__vacio">Persona oculta</span>
+                                        @else
+                                            @can(\App\Enums\Privilegio::GestionarPersonas->value)
+                                                <a href="{{ route('personas.show', ['persona' => $designacion->persona, 'pestana' => 'designaciones']) }}" class="tabla__principal tabla__enlace">{{ $designacion->nombre }}</a>
+                                            @else
+                                                <span class="tabla__principal">{{ $designacion->nombre }}</span>
+                                            @endcan
+                                        @endif
+                                    </th>
+                                    <td data-etiqueta="Periodo">{{ $fecha($designacion->desde) }} – {{ $designacion->hasta ? $fecha($designacion->hasta) : 'a la fecha' }}</td>
+                                    <td data-etiqueta="Estado">
+                                        <span @class(['estado', 'estado--activo' => $vigente])>{{ $vigente ? 'Vigente' : ($porVenir ? 'Por iniciar' : 'Terminada') }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <x-paginacion :paginas="$historial" />
                 @endif
-                @if ($puesto->organizacion)
-                    <div>
-                        <dt>Organización</dt>
-                        <dd>{{ $puesto->organizacion }}</dd>
-                    </div>
-                @endif
-                @if ($puesto->zona_numero)
-                    <div>
-                        <dt>Zona</dt>
-                        <dd>Zona {{ $puesto->zona_numero }} · {{ $puesto->zona_nombre }}</dd>
-                    </div>
-                @endif
-                @if ($puesto->coordinacion)
-                    <div>
-                        <dt>Coordinación</dt>
-                        <dd><span class="etiqueta-coordinacion">{{ $puesto->coordinacion }}</span></dd>
-                    </div>
-                @endif
-                @if ($puesto->nivel !== 'Institucional')
-                    <div>
-                        <dt>Aparece en</dt>
-                        <dd>{{ $directorios === [] ? 'Ningún directorio' : implode(', ', $directorios) }}</dd>
-                    </div>
-                @endif
-            </dl>
+            </div>
         </section>
     </div>
-
-    <section class="tarjeta tarjeta--tabla" aria-labelledby="historial-titulo">
-        <div class="tarjeta__barra">
-            <div>
-                <h2 id="historial-titulo" class="ficha__titulo">Quiénes lo han ocupado</h2>
-                <p class="tarjeta__texto">De la más reciente a la más antigua.</p>
-            </div>
-        </div>
-
-        @if ($historial->isEmpty())
-            <p class="vacio vacio--en-tabla">Nadie ha ocupado este puesto todavía.</p>
-        @else
-            <table class="tabla">
-                <thead>
-                    <tr>
-                        <th scope="col">Persona</th>
-                        <th scope="col">Periodo</th>
-                        <th scope="col">Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($historial as $designacion)
-                        @php
-                            $vigente = $designacion->desde <= $hoy && ($designacion->hasta === null || $designacion->hasta >= $hoy);
-                            $porVenir = $designacion->desde > $hoy;
-                        @endphp
-                        <tr>
-                            <th scope="row" data-etiqueta="Persona">
-                                @if ($designacion->oculta)
-                                    <span class="tabla__vacio">Persona oculta</span>
-                                @else
-                                    @can(\App\Enums\Privilegio::GestionarPersonas->value)
-                                        <a href="{{ route('personas.show', ['persona' => $designacion->persona, 'pestana' => 'designaciones']) }}" class="tabla__principal tabla__enlace">{{ $designacion->nombre }}</a>
-                                    @else
-                                        <span class="tabla__principal">{{ $designacion->nombre }}</span>
-                                    @endcan
-                                @endif
-                            </th>
-                            <td data-etiqueta="Periodo">{{ $fecha($designacion->desde) }} – {{ $designacion->hasta ? $fecha($designacion->hasta) : 'a la fecha' }}</td>
-                            <td data-etiqueta="Estado">
-                                <span @class(['estado', 'estado--activo' => $vigente])>{{ $vigente ? 'Vigente' : ($porVenir ? 'Por iniciar' : 'Terminada') }}</span>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-
-            <x-paginacion :paginas="$historial" />
-        @endif
-    </section>
 @endsection

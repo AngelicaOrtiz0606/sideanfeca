@@ -16,6 +16,9 @@
         <div>
             <h1 class="pagina__titulo">Zonas regionales</h1>
             <p class="pagina__texto">Las zonas de ANFECA y las entidades federativas de cada una.</p>
+            @if ($numerosLibres === [])
+                <p class="pagina__texto">ANFECA tiene 7 zonas (de la 1 a la 7) y ya están todas registradas, por eso no aparece «Nueva zona». Para cambiar el nombre o las entidades de una zona, usa «Editar».</p>
+            @endif
         </div>
 
         @if ($numerosLibres !== [])

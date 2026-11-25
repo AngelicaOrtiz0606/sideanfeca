@@ -224,6 +224,11 @@ class PuestoService
     public function registrar(Usuario $actor, array $datos): int
     {
         return DB::transaction(function () use ($actor, $datos): int {
+            // Pasa a ser el titular: el anterior titular de la institución deja de serlo
+            if ($datos['titular']) {
+                $this->quitarTitularidad($actor, (int) $datos['institucion'], null);
+            }
+
             $id = (int) DB::table('puesto')->insertGetId([
                 'pues_id_cargo' => $datos['cargo'],
                 'pues_id_zona_regional' => $datos['zona'],
@@ -261,6 +266,11 @@ class PuestoService
                 return;
             }
 
+            // Pasa a ser el titular: el anterior titular de la institución deja de serlo
+            if ($datos['titular'] && ! $actual->pues_titularidad) {
+                $this->quitarTitularidad($actor, (int) $datos['institucion'], $id);
+            }
+
             DB::table('puesto')->where('pues_id_puesto', $id)->update([
                 'pues_id_cargo' => $datos['cargo'],
                 'pues_id_zona_regional' => $datos['zona'],
@@ -275,6 +285,21 @@ class PuestoService
                 $this->detalle($idBitacora, $id, $campo, $anterior, $nuevo);
             }
         });
+    }
+
+    /**
+     * El puesto que era titular de la institución deja de serlo (quien lo
+     * ocupa conserva su cargo); queda en la bitácora de ese puesto.
+     */
+    private function quitarTitularidad(Usuario $actor, int $institucion, ?int $excepto): void
+    {
+        $anteriores = DB::table('puesto')->where('pues_id_institucion_educativa', $institucion)->where('pues_titularidad', true)
+            ->when($excepto, fn (Builder $q, int $id) => $q->where('pues_id_puesto', '!=', $id))->lockForUpdate()->pluck('pues_id_puesto');
+
+        foreach ($anteriores as $anterior) {
+            DB::table('puesto')->where('pues_id_puesto', $anterior)->update(['pues_titularidad' => false]);
+            $this->detalle($this->bitacora($actor, 'Modificacion', 'PUESTO', (int) $anterior), (int) $anterior, 'Titular de la institución', 'Sí', 'No');
+        }
     }
 
     public function cambiarEstado(Usuario $actor, int $id, bool $activo): void

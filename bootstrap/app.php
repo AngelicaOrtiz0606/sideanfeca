@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AsegurarCuentaActiva;
+use App\Http\Middleware\ConfirmarContrasenia;
 use App\Http\Middleware\EncabezadosSeguridad;
 use App\Http\Middleware\ParametrosSimples;
 use App\Http\Middleware\SinCacheConSesion;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'cuenta.activa' => AsegurarCuentaActiva::class,
+            'contrasenia.confirmada' => ConfirmarContrasenia::class,
         ]);
 
         // Encabezados de seguridad del navegador en todas las pantallas, y sin

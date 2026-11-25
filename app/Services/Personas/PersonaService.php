@@ -5,6 +5,7 @@ namespace App\Services\Personas;
 use App\Models\Usuario;
 use App\Services\Catalogos\BitacoraCatalogo;
 use App\Services\Designaciones\DesignacionService;
+use App\Support\FuncionSql;
 use App\Support\Paginacion;
 use App\Support\TextoCatalogo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -213,15 +214,23 @@ class PersonaService
      *
      * @param  array{nombre: string, primer_apellido: string, segundo_apellido: ?string, curp: ?string, genero: string, institucion: ?int, organizacion: ?int, grados: array<int, int>, contactos: array<int, array{tipo: int, valor: string, lada: ?string, extension: ?string, visible: bool}>}  $datos
      */
-    public function actualizar(Usuario $actor, int $id, array $datos, array $designaciones = ['borrar' => [], 'inicio' => [], 'terminar' => []], array $nuevas = []): void
+    public function actualizar(Usuario $actor, int $id, array $datos, array $designaciones = ['borrar' => [], 'inicio' => [], 'terminar' => []], array $nuevas = [], ?int $unirCon = null): void
     {
-        DB::transaction(function () use ($actor, $id, $datos, $designaciones, $nuevas): void {
+        DB::transaction(function () use ($actor, $id, $datos, $designaciones, $nuevas, $unirCon): void {
+            // La misma persona capturada dos veces (una solo con cuenta): su cuenta pasa a esta y la otra se borra
+            if ($unirCon !== null) {
+                $this->unirCuenta($actor, $id, $unirCon);
+            }
+
             // Datos y designaciones nuevas: un solo movimiento en la bitácora
             $cambios = $this->guardarDatos($id, $datos);
-            if ($cambios !== [] || $nuevas !== []) {
+            if ($cambios !== [] || $nuevas !== [] || $unirCon !== null) {
                 $idBitacora = $this->bitacora($actor, 'Modificacion', 'PERSONA', $id);
                 foreach ($cambios as $campo => [$anterior, $nuevo]) {
                     $this->detalle($idBitacora, $id, $campo, $anterior, $nuevo);
+                }
+                if ($unirCon !== null) {
+                    $this->detalle($idBitacora, $unirCon, 'Cuenta de usuario', null, "Unida con el registro duplicado #{$unirCon}, que se borró");
                 }
                 app(DesignacionService::class)->designar($id, $datos['genero'], $nuevas, $idBitacora, $actor);
             }
@@ -484,6 +493,36 @@ class PersonaService
             ->first(['p.pers_nombre as nombre', 'p.pers_primer_apellido as primer_apellido', 'p.pers_segundo_apellido as segundo_apellido', 'p.pers_oculta_admin as oculta']);
 
         return $ocupante === null ? null : ($ocupante->oculta ? 'otra persona' : $this->nombreCompleto($ocupante));
+    }
+
+    /**
+     * Une a la persona $id con $duplicada, que solo tiene cuenta de usuario: los
+     * contactos y grados que $id no tenga pasan a ella, la cuenta pasa a $id y
+     * $duplicada se borra con la función de la base (motivo «Duplicado»).
+     */
+    private function unirCuenta(Usuario $actor, int $id, int $duplicada): void
+    {
+        DB::table('persona')->whereIn('pers_id_persona', [$id, $duplicada])->lockForUpdate()->get();
+
+        $contactos = DB::table('contacto')->where('cont_id_persona', $id)->get(['cont_id_tipo_contacto', 'cont_valor'])
+            ->map(fn (object $c) => $c->cont_id_tipo_contacto.'|'.mb_strtolower($c->cont_valor))->all();
+        DB::table('contacto')->where('cont_id_persona', $duplicada)->get()
+            ->reject(fn (object $c) => in_array($c->cont_id_tipo_contacto.'|'.mb_strtolower($c->cont_valor), $contactos, true))
+            ->each(fn (object $c) => DB::table('contacto')->where('cont_id_contacto', $c->cont_id_contacto)->update(['cont_id_persona' => $id]));
+        DB::table('persona_nivel_academico')->where('pena_id_persona', $duplicada)
+            ->whereNotIn('pena_id_nivel_academico', DB::table('persona_nivel_academico')->where('pena_id_persona', $id)->pluck('pena_id_nivel_academico'))
+            ->update(['pena_id_persona' => $id]);
+
+        // La CURP pasa a esta persona, luego la cuenta; la duplicada se queda sin nada y se borra
+        $curp = DB::table('persona')->where('pers_id_persona', $duplicada)->value('pers_curp');
+        DB::table('persona')->where('pers_id_persona', $duplicada)->update(['pers_curp' => null]);
+        DB::table('persona')->where('pers_id_persona', $id)->update(['pers_curp' => $curp]);
+        DB::table('usuario')->where('usua_id_persona', $duplicada)->update(['usua_id_persona' => $id]);
+
+        [, $error] = FuncionSql::llamar('eliminar_persona_definitiva', [$actor->usua_id_usuario, $duplicada, 'Duplicado']);
+        if ($error !== null) {
+            throw ValidationException::withMessages(['curp' => $error]);
+        }
     }
 
     /**

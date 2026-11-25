@@ -310,8 +310,12 @@ class CambiosConHistorialTest extends TestCase
     {
         $udg = $this->registrarObservadora();
 
-        // Se capturó como observadora, pero era afiliada: sin número, se le asigna el siguiente (año y zona del periodo)
+        // Sin confirmar que es un error de captura, no se cambia
         $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Afiliada']))
+            ->assertSessionHasErrors(['correccion_participacion' => 'Confirma que la participación se capturó mal. Si la institución fue aprobada como afiliada, usa «Pasar a afiliada».']);
+
+        // Se capturó como observadora, pero era afiliada: sin número, se le asigna el siguiente (año y zona del periodo)
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Afiliada', 'correccion_participacion' => '1']))
             ->assertSessionHasNoErrors();
         $institucion = DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->first();
         $this->assertSame('Afiliada', $institucion->ined_participacion);
@@ -321,11 +325,11 @@ class CambiosConHistorialTest extends TestCase
         $this->assertContains(['Participación (corrección)', 'Observadora', 'Afiliada'], $this->detalles($this->ultimaBitacora()->bita_id_bitacora));
 
         // Y de regreso: una observadora no tiene número
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Observadora']))->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Observadora', 'correccion_participacion' => '1']))->assertSessionHasNoErrors();
         $this->assertNull(DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $udg)->value('ined_num_afiliacion'));
 
         // Solo una universidad puede ser matriz
-        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Matriz', 'tipo' => 'Facultad']))
+        $this->actingAs($this->admin)->put("/instituciones/{$udg}", $this->observadoraEditada(['participacion' => 'Matriz', 'tipo' => 'Facultad', 'correccion_participacion' => '1']))
             ->assertSessionHasErrors('tipo');
     }
 

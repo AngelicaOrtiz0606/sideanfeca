@@ -11,6 +11,7 @@ use App\Services\Catalogos\ZonaService;
 use App\Support\Paginacion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -84,6 +85,16 @@ class ZonaController extends Controller
      */
     private function entidades(): Collection
     {
-        return EntidadFederativa::query()->with('zona')->orderBy('enfe_nombre')->get();
+        // Cuántas instituciones tiene cada entidad: al pasarla a otra zona, se van con ella
+        $instituciones = DB::table('institucion_educativa as i')
+            ->join('domicilio as d', 'd.domi_id_domicilio', '=', 'i.ined_id_domicilio')
+            ->join('colonia as c', 'c.colo_id_colonia', '=', 'd.domi_id_colonia')
+            ->join('alcaldia_municipio as m', 'm.almu_id_alcaldia_municipio', '=', 'c.colo_id_alcaldia_municipio')
+            ->groupBy('m.almu_id_entidad_federativa')
+            ->selectRaw('m.almu_id_entidad_federativa as entidad, count(*) as total')
+            ->pluck('total', 'entidad');
+
+        return EntidadFederativa::query()->with('zona')->orderBy('enfe_nombre')->get()
+            ->each(fn (EntidadFederativa $e) => $e->setAttribute('instituciones', (int) ($instituciones[$e->enfe_id_entidad_federativa] ?? 0)));
     }
 }

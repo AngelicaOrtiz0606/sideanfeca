@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Formulario de inicio de sesión: valida los campos y limita los intentos:
  * - 5 por minuto para cada combinación de correo e IP (adivinar una contraseña);
- * - 20 fallidos cada 10 minutos desde una misma IP, con cualquier correo
+ * - 10 fallidos cada 10 minutos desde una misma IP, con cualquier correo
  *   (probar una contraseña común contra muchas cuentas).
  *
  * Los intentos bloqueados por el límite no se evalúan ni se registran en
@@ -20,7 +20,7 @@ class LoginRequest extends FormRequest
 {
     public const INTENTOS_POR_MINUTO = 5;
 
-    public const FALLIDOS_POR_IP = 20;
+    public const FALLIDOS_POR_IP = 10;
 
     public const VENTANA_IP_SEGUNDOS = 600;
 

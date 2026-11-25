@@ -42,6 +42,14 @@ class RazonSocialRequest extends FormRequest
                     $vigente = (string) DB::table('institucion_nombre')->where('instn_id_institucion', $id)->whereNull('instn_fecha_fin')->value('instn_nombre');
                     if (TextoCatalogo::clave($vigente) === TextoCatalogo::clave((string) $this->input('razon_social'))) {
                         $validator->errors()->add('razon_social', 'Es la misma razón social que la vigente. Para corregir cómo está escrita, usa Editar.');
+                    } else {
+                        $institucion = DB::table('institucion_educativa as i')->join('tipo_institucion_educativa as t', 't.tiie_id_tipo_institucion', '=', 'i.ined_id_tipo_institucion')
+                            ->where('i.ined_id_institucion_educativa', $id)->first(['i.ined_id_institucion_padre as padre', 't.tiie_nombre as tipo']);
+                        $padre = $institucion?->tipo === 'Universidad' ? null : ($institucion?->padre === null ? null : (int) $institucion->padre);
+                        $repetida = app(InstitucionService::class)->nombreRepetido(TextoCatalogo::limpiar((string) $this->input('razon_social')), $padre, $id);
+                        if ($repetida !== null) {
+                            $validator->errors()->add('razon_social', $padre === null ? "Ya existe la universidad «{$repetida}»." : "Ya existe «{$repetida}» en esa universidad.");
+                        }
                     }
                 }
 

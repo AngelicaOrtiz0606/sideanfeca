@@ -4,7 +4,6 @@ namespace App\Services\Catalogos;
 
 use App\Models\Cargo;
 use App\Models\Usuario;
-use App\Services\Puestos\PuestoService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -13,15 +12,13 @@ use Illuminate\Support\Facades\DB;
  * y la bitácora se registra en la misma transacción.
  *
  * - Si un cargo ya tiene puestos, su nivel no cambia (validar_puesto depende de él).
- * - Se borra (por ejemplo, por error de captura) si sus puestos nunca tuvieron
- *   personas designadas; esos puestos vacíos se borran con él. Si ya tiene
+ * - Se borra (por ejemplo, por error de captura) solo si no tiene puestos. Si
+ *   tiene puestos sin personas, se borran primero en Puestos; si ya tiene
  *   historia, se desactiva.
  */
 class CargoService
 {
     use BitacoraCatalogo;
-
-    public function __construct(private readonly PuestoService $servicioPuestos) {}
 
     /**
      * @return Collection<int, object>
@@ -37,8 +34,8 @@ class CargoService
             ->orderBy('c.carg_nombre_m')
             ->get()
             ->each(function (object $cargo): void {
-                $cargo->motivo_para_no_borrar = $this->explicar((int) $cargo->designaciones);
-                $cargo->texto_al_borrar = $this->textoAlBorrar((int) $cargo->puestos);
+                $cargo->motivo_para_no_borrar = $this->explicar((int) $cargo->designaciones, (int) $cargo->puestos);
+                $cargo->texto_al_borrar = 'No se puede deshacer. Queda en la bitácora con su motivo.';
             });
     }
 
@@ -112,11 +109,12 @@ class CargoService
      */
     public function motivoParaNoBorrar(Cargo $cargo): ?string
     {
-        return $this->explicar($this->designaciones($cargo));
+        return $this->explicar($this->designaciones($cargo), $this->puestos($cargo));
     }
 
     /**
-     * Borra el cargo y sus puestos vacíos (cada uno queda en la bitácora con el mismo motivo).
+     * Borra un cargo que no tiene puestos (si tiene, primero se borran o se
+     * desactiva el cargo: así nunca se borran puestos de los directorios sin querer).
      */
     public function eliminar(Usuario $actor, Cargo $cargo, string $motivo): bool
     {
@@ -127,21 +125,10 @@ class CargoService
                 return false;
             }
 
-            $puestos = DB::table('puesto')->where('pues_id_cargo', $cargo->carg_id_cargo)->lockForUpdate()->pluck('pues_id_puesto');
-            foreach ($puestos as $puesto) {
-                // Si alguno no se pudo borrar, se deshace todo (no queda el cargo a medias)
-                if (! $this->servicioPuestos->eliminar($actor, (int) $puesto, $motivo)) {
-                    throw new \RuntimeException('Un puesto del cargo ya tiene designaciones.');
-                }
-            }
-
             $idBitacora = $this->bitacora($actor, 'Eliminacion', 'CARGO', $cargo->carg_id_cargo, $motivo);
             $this->detalle($idBitacora, $cargo->carg_id_cargo, 'Nombre masculino', $actual->carg_nombre_m, null);
             $this->detalle($idBitacora, $cargo->carg_id_cargo, 'Nombre femenino', $actual->carg_nombre_f, null);
             $this->detalle($idBitacora, $cargo->carg_id_cargo, 'Nivel', $actual->carg_nivel, null);
-            if ($puestos->isNotEmpty()) {
-                $this->detalle($idBitacora, $cargo->carg_id_cargo, 'Puestos vacíos borrados con el cargo', (string) $puestos->count(), null);
-            }
 
             DB::table('cargo')->where('carg_id_cargo', $cargo->carg_id_cargo)->delete();
 
@@ -155,24 +142,14 @@ class CargoService
             ->where('p.pues_id_cargo', $cargo->carg_id_cargo)->count();
     }
 
-    /**
-     * Qué pasa al borrar: si tiene puestos vacíos, se avisa que se borran con él.
-     */
-    private function textoAlBorrar(int $puestos): string
+    private function explicar(int $designaciones, int $puestos): ?string
     {
         return match (true) {
-            $puestos === 0 => 'No se puede deshacer. Queda en la bitácora con su motivo.',
-            $puestos === 1 => 'También se borra su puesto, que nunca ha tenido personas. No se puede deshacer; queda en la bitácora con su motivo.',
-            default => "También se borran sus {$puestos} puestos, que nunca han tenido personas. No se puede deshacer; queda en la bitácora con su motivo.",
-        };
-    }
-
-    private function explicar(int $designaciones): ?string
-    {
-        return match (true) {
-            $designaciones === 0 => null,
             $designaciones === 1 => 'No se puede borrar porque sus puestos ya tuvieron 1 designación. Si ya no se usa, desactívalo: su historia se conserva.',
-            default => "No se puede borrar porque sus puestos ya tuvieron {$designaciones} designaciones. Si ya no se usa, desactívalo: su historia se conserva.",
+            $designaciones > 1 => "No se puede borrar porque sus puestos ya tuvieron {$designaciones} designaciones. Si ya no se usa, desactívalo: su historia se conserva.",
+            $puestos === 1 => 'No se puede borrar porque tiene 1 puesto. Si el puesto se capturó por error, bórralo primero en Puestos; si el cargo ya no se usa, desactívalo.',
+            $puestos > 1 => "No se puede borrar porque tiene {$puestos} puestos. Si se capturaron por error, bórralos primero en Puestos; si el cargo ya no se usa, desactívalo.",
+            default => null,
         };
     }
 }

@@ -13,7 +13,7 @@
         'zonas' => $zonas->map(fn ($z) => ['id' => $z->id, 'texto' => "Zona {$z->numero} · {$z->nombre}"])->values(),
         'coordinaciones' => $coordinaciones->map(fn ($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
         'iniciales' => collect(old('designaciones', []))->filter(fn ($d) => is_array($d))->values(),
-        'errores' => collect($errors->getMessages())->keys()->filter(fn ($k) => str_starts_with($k, 'designaciones.'))->mapWithKeys(fn ($k) => [$k => true]),
+        'errores' => collect($errors->getMessages())->filter(fn ($m, $k) => str_starts_with($k, 'designaciones.'))->map(fn ($m) => $m[0]),
         'maximo' => \App\Http\Requests\Personas\PersonaRequest::MAXIMO_DESIGNACIONES,
         'hoy' => now()->toDateString(),
         'notaInstitucional' => $notaInstitucional,

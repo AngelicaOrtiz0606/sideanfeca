@@ -25,6 +25,8 @@ use Illuminate\Validation\Rule;
  * - un cargo institucional se puede marcar como titular de la institución:
  *   si ya hay titular, hay que confirmar el cambio (reemplazar). Si es el
  *   mismo puesto, la designación del titular anterior termina el día antes.
+ * - si el puesto ya lo ocupa alguien desde antes, se ofrece reemplazarlo
+ *   (reemplazar_ocupante): su designación termina el día antes de la nueva.
  * Los mensajes dicen de qué fila se trata ("Designación 2: ...").
  */
 trait ValidaDesignaciones
@@ -83,7 +85,7 @@ trait ValidaDesignaciones
      * y uno nacional sin coordinación, su organización (para usar el puesto de
      * su organización, si lo hay).
      *
-     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, fecha_inicio: string, fecha_fin: ?string, titular: bool, reemplazar: bool}>
+     * @return array<int, array{cargo: int, zona: ?int, coordinacion: ?int, institucion: ?int, organizacion: ?int, fecha_inicio: string, fecha_fin: ?string, titular: bool, reemplazar: bool, reemplazar_ocupante: bool}>
      */
     public function designaciones(?int $institucion, ?int $organizacion = null): array
     {
@@ -101,6 +103,7 @@ trait ValidaDesignaciones
                 'fecha_fin' => filled($d['fecha_fin'] ?? null) ? (string) $d['fecha_fin'] : null,
                 'titular' => $nivel === 'Institucional' && filter_var($d['titular'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'reemplazar' => filter_var($d['reemplazar'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'reemplazar_ocupante' => filter_var($d['reemplazar_ocupante'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
         }, (array) $this->input('designaciones', []));
     }
@@ -190,7 +193,19 @@ trait ValidaDesignaciones
             if (! DB::table('puesto')->where('pues_id_puesto', $puesto)->value('pues_activo')) {
                 $validator->errors()->add($campo, "Designación {$n}: ese puesto está desactivado. Actívalo en Puestos o elige otro.");
             } elseif (($ocupante = $servicio->ocupanteEntre($puesto, $designacion['fecha_inicio'], $designacion['fecha_fin'], $reemplazada)) !== null) {
-                $validator->errors()->add($campo, "Designación {$n}: ese puesto lo ocupa {$ocupante} en esas fechas. Primero termina esa designación.");
+                // Si quien lo ocupa empezó antes y nadie más se cruza, se ofrece reemplazarlo:
+                // su designación termina el día anterior a la nueva
+                $actual = app(DesignacionService::class)->ocupanteEn($puesto, $designacion['fecha_inicio']);
+                $soloEse = $actual !== null && $actual->desde < $designacion['fecha_inicio']
+                    && $actual->persona !== (int) ($this->route('persona') ?? 0)
+                    && $servicio->ocupanteEntre($puesto, $designacion['fecha_inicio'], $designacion['fecha_fin'], $actual->designacion) === null;
+                if (! $soloEse) {
+                    $validator->errors()->add($campo, "Designación {$n}: ese puesto lo ocupa {$ocupante} en esas fechas. Primero termina esa designación.");
+                } elseif (! $designacion['reemplazar_ocupante']) {
+                    $validator->errors()->add("designaciones.{$i}.reemplazar_ocupante", "Designación {$n}: ese puesto lo ocupa {$actual->nombre} desde el "
+                        .Carbon::parse($actual->desde)->format('d/m/Y').'. Si deja el puesto, marca «Sí, reemplazar»: su designación terminará el '
+                        .Carbon::parse($designacion['fecha_inicio'])->subDay()->format('d/m/Y').'.');
+                }
             }
         }
     }

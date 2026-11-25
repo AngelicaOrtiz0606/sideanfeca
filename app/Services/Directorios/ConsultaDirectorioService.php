@@ -188,7 +188,7 @@ class ConsultaDirectorioService
     /**
      * Lo que se muestra de la persona; una persona oculta (o ninguna) es "Vacante".
      *
-     * @return array{nombre: ?string, grado: ?string, pertenencia: ?string, telefonos: array<int, string>, correos: array<int, string>, vacante: bool}
+     * @return array{nombre: ?string, grado: ?string, pertenencia: ?string, telefonos: array<int, string>, celulares: array<int, string>, correos: array<int, string>, vacante: bool}
      */
     private function datosDe(?object $persona): array
     {
@@ -197,6 +197,7 @@ class ConsultaDirectorioService
             'grado' => $persona?->grado,
             'pertenencia' => $persona?->pertenencia,
             'telefonos' => $persona?->telefonos ?? [],
+            'celulares' => $persona?->celulares ?? [],
             'correos' => $persona?->correos ?? [],
             'vacante' => $persona === null,
         ];
@@ -249,9 +250,9 @@ class ConsultaDirectorioService
             $suyos = $contactos->get($p->id, collect());
             $p->pertenencia = $p->organizacion ?? collect([$p->institucion, $p->universidad])->filter()->implode(' · ') ?: null;
             $p->correos = $suyos->where('tipo', 'Correo')->pluck('valor')->values()->all();
-            $p->telefonos = $suyos->where('tipo', '!=', 'Correo')
-                ->map(fn (object $c) => trim(($c->lada ? "({$c->lada}) " : '').$c->valor.($c->extension ? " ext. {$c->extension}" : '')))
-                ->values()->all();
+            $numero = fn (object $c) => trim(($c->lada ? "({$c->lada}) " : '').$c->valor.($c->extension ? " ext. {$c->extension}" : ''));
+            $p->telefonos = $suyos->whereNotIn('tipo', ['Correo', 'Celular'])->map($numero)->values()->all();
+            $p->celulares = $suyos->where('tipo', 'Celular')->map($numero)->values()->all();
 
             return $p;
         })->all();

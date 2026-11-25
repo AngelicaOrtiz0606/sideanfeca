@@ -157,6 +157,23 @@
                             </button>
                         @endif
                     </div>
+
+                    {{-- Cambiar la participación aquí es corregir un error de captura (sin historial): se confirma --}}
+                    <div class="aviso aviso--atencion aviso-correccion" data-correccion data-actual="{{ $institucion->participacion }}"
+                         @if ($participacionElegida === $institucion->participacion) hidden @endif>
+                        <p data-correccion-texto>
+                            @if ($institucion->participacion === 'Afiliada')
+                                Una afiliada no deja de serlo: cámbiala solo si se capturó mal.
+                            @else
+                                Si la institución fue aprobada como afiliada, no la cambies aquí: usa «Pasar a afiliada» para que quede en su historial.
+                            @endif
+                        </p>
+                        <label class="opcion-en-linea opcion-en-linea--casilla">
+                            <input type="checkbox" name="correccion_participacion" value="1" required
+                                   @checked($valor('correccion_participacion', false)) @disabled($participacionElegida === $institucion->participacion)>
+                            Confirmo que se capturó mal: es una corrección y no queda en el historial <x-obligatorio />
+                        </label>
+                    </div>
                 </div>
 
                 <div class="campo campo--mitad" data-solo-afiliada @unless ($participacionElegida === 'Afiliada') hidden @endunless>

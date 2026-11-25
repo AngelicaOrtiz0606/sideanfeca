@@ -180,9 +180,10 @@
                                 </td>
                             @endif
                             <td data-etiqueta="Contacto">
-                                @forelse ([...array_map(fn ($t) => ['telefono', $t], $fila->telefonos), ...array_map(fn ($c) => ['correo', $c], $fila->correos)] as [$tipo, $valor])
-                                    <span class="contacto-directorio">
+                                @forelse ([...array_map(fn ($t) => ['telefono', $t, 'Teléfono'], $fila->telefonos), ...array_map(fn ($t) => ['celular', $t, 'Celular'], $fila->celulares), ...array_map(fn ($c) => ['correo', $c, 'Correo'], $fila->correos)] as [$tipo, $valor, $etiqueta])
+                                    <span class="contacto-directorio" title="{{ $etiqueta }}">
                                         <x-icono :nombre="$tipo" />
+                                        <span class="solo-lectores">{{ $etiqueta }}:</span>
                                         @if ($tipo === 'correo')
                                             <a href="mailto:{{ $valor }}" class="tabla__enlace-web">{{ $valor }}</a>
                                         @else

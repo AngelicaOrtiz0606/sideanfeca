@@ -208,10 +208,41 @@ class ZonaService
             $idBitacora = $this->bitacora($actor, 'Modificacion', 'ENTIDAD_FEDERATIVA', $entidad->enfe_id_entidad_federativa);
             $this->detalle($idBitacora, $entidad->enfe_id_entidad_federativa, 'Zona regional', $anterior, $zona->etiqueta());
 
-            $movidas[] = "{$entidad->enfe_nombre} (antes en la {$anterior})";
+            // Sus instituciones pasan con ella a la nueva zona; su número de afiliación no cambia
+            $instituciones = $this->institucionesDe($entidad->enfe_id_entidad_federativa, $zona->zore_id_zona_regional);
+            foreach ($instituciones as $institucion) {
+                DB::table('institucion_educativa')->where('ined_id_institucion_educativa', $institucion->id)
+                    ->update(['ined_id_zona_regional' => $zona->zore_id_zona_regional]);
+                $idInstitucion = $this->bitacora($actor, 'Modificacion', 'INSTITUCION_EDUCATIVA', $institucion->id);
+                $this->detalle($idInstitucion, $institucion->id, 'Zona regional', $institucion->zona, $zona->etiqueta());
+            }
+            if ($instituciones->isNotEmpty()) {
+                $this->detalle($idBitacora, $entidad->enfe_id_entidad_federativa, 'Instituciones que cambiaron de zona', null, (string) $instituciones->count());
+            }
+
+            $movidas[] = "{$entidad->enfe_nombre} (antes en la {$anterior}".($instituciones->isEmpty() ? '' : ', con '.$this->cantidad($instituciones->count(), 'institución', 'instituciones')).')';
         }
 
         return $movidas;
+    }
+
+    /**
+     * Instituciones con domicilio en la entidad que todavía no están en la zona.
+     *
+     * @return Collection<int, object{id: int, zona: ?string}>
+     */
+    private function institucionesDe(int $entidad, int $zona): Collection
+    {
+        return DB::table('institucion_educativa as i')
+            ->join('domicilio as d', 'd.domi_id_domicilio', '=', 'i.ined_id_domicilio')
+            ->join('colonia as c', 'c.colo_id_colonia', '=', 'd.domi_id_colonia')
+            ->join('alcaldia_municipio as m', 'm.almu_id_alcaldia_municipio', '=', 'c.colo_id_alcaldia_municipio')
+            ->leftJoin('zona_regional as z', 'z.zore_id_zona_regional', '=', 'i.ined_id_zona_regional')
+            ->where('m.almu_id_entidad_federativa', $entidad)
+            ->where(fn ($q) => $q->whereNull('i.ined_id_zona_regional')->orWhere('i.ined_id_zona_regional', '!=', $zona))
+            ->lock('for update of i')
+            ->get(['i.ined_id_institucion_educativa as id', DB::raw("case when z.zore_id_zona_regional is null then null else concat('Zona ', z.zore_numero, ' · ', z.zore_nombre) end as zona")])
+            ->map(fn (object $i) => (object) ['id' => (int) $i->id, 'zona' => $i->zona]);
     }
 
     private function cantidad(int $total, string $singular, string $plural): ?string

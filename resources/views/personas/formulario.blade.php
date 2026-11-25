@@ -109,6 +109,13 @@
                                    data-mensaje-formato="La CURP tiene 18 caracteres: 4 letras, 6 números, H o M, 5 letras y 2 caracteres finales."
                                    @if ($errors->has('curp')) aria-invalid="true" @endif>
                             <p class="campo__retro" id="persona-curp-aviso" data-tipo="aviso" data-curp-aviso aria-live="polite" hidden></p>
+                            {{-- La CURP es de una persona que solo tiene cuenta: es la misma, capturada dos veces --}}
+                            @if ($persona->id && (str_contains($errors->first('curp'), 'Unir con su cuenta') || old('unir_cuenta')))
+                                <label class="opcion-en-linea opcion-en-linea--casilla aviso aviso--atencion aviso-titular">
+                                    <input type="checkbox" name="unir_cuenta" value="1" @checked(old('unir_cuenta'))>
+                                    Unir con su cuenta: es la misma persona. Su cuenta de usuario pasa a este registro y el registro duplicado se borra.
+                                </label>
+                            @endif
                         </div>
                     </div>
 
