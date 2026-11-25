@@ -19,6 +19,13 @@ use Symfony\Component\HttpFoundation\Response;
  * - X-Content-Type-Options: el navegador no adivina el tipo de archivo.
  * - Referrer-Policy: la dirección completa no se pasa a otros sitios (así el
  *   enlace de recuperación nunca sale del sistema).
+ * - Permissions-Policy: el sistema no usa cámara, micrófono, ubicación ni pagos;
+ *   ninguna página los puede pedir.
+ * - Cross-Origin-Opener-Policy: otra pestaña abierta desde otro sitio no puede
+ *   manipular la ventana del sistema.
+ * - Strict-Transport-Security (solo cuando el sitio ya va por HTTPS): el
+ *   navegador recuerda usar siempre HTTPS durante un año.
+ * - Se quita X-Powered-By: no se anuncia la versión de PHP.
  *
  * Con APP_DEBUG=true (máquina de práctica) o con "npm run dev" solo se aplica
  * frame-ancestors: la página de errores de Laravel y el servidor de Vite usan
@@ -44,6 +51,8 @@ class EncabezadosSeguridad
         'X-Frame-Options' => 'DENY',
         'X-Content-Type-Options' => 'nosniff',
         'Referrer-Policy' => 'same-origin',
+        'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+        'Cross-Origin-Opener-Policy' => 'same-origin',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -53,6 +62,14 @@ class EncabezadosSeguridad
         foreach (self::ENCABEZADOS as $nombre => $valor) {
             $respuesta->headers->set($nombre, $valor);
         }
+
+        if ($request->isSecure()) {
+            $respuesta->headers->set('Strict-Transport-Security', 'max-age=31536000');
+        }
+
+        // PHP lo agrega por su cuenta; se quita aquí y también conviene expose_php = Off
+        header_remove('X-Powered-By');
+        $respuesta->headers->remove('X-Powered-By');
 
         $completa = ! config('app.debug') && ! Vite::isRunningHot();
         $respuesta->headers->set('Content-Security-Policy', $completa ? implode('; ', self::POLITICA) : "frame-ancestors 'none'");

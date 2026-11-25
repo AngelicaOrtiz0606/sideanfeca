@@ -52,16 +52,20 @@ class PuestoController extends Controller
         ]);
     }
 
-    /** Consulta de un puesto: sus datos y quiénes lo han ocupado. */
-    public function show(int $puesto): View
+    /** Consulta de un puesto, por pestañas: sus datos y quiénes lo han ocupado. */
+    public function show(Request $request, int $puesto): View
     {
         $encontrado = $this->puestos->buscar($puesto);
         abort_if($encontrado === null, 404);
 
+        $pestanas = ['general' => 'General', 'personas' => 'Quiénes lo han ocupado'];
+
         return view('puestos.consulta', [
+            'pestanas' => $pestanas,
+            'pestana' => array_key_exists((string) $request->query('pestana'), $pestanas) ? (string) $request->query('pestana') : 'general',
             'puesto' => $encontrado,
             'nombre' => $this->puestos->ambito($encontrado, true),
-            'historial' => Paginacion::de($this->puestos->historial($puesto)),
+            'historial' => Paginacion::de($this->puestos->historial($puesto), 'pagina_personas'),
             'directorios' => $this->puestos->directoriosDe($puesto),
         ]);
     }

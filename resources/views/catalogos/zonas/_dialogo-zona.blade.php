@@ -71,6 +71,7 @@
                                    data-zona-id="{{ $entidad->enfe_id_zona_regional }}"
                                    data-zona-actual="{{ $entidad->zona?->etiqueta() }}"
                                    data-zona-numero="{{ $entidad->zona?->zore_numero }}"
+                                   data-instituciones="{{ $entidad->instituciones ?? 0 }}"
                                    @checked($enEstaZona || $elegidas->contains($entidad->enfe_id_entidad_federativa))
                                    @disabled($enEstaZona)>
                             <span class="opcion-entidad__nombre">{{ $entidad->enfe_nombre }}</span>

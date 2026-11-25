@@ -1,10 +1,11 @@
 {{--
-    Ventana para registrar o editar un puesto. Primero el cargo; según su nivel
-    aparece lo que aplica (puesto-formulario.js):
+    Ventana para registrar o editar un puesto. Primero el nivel, luego el cargo
+    (solo los de ese nivel); según el nivel aparece lo que aplica (puesto-formulario.js):
     - Institucional: la institución (buscador) y si es su titular.
     - Regional: la zona y, si aplica, la coordinación.
     - Nacional: la coordinación o la organización (por ejemplo, CACECA), si aplica.
     Si el puesto ya tiene designaciones, el cargo y el ámbito quedan fijos.
+    Si la institución ya tiene otro puesto titular, se puede pasar la titularidad a este.
 --}}
 @php
     $abrir = old('_dialogo') === 'puesto' && $errors->any() && ! $errors->has('motivo');
@@ -37,6 +38,21 @@
 
         <p class="aviso aviso--atencion" data-ambito-nota hidden></p>
 
+        {{-- Primero el nivel: la lista de cargos muestra solo los de ese nivel --}}
+        <fieldset class="opciones-nivel" data-ambito data-puesto-niveles>
+            <legend class="campo__etiqueta">Nivel <x-obligatorio /></legend>
+            <div class="opciones-nivel__lista">
+                @foreach ($niveles as $nivel)
+                    <label class="opcion-nivel">
+                        <input type="radio" name="_nivel" value="{{ $nivel }}" required
+                               @checked($abrir && $cargos->firstWhere('id', $cargoElegido)?->nivel === $nivel)>
+                        <span class="opcion-nivel__nombre">{{ $nivel }}</span>
+                        <span class="opcion-nivel__ayuda">{{ ['Nacional' => 'Sin zona ni institución; puede llevar coordinación u organización.', 'Regional' => 'De una zona; puede llevar coordinación.', 'Institucional' => 'De una institución.'][$nivel] }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </fieldset>
+
         <div class="campo" data-ambito>
             <label for="puesto-cargo" class="campo__etiqueta">Cargo <x-obligatorio /></label>
             <select id="puesto-cargo" name="cargo" class="campo__entrada" required data-puesto-cargo
@@ -53,7 +69,7 @@
                     </optgroup>
                 @endforeach
             </select>
-            <p class="campo__ayuda" data-puesto-guia>El nivel del cargo decide qué más se pide.</p>
+            <p class="campo__ayuda" data-puesto-guia>Primero elige el nivel.</p>
         </div>
 
         {{-- Institucional --}}
@@ -68,6 +84,18 @@
             <input type="checkbox" name="titular" value="1" @checked($abrir && old('titular')) disabled>
             Es el titular de la institución <span class="campo__opcional">(aparece en el directorio de Instituciones)</span>
         </label>
+
+        {{-- Si la institución ya tiene otro puesto titular, el servidor lo dice y aquí se confirma el cambio --}}
+        @if ($abrir && ($errors->has('cambiar_titular') || old('cambiar_titular')))
+            <div class="aviso aviso--atencion aviso-titular" data-solo-nivel="Institucional" hidden>
+                <p>{{ $errors->first('cambiar_titular') ?: 'Este puesto pasa a ser el titular de la institución.' }}</p>
+                <label class="opcion-en-linea opcion-en-linea--casilla">
+                    <input type="checkbox" name="cambiar_titular" value="1" @checked(old('cambiar_titular')) disabled>
+                    Sí, cambiar la titularidad a este puesto
+                </label>
+                <p class="campo__ayuda">Quien ocupa el puesto titular anterior conserva su cargo.</p>
+            </div>
+        @endif
 
         {{-- Regional --}}
         <div class="campo" data-ambito data-solo-nivel="Regional" hidden>

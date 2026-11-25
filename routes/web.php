@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Privilegio;
+use App\Http\Controllers\Auth\ConfirmarContraseniaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RecuperacionController;
 use App\Http\Controllers\BitacoraController;
@@ -176,11 +177,18 @@ Route::middleware(['auth', 'auth.session', 'cuenta.activa'])->group(function () 
     });
 
     // Usuarios (solo superadministrador): cuentas de las personas; no se borran, se desactivan
+    // Crear, editar, activar o desactivar una cuenta pide confirmar la contraseña (15 minutos)
     Route::middleware(Privilegio::GestionarUsuarios->middleware())->group(function () {
         Route::get('/usuarios/coincidencias', [UsuarioController::class, 'coincidencias'])->name('usuarios.coincidencias');
-        Route::patch('/usuarios/{usuario}/estado', [UsuarioController::class, 'cambiarEstado'])->whereNumber('usuario')->name('usuarios.estado');
-        Route::resource('usuarios', UsuarioController::class)->only(['index', 'create', 'store', 'edit', 'update'])->whereNumber('usuario');
+        Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+        Route::middleware('contrasenia.confirmada')->group(function () {
+            Route::patch('/usuarios/{usuario}/estado', [UsuarioController::class, 'cambiarEstado'])->whereNumber('usuario')->name('usuarios.estado');
+            Route::resource('usuarios', UsuarioController::class)->only(['create', 'store', 'edit', 'update'])->whereNumber('usuario');
+        });
     });
+
+    Route::get('/confirmar-contrasenia', [ConfirmarContraseniaController::class, 'mostrar'])->name('contrasenia.confirmar');
+    Route::post('/confirmar-contrasenia', [ConfirmarContraseniaController::class, 'confirmar'])->name('contrasenia.confirmar.guardar');
 
     // Cambiar contraseña: cualquier cuenta, la propia
     Route::get('/cuenta/contrasenia', [CuentaController::class, 'editarContrasenia'])->name('cuenta.contrasenia');

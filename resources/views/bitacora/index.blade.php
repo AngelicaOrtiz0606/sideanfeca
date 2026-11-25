@@ -77,15 +77,19 @@
                     </select>
                 </label>
 
-                <label @class(['filtros__selector', 'filtros__selector--fecha', 'filtros__selector--en-uso' => $filtros['desde']])>
-                    <span class="filtros__etiqueta">Desde</span>
-                    <input type="date" name="desde" class="campo__entrada" value="{{ $filtros['desde'] }}" max="{{ now()->toDateString() }}">
-                </label>
-
-                <label @class(['filtros__selector', 'filtros__selector--fecha', 'filtros__selector--en-uso' => $filtros['hasta']])>
-                    <span class="filtros__etiqueta">Hasta</span>
-                    <input type="date" name="hasta" class="campo__entrada" value="{{ $filtros['hasta'] }}" max="{{ now()->toDateString() }}">
-                </label>
+                {{-- Periodo: se eligen las dos fechas y se aplica con el botón (no se recarga a media captura) --}}
+                <div class="filtros__periodo" role="group" aria-labelledby="periodo-etiqueta">
+                    <span id="periodo-etiqueta" class="filtros__periodo-titulo">Periodo</span>
+                    <label @class(['filtros__selector', 'filtros__selector--fecha', 'filtros__selector--en-uso' => $filtros['desde']])>
+                        <span class="filtros__etiqueta">Desde</span>
+                        <input type="date" name="desde" class="campo__entrada" value="{{ $filtros['desde'] }}" max="{{ now()->toDateString() }}">
+                    </label>
+                    <label @class(['filtros__selector', 'filtros__selector--fecha', 'filtros__selector--en-uso' => $filtros['hasta']])>
+                        <span class="filtros__etiqueta">Hasta</span>
+                        <input type="date" name="hasta" class="campo__entrada" value="{{ $filtros['hasta'] }}" max="{{ now()->toDateString() }}">
+                    </label>
+                    <button type="submit" class="boton boton--secundario filtros__aplicar">Ver periodo</button>
+                </div>
             </div>
 
             @if ($hayFiltros)

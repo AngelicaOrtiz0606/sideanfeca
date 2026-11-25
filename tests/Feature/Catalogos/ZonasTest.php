@@ -220,6 +220,37 @@ class ZonasTest extends TestCase
         $this->assertTrue(DB::table('bitacora')->where(['bita_accion' => 'Registro', 'bita_tabla' => 'ZONA_REGIONAL', 'bita_referencia' => $id])->exists());
     }
 
+    public function test_al_mover_una_entidad_sus_instituciones_cambian_de_zona_y_conservan_su_numero(): void
+    {
+        $noroeste = $this->zona(1, 'Noroeste');
+        $norte = $this->zona(2, 'Norte');
+        $sonora = $this->entidad('26', 'Sonora', $norte);
+        $municipio = DB::table('alcaldia_municipio')->insertGetId(['almu_id_entidad_federativa' => $sonora, 'almu_clave' => '030', 'almu_nombre' => 'Hermosillo'], 'almu_id_alcaldia_municipio');
+        $colonia = DB::table('colonia')->insertGetId(['colo_id_alcaldia_municipio' => $municipio, 'colo_codigo_postal' => '83000', 'colo_id_asenta_cpcons' => '0001', 'colo_nombre' => 'Centro'], 'colo_id_colonia');
+        $domicilio = DB::table('domicilio')->insertGetId(['domi_id_colonia' => $colonia, 'domi_calle' => 'Rosales', 'domi_num_ext' => '1'], 'domi_id_domicilio');
+        $institucion = DB::table('institucion_educativa')->insertGetId([
+            'ined_id_tipo_institucion' => DB::table('tipo_institucion_educativa')->where('tiie_nombre', 'Universidad')->value('tiie_id_tipo_institucion'),
+            'ined_participacion' => 'Afiliada', 'ined_num_afiliacion' => '2002005', 'ined_sector' => 'Publica',
+            'ined_id_domicilio' => $domicilio, 'ined_id_zona_regional' => $norte, 'ined_activo' => true,
+        ], 'ined_id_institucion_educativa');
+
+        $this->actingAs($this->admin)->put("/zonas/{$noroeste}", ['numero' => 1, 'nombre' => 'Noroeste', 'entidades' => [$sonora]])
+            ->assertSessionHas('estado', 'Se guardaron los cambios de la Zona 1 · Noroeste. Pasaron a esta zona: Sonora (antes en la Zona 2 · Norte, con 1 institución).');
+
+        $this->assertDatabaseHas('institucion_educativa', ['ined_id_institucion_educativa' => $institucion, 'ined_id_zona_regional' => $noroeste, 'ined_num_afiliacion' => '2002005']);
+        $movimiento = DB::table('bitacora')->where('bita_tabla', 'INSTITUCION_EDUCATIVA')->where('bita_referencia', $institucion)->orderByDesc('bita_id_bitacora')->first();
+        $this->assertSame([['Zona regional', 'Zona 2 · Norte', 'Zona 1 · Noroeste']], $this->detalles($movimiento->bita_id_bitacora));
+    }
+
+    public function test_con_las_7_zonas_se_explica_por_que_no_hay_nueva_zona(): void
+    {
+        foreach (range(1, 7) as $numero) {
+            $this->zona($numero, "Zona de prueba {$numero}");
+        }
+
+        $this->actingAs($this->admin)->get('/zonas')->assertSee('ANFECA tiene 7 zonas (de la 1 a la 7) y ya están todas registradas');
+    }
+
     public function test_con_las_7_zonas_no_se_puede_registrar_otra(): void
     {
         foreach (range(1, 7) as $numero) {

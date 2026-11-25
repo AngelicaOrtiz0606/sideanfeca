@@ -63,6 +63,22 @@ class ConsultaDirectoriosTest extends TestCase
             ->assertSee('>rosa@anfeca.org</textarea>', false);
     }
 
+    public function test_el_celular_va_aparte_del_telefono_en_pantalla_y_en_el_csv(): void
+    {
+        $presidente = $this->enDirectorio('Consejo Nacional Directivo', $this->puesto('Presidente', 'Presidenta', 'Nacional'));
+        $rosa = $this->persona('Rosa', 'F');
+        $this->contacto($rosa, 'Teléfono', '56228300', '55');
+        $this->contacto($rosa, 'Celular', '5512345678');
+        $this->designar($presidente, $rosa, '2020-01-01');
+
+        $this->actingAs($this->admin)->get('/directorios')->assertOk()
+            ->assertSeeInOrder(['Teléfono:', '(55) 56228300', 'Celular:', '5512345678'], false);
+
+        $csv = $this->actingAs($this->admin)->get('/directorios/csv')->streamedContent();
+        $this->assertStringContainsString('Teléfonos,Celulares,Correos', $csv);
+        $this->assertStringContainsString('"(55) 56228300",5512345678,', $csv);
+    }
+
     public function test_solo_muestra_a_quien_ocupa_el_puesto_hoy(): void
     {
         $presidente = $this->enDirectorio('Consejo Nacional Directivo', $this->puesto('Presidente', 'Presidenta', 'Nacional'));

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Personas;
 
+use App\Enums\Privilegio;
 use App\Rules\TextoSeguro;
 use App\Services\Designaciones\DesignacionService;
 use App\Services\Personas\PersonaService;
@@ -97,7 +98,22 @@ class PersonaRequest extends FormRequest
             'primer_apellido' => ['required', 'string', new TextoSeguro, 'max:45'],
             'segundo_apellido' => ['nullable', 'string', new TextoSeguro, 'max:45'],
             'curp' => ['nullable', 'string', 'size:18', 'regex:'.self::CURP,
-                Rule::unique('persona', 'pers_curp')->ignore($id, 'pers_id_persona')],
+                function (string $campo, mixed $valor, \Closure $falla) use ($id): void {
+                    $otra = DB::table('persona')->where('pers_curp', $valor)->when($id, fn ($q, $p) => $q->where('pers_id_persona', '!=', (int) $p))->first();
+                    if ($otra === null || ($this->route('persona') !== null && $this->personaParaUnir() === (int) $otra->pers_id_persona)) {
+                        return;
+                    }
+                    if ($this->route('persona') !== null && $this->puedeUnirse((int) $this->route('persona'), (int) $otra->pers_id_persona)) {
+                        $nombre = trim("{$otra->pers_nombre} {$otra->pers_primer_apellido} {$otra->pers_segundo_apellido}");
+                        $falla($this->user()?->can(Privilegio::GestionarUsuarios->value)
+                            ? "Esa CURP es de la cuenta de usuario de {$nombre}. Si es la misma persona, marca «Unir con su cuenta»."
+                            : "Esa CURP es de la cuenta de usuario de {$nombre}. Si es la misma persona, pide a un superadministrador que una los dos registros.");
+
+                        return;
+                    }
+                    $falla('Esa CURP ya pertenece a otra persona.');
+                }],
+            'unir_cuenta' => ['nullable', 'boolean'],
             'genero' => ['required', Rule::in(array_keys(PersonaService::GENEROS))],
 
             // Este formulario es de las personas de los directorios: siempre pertenecen a algo
@@ -206,7 +222,6 @@ class PersonaRequest extends FormRequest
             'primer_apellido.required' => 'Escribe el primer apellido.',
             'curp.size' => 'La CURP tiene 18 caracteres.',
             'curp.regex' => 'La CURP no tiene un formato válido. Revísala: 4 letras, 6 números (fecha), H o M, 5 letras y 2 caracteres finales.',
-            'curp.unique' => 'Esa CURP ya pertenece a otra persona.',
             'genero.required' => 'Elige el género.',
             'pertenencia.required' => 'Elige a qué pertenece: una institución o una organización.',
             'pertenencia.in' => 'Elige a qué pertenece: una institución o una organización.',
@@ -283,6 +298,33 @@ class PersonaRequest extends FormRequest
     /**
      * Al registrar: si ya tenía cuenta, su número (si de verdad solo tiene cuenta).
      */
+    /**
+     * Al editar: la persona que solo tiene cuenta de usuario y comparte la CURP
+     * escrita, si se marcó «Unir con su cuenta» y quien guarda gestiona usuarios.
+     * Es la misma persona capturada dos veces: su cuenta pasa a esta y ella se borra.
+     */
+    public function personaParaUnir(): ?int
+    {
+        $persona = $this->route('persona');
+        if ($persona === null || ! $this->boolean('unir_cuenta') || ! $this->user()?->can(Privilegio::GestionarUsuarios->value)
+            || ! is_string($this->input('curp')) || $this->input('curp') === '') {
+            return null;
+        }
+        $otra = DB::table('persona')->where('pers_curp', $this->input('curp'))->where('pers_id_persona', '!=', (int) $persona)->value('pers_id_persona');
+
+        return $otra !== null && $this->puedeUnirse((int) $persona, (int) $otra) ? (int) $otra : null;
+    }
+
+    /**
+     * Se pueden unir si la otra solo tiene cuenta (sin designaciones) y esta no tiene cuenta.
+     */
+    private function puedeUnirse(int $persona, int $otra): bool
+    {
+        return DB::table('usuario')->where('usua_id_persona', $otra)->exists()
+            && ! DB::table('designacion')->where('desi_id_persona', $otra)->exists()
+            && ! DB::table('usuario')->where('usua_id_persona', $persona)->exists();
+    }
+
     public function existente(): ?int
     {
         $id = $this->input('persona_existente');

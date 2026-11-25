@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Middleware\AsegurarCuentaActiva;
+use App\Http\Middleware\ConfirmarContrasenia;
 use App\Http\Middleware\EncabezadosSeguridad;
+use App\Http\Middleware\ParametrosSimples;
 use App\Http\Middleware\SinCacheConSesion;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -19,11 +21,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'cuenta.activa' => AsegurarCuentaActiva::class,
+            'contrasenia.confirmada' => ConfirmarContrasenia::class,
         ]);
 
         // Encabezados de seguridad del navegador en todas las pantallas, y sin
         // copias guardadas (la flecha de regreso no muestra pantallas viejas)
         $middleware->web(append: [EncabezadosSeguridad::class, SinCacheConSesion::class]);
+
+        // Los filtros de la dirección nunca son listas (?texto[]=a se ignora)
+        $middleware->web(prepend: [ParametrosSimples::class]);
 
         // Quien no ha iniciado sesión va al login; quien ya la inició, al inicio
         $middleware->redirectGuestsTo(fn () => route('login'));

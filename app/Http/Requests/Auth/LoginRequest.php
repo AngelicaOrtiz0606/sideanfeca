@@ -8,8 +8,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Formulario de inicio de sesión: valida los campos y limita los intentos
- * a 5 por minuto para cada combinación de correo e IP.
+ * Formulario de inicio de sesión: valida los campos y limita los intentos:
+ * - 5 por minuto para cada combinación de correo e IP (adivinar una contraseña);
+ * - 10 fallidos cada 10 minutos desde una misma IP, con cualquier correo
+ *   (probar una contraseña común contra muchas cuentas).
  *
  * Los intentos bloqueados por el límite no se evalúan ni se registran en
  * LOG_ACCESO (decisión del lote 3, opción A).
@@ -17,6 +19,10 @@ use Illuminate\Validation\ValidationException;
 class LoginRequest extends FormRequest
 {
     public const INTENTOS_POR_MINUTO = 5;
+
+    public const FALLIDOS_POR_IP = 10;
+
+    public const VENTANA_IP_SEGUNDOS = 600;
 
     public function authorize(): bool
     {
@@ -65,25 +71,39 @@ class LoginRequest extends FormRequest
      */
     public function asegurarQueNoEsteBloqueado(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->claveDeLimite(), self::INTENTOS_POR_MINUTO)) {
+        $clave = match (true) {
+            RateLimiter::tooManyAttempts($this->claveDeLimite(), self::INTENTOS_POR_MINUTO) => $this->claveDeLimite(),
+            RateLimiter::tooManyAttempts($this->claveDeIp(), self::FALLIDOS_POR_IP) => $this->claveDeIp(),
+            default => null,
+        };
+
+        if ($clave === null) {
             return;
         }
 
-        $segundos = RateLimiter::availableIn($this->claveDeLimite());
+        $segundos = RateLimiter::availableIn($clave);
+        $espera = $segundos > 90 ? ((int) ceil($segundos / 60)).' minutos' : "{$segundos} segundos";
 
         throw ValidationException::withMessages([
-            'correo' => "Demasiados intentos. Espera {$segundos} segundos e inténtalo de nuevo.",
+            'correo' => "Demasiados intentos. Espera {$espera} e inténtalo de nuevo.",
         ]);
     }
 
     public function registrarIntentoFallido(): void
     {
         RateLimiter::hit($this->claveDeLimite(), 60);
+        RateLimiter::hit($this->claveDeIp(), self::VENTANA_IP_SEGUNDOS);
     }
 
+    /** Al entrar se limpian los intentos de ese correo; los de la IP siguen contando. */
     public function limpiarIntentos(): void
     {
         RateLimiter::clear($this->claveDeLimite());
+    }
+
+    private function claveDeIp(): string
+    {
+        return 'login-ip|'.$this->ip();
     }
 
     private function claveDeLimite(): string

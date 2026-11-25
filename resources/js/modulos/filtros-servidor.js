@@ -1,6 +1,7 @@
 /*
  * Filtros que se aplican en el servidor (form[data-filtros-servidor]):
- * - al cambiar una lista desplegable o una fecha se aplican solos;
+ * - al cambiar una lista desplegable se aplican solos; las fechas de un
+ *   periodo se aplican con su botón «Ver periodo», para elegir las dos con calma;
  * - el buscador se aplica solo cuando se deja de escribir (o con Enter), y
  *   al recargar el cursor queda al final de lo escrito para seguir buscando.
  * Los filtros vacíos no se mandan, para que la dirección quede limpia.
@@ -15,7 +16,7 @@ document.querySelectorAll('form[data-filtros-servidor]').forEach((formulario) =>
         boton.setAttribute('aria-expanded', String(abrir));
     });
 
-    formulario.querySelectorAll('select, input[type="date"]').forEach((lista) => {
+    formulario.querySelectorAll('select').forEach((lista) => {
         lista.addEventListener('change', () => formulario.requestSubmit());
     });
 
@@ -23,10 +24,14 @@ document.querySelectorAll('form[data-filtros-servidor]').forEach((formulario) =>
     let espera = null;
     buscador?.addEventListener('input', () => {
         clearTimeout(espera);
-        espera = setTimeout(() => formulario.requestSubmit(), 600);
+        espera = setTimeout(() => formulario.requestSubmit(), 800);
     });
-    if (buscador && document.activeElement === buscador) {
-        buscador.setSelectionRange(buscador.value.length, buscador.value.length);
+    // Al recargar después de buscar, el cursor queda al final de lo escrito para seguir escribiendo
+    if (buscador?.hasAttribute('autofocus')) {
+        const alFinal = () => buscador.setSelectionRange(buscador.value.length, buscador.value.length);
+        buscador.focus();
+        alFinal();
+        requestAnimationFrame(alFinal);
     }
 
     formulario.addEventListener('submit', () => {

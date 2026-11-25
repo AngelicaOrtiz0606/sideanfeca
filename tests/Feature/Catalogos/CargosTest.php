@@ -117,26 +117,21 @@ class CargosTest extends TestCase
         $this->assertDatabaseHas('cargo', ['carg_id_cargo' => $id, 'carg_nivel' => 'Nacional']);
     }
 
-    public function test_un_cargo_con_puestos_vacios_se_borra_junto_con_ellos(): void
+    public function test_un_cargo_con_puestos_no_se_borra_aunque_esten_vacios(): void
     {
         $id = $this->cargo('Tesorero', 'Tesorera', 'Nacional');
         $puesto = (int) DB::table('puesto')->insertGetId(['pues_id_cargo' => $id], 'pues_id_puesto');
         DB::table('puesto_directorio')->insert(['pudi_id_puesto' => $puesto, 'pudi_id_tipo_directorio' => 1, 'pudi_orden' => 1]);
 
-        // La ventana avisa que también se borra su puesto
         $this->actingAs($this->admin)->get('/cargos')
-            ->assertSee('También se borra su puesto, que nunca ha tenido personas.')
-            ->assertDontSee('accion--bloqueada', false);
+            ->assertSee('No se puede borrar porque tiene 1 puesto.');
 
         $this->actingAs($this->admin)->delete("/cargos/{$id}", ['motivo' => 'Error de captura'])
-            ->assertSessionHas('estado', 'Se borró el cargo Tesorero.');
+            ->assertSessionHas('aviso', 'No se puede borrar porque tiene 1 puesto. Si el puesto se capturó por error, bórralo primero en Puestos; si el cargo ya no se usa, desactívalo.');
 
-        $this->assertDatabaseMissing('cargo', ['carg_id_cargo' => $id]);
-        $this->assertDatabaseMissing('puesto', ['pues_id_puesto' => $puesto]);
-        $this->assertDatabaseMissing('puesto_directorio', ['pudi_id_puesto' => $puesto]);
-        // Queda en la bitácora: el puesto y el cargo, con el mismo motivo
-        $this->assertSame(1, DB::table('bitacora')->where('bita_tabla', 'PUESTO')->where('bita_referencia', $puesto)->where('bita_accion', 'Eliminacion')->where('bita_motivo', 'Error de captura')->count());
-        $this->assertSame(['Puestos vacíos borrados con el cargo', '1', null], array_values(array_slice($this->detalles($this->ultimaBitacora()->bita_id_bitacora), -1))[0]);
+        $this->assertDatabaseHas('cargo', ['carg_id_cargo' => $id]);
+        $this->assertDatabaseHas('puesto', ['pues_id_puesto' => $puesto]);
+        $this->assertDatabaseHas('puesto_directorio', ['pudi_id_puesto' => $puesto]);
     }
 
     public function test_un_cargo_cuyos_puestos_ya_tuvieron_personas_no_se_borra(): void

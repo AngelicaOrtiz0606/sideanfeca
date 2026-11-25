@@ -7,7 +7,8 @@
  *   aparecen sin marcar.
  * - Al marcar una entidad que pertenece a otra zona, se pregunta si se quiere
  *   quitar de esa zona y pasar a esta (#dialogo-cambio-zona). Si la persona
- *   cancela (o cierra con Esc), la entidad se desmarca.
+ *   cancela (o cierra con Esc), la entidad se desmarca. Si la entidad tiene
+ *   instituciones, se avisa que pasan con ella (su número no cambia).
  */
 const ventana = document.getElementById('dialogo-zona');
 const confirmacion = document.getElementById('dialogo-cambio-zona');
@@ -38,7 +39,11 @@ if (ventana && confirmacion) {
             }
 
             pendiente = casilla;
-            texto.textContent = `${casilla.dataset.entidad} ya está asignada a la ${casilla.dataset.zonaActual}. ¿Quieres quitarla de esa zona y pasarla a esta?`;
+            const instituciones = Number(casilla.dataset.instituciones ?? 0);
+            const conEllas = instituciones === 0
+                ? ''
+                : ` ${instituciones === 1 ? 'Su institución también pasa' : `Sus ${instituciones} instituciones también pasan`} a esta zona; su número de afiliación no cambia.`;
+            texto.textContent = `${casilla.dataset.entidad} ya está asignada a la ${casilla.dataset.zonaActual}. ¿Quieres quitarla de esa zona y pasarla a esta?${conEllas}`;
             confirmacion.returnValue = '';
             confirmacion.showModal();
         });

@@ -393,6 +393,24 @@
     background-image: none;
 }
 
+/* Periodo (desde / hasta): las dos fechas y su botón, juntos */
+.filtros__periodo {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filtros__periodo-titulo {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.filtros__aplicar {
+    min-height: 2.5rem;
+}
+
 /* Filtro en uso (las fechas lo marcan desde el servidor) */
 .filtros__selector--en-uso,
 .filtros__selector:has(option:checked:not([value=''])) {
@@ -514,6 +532,18 @@ a.paginacion__enlace:hover {
 
     .filtros__opciones[data-cerrado] {
         display: none;
+    }
+
+    /* El periodo ocupa todo el renglón: las dos fechas lado a lado y el botón abajo */
+    .filtros__periodo {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    }
+
+    .filtros__periodo-titulo,
+    .filtros__aplicar {
+        grid-column: 1 / -1;
     }
 
     .filtros__selector {

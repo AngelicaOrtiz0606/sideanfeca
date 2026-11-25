@@ -5,6 +5,8 @@
  * - Matriz: solo para universidad (si no, se desactiva esa opción).
  * - Número de afiliación: solo para afiliada.
  * - Domicilio y zona: obligatorios, salvo para una matriz.
+ * - Al editar, si se cambia la participación se pide confirmar que es una
+ *   corrección por error de captura (el cambio aprobado va en «Pasar a afiliada»).
  * Los campos ocultos se desactivan, así no se envían ni se validan.
  * Lo usan el registro y la ventana "Identificación" de la consulta.
  */
@@ -56,6 +58,12 @@ if (formulario) {
 
         mostrar('[data-solo-con-universidad]', tipo === 'Facultad' || tipo === 'Campus');
         mostrar('[data-solo-afiliada]', participacion === 'Afiliada');
+
+        // Al editar, cambiar la participación es corregir un error de captura: se pide confirmarlo
+        const correccion = formulario.querySelector('[data-correccion]');
+        if (correccion) {
+            mostrar('[data-correccion]', participacion !== '' && participacion !== correccion.dataset.actual);
+        }
 
         if (domicilio) {
             const obligatorio = participacion !== 'Matriz';

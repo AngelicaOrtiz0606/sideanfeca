@@ -162,7 +162,7 @@ class PersonaController extends Controller
     {
         abort_if($this->personas->buscar($persona) === null, 404);
 
-        $this->personas->actualizar($request->user(), $persona, $request->datos(), $request->cambiosDeDesignaciones(), $request->designacionesNuevas());
+        $this->personas->actualizar($request->user(), $persona, $request->datos(), $request->cambiosDeDesignaciones(), $request->designacionesNuevas(), $request->personaParaUnir());
 
         return redirect()->route('personas.show', $persona)->with('estado', 'Se guardaron los cambios.');
     }

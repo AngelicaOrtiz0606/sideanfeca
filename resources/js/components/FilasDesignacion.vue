@@ -14,6 +14,10 @@
     Al marcarlo se pregunta al servidor quién es el titular hoy: si hay alguien,
     se dice qué pasa con él y se pide confirmar el cambio. La institución es la
     de la persona: fija (prop "institucion") o la que se elige en el formulario.
+
+    Si al guardar el puesto ya lo ocupa alguien desde antes, el servidor lo
+    dice en esa fila y se ofrece «Sí, reemplazar»: su designación termina el
+    día anterior a la nueva.
 -->
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
@@ -23,7 +27,7 @@ const props = defineProps({
     zonas: { type: Array, required: true }, // [{ id, texto }]
     coordinaciones: { type: Array, required: true }, // [{ id, nombre }]
     iniciales: { type: Array, default: () => [] }, // filas escritas antes (si hubo errores)
-    errores: { type: Object, default: () => ({}) }, // { 'designaciones.0.cargo': true }
+    errores: { type: Object, default: () => ({}) }, // { 'designaciones.0.cargo': 'mensaje' }
     maximo: { type: Number, default: 10 },
     hoy: { type: String, required: true },
     notaInstitucional: { type: String, default: 'Es un cargo de la institución a la que pertenece.' },
@@ -49,13 +53,15 @@ const nuevaFila = (datos = {}) => ({
     fecha_fin: datos.fecha_fin ?? '',
     titular: datos.titular === '1' || datos.titular === true,
     reemplazar: datos.reemplazar === '1' || datos.reemplazar === true,
+    reemplazarOcupante: datos.reemplazar_ocupante === '1' || datos.reemplazar_ocupante === true,
 });
 
 const filas = ref(props.iniciales.length > 0 ? props.iniciales.map(nuevaFila) : Array.from({ length: props.minimo }, () => nuevaFila()));
 const raiz = ref(null);
 
 const cargosDe = (nivel) => props.cargos.filter((c) => c.nivel === nivel);
-const conError = (i, campo) => props.errores[`designaciones.${i}.${campo}`] === true;
+const conError = (i, campo) => Boolean(props.errores[`designaciones.${i}.${campo}`]);
+const mensaje = (i, campo) => props.errores[`designaciones.${i}.${campo}`] ?? '';
 const puedeAgregar = computed(() => filas.value.length < props.maximo);
 
 // El formulario vuelve a revisar sus campos (validacion-formularios.js) cuando cambian las filas
@@ -103,7 +109,9 @@ const pedirTitular = async (institucion) => {
     titulares[institucion] = 'cargando';
     try {
         const respuesta = await fetch(props.urlTitular.replace('__id__', institucion), { headers: { Accept: 'application/json' } });
-        titulares[institucion] = respuesta.ok ? await respuesta.json() : null;
+        // Sin titular el servidor responde vacío ({}): se trata igual que «sin titular»
+        const datos = respuesta.ok ? await respuesta.json() : null;
+        titulares[institucion] = datos && datos.cargo_id ? datos : null;
     } catch {
         delete titulares[institucion];
     }
@@ -212,6 +220,15 @@ const quitar = async (indice) => {
                         </div>
                     </div>
                 </template>
+                <!-- El puesto ya lo ocupa alguien desde antes: se puede reemplazar (el servidor lo dijo al guardar) -->
+                <div v-if="conError(i, 'reemplazar_ocupante') || fila.reemplazarOcupante" class="campo--completo aviso aviso--atencion aviso-titular" aria-live="polite">
+                    <p>{{ mensaje(i, 'reemplazar_ocupante') || 'Reemplaza a quien ocupa el puesto: su designación termina el día anterior.' }}</p>
+                    <label class="opcion-en-linea opcion-en-linea--casilla">
+                        <input v-model="fila.reemplazarOcupante" type="checkbox" :name="`designaciones[${i}][reemplazar_ocupante]`" value="1"
+                               :aria-invalid="conError(i, 'reemplazar_ocupante') ? 'true' : null">
+                        Sí, reemplazar
+                    </label>
+                </div>
             </div>
         </div>
 

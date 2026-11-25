@@ -160,6 +160,20 @@ php artisan optimize:clear
 php artisan config:cache
 ```
 
+### El servidor también se protege
+
+Lo que el sistema ya hace solo: límites de intentos al entrar (por correo y por computadora), al pedir enlaces de recuperación y al cambiar la contraseña; encabezados de seguridad en todas las pantallas (y HSTS en cuanto el sitio va por HTTPS); el enlace de recuperación se envía después de responder, para no revelar qué correos existen. Lo que le toca al servidor:
+
+| Qué | Cómo | Por qué |
+|---|---|---|
+| La raíz del sitio es `public/` | En Apache, `DocumentRoot` apunta a `…/sideanfeca/public`, nunca a la carpeta del proyecto. | Así nadie puede descargar `.env`, el código ni los registros. |
+| No anunciar versiones | En `php.ini`: `expose_php = Off`. En Apache: `ServerTokens Prod` y `ServerSignature Off`. | Quien ataca no sabe qué versión buscar. |
+| HTTPS | Certificado instalado y redirección de `http://` a `https://`; luego `SESSION_SECURE_COOKIE=true`. | Las contraseñas y la sesión viajan cifradas. |
+| Usuario de la base propio | El `.env` usa un usuario de PostgreSQL solo para el sistema, que no sea `postgres` ni superusuario. | Si algo fallara, ese usuario no puede tocar otras bases ni el servidor. |
+| Permisos de archivos | `.env` con permisos `640`; solo `storage/` y `bootstrap/cache/` con escritura para Apache. | Nadie más lee las claves ni cambia el código. |
+| Si hay un balanceador o proxy | Configurar en Laravel las IP de confianza (`trustProxies`). | Si no, todas las personas parecen venir de la misma IP y los límites por computadora bloquearían a todos. |
+| Respaldos | Respaldo diario de la base (`pg_dump`) guardado fuera del servidor. | Para recuperar la información ante una falla o un ataque. |
+
 ## Dónde está cada cosa
 
 | Qué | Dónde |

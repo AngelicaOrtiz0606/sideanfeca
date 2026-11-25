@@ -89,7 +89,24 @@ class InstitucionRequest extends FormRequest
                     $validator->errors()->add('universidad', 'Una institución no puede pertenecer a sí misma.');
                 }
 
+                // El mismo nombre solo se repite en universidades distintas (dos facultades de
+                // Contaduría, cada una de su universidad); dos universidades no se llaman igual
+                if (! $validator->errors()->has('razon_social') && is_string($this->input('razon_social'))) {
+                    $padre = $this->input('tipo') === 'Universidad' ? null : ((int) $this->input('universidad') ?: null);
+                    $repetida = app(InstitucionService::class)->nombreRepetido(TextoCatalogo::limpiar($this->input('razon_social')), $padre, $id);
+                    if ($repetida !== null) {
+                        $validator->errors()->add('razon_social', $padre === null
+                            ? "Ya existe la universidad «{$repetida}»."
+                            : "Ya existe «{$repetida}» en esa universidad.");
+                    }
+                }
+
+                // Cambiar la participación al editar es corregir un error de captura: se confirma
                 $actual = $this->actual();
+                if ($actual !== null && $this->participacion() !== $actual->participacion && ! $this->boolean('correccion_participacion')) {
+                    $validator->errors()->add('correccion_participacion', 'Confirma que la participación se capturó mal. Si la institución fue aprobada como afiliada, usa «Pasar a afiliada».');
+                }
+
                 if ($actual !== null && $this->input('tipo') !== $actual->tipo && ! $validator->errors()->has('tipo')) {
                     $motivo = app(InstitucionService::class)->motivoParaNoCambiarTipo($actual);
                     if ($motivo !== null) {

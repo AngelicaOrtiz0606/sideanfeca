@@ -85,17 +85,29 @@ class PuestosTest extends TestCase
         $this->assertSame(1, DB::table('puesto')->count());
     }
 
-    public function test_una_institucion_tiene_a_lo_mas_un_puesto_titular(): void
+    public function test_una_institucion_tiene_un_puesto_titular_y_se_puede_cambiar_confirmando(): void
     {
         $fca = $this->institucion();
         $subdirector = (int) DB::table('cargo')->insertGetId(['carg_nombre_m' => 'Subdirector', 'carg_nombre_f' => 'Subdirectora', 'carg_nivel' => 'Institucional', 'carg_activo' => true], 'carg_id_cargo');
         $this->actingAs($this->admin)->post('/puestos', ['cargo' => $this->cargos['Director'], 'institucion' => $fca, 'titular' => '1'])->assertSessionHasNoErrors();
+        $director = (int) DB::table('puesto')->where('pues_id_cargo', $this->cargos['Director'])->value('pues_id_puesto');
 
+        // Sin confirmar, no se cambia el titular
         $this->actingAs($this->admin)->post('/puestos', ['cargo' => $subdirector, 'institucion' => $fca, 'titular' => '1'])
-            ->assertSessionHasErrors(['titular' => 'La institución ya tiene su puesto titular: «Director». Solo puede haber uno.']);
+            ->assertSessionHasErrors(['cambiar_titular' => 'La institución ya tiene su puesto titular: «Director». Si este puesto pasa a ser el titular, confirma el cambio.']);
 
-        // Sin titularidad sí se registra
-        $this->actingAs($this->admin)->post('/puestos', ['cargo' => $subdirector, 'institucion' => $fca])->assertSessionHasNoErrors();
+        // Confirmando, el nuevo puesto es el titular y el anterior deja de serlo (con su bitácora)
+        $this->actingAs($this->admin)->post('/puestos', ['cargo' => $subdirector, 'institucion' => $fca, 'titular' => '1', 'cambiar_titular' => '1'])->assertSessionHasNoErrors();
+        $this->assertSame(1, DB::table('puesto')->where('pues_id_institucion_educativa', $fca)->where('pues_titularidad', true)->count());
+        $this->assertDatabaseHas('puesto', ['pues_id_cargo' => $subdirector, 'pues_titularidad' => true]);
+        $this->assertDatabaseHas('puesto', ['pues_id_puesto' => $director, 'pues_titularidad' => false]);
+        $this->assertTrue(DB::table('bitacora as b')->join('bitacora_detalle as d', 'd.bide_id_bitacora', '=', 'b.bita_id_bitacora')
+            ->where('b.bita_tabla', 'PUESTO')->where('b.bita_referencia', $director)->where('d.bide_campo', 'Titular de la institución')->where('d.bide_nuevo', 'No')->exists());
+
+        // Y de regreso, editando el puesto del director
+        $this->actingAs($this->admin)->put("/puestos/{$director}", ['cargo' => $this->cargos['Director'], 'institucion' => $fca, 'titular' => '1', 'cambiar_titular' => '1'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('puesto', ['pues_id_puesto' => $director, 'pues_titularidad' => true]);
+        $this->assertDatabaseHas('puesto', ['pues_id_cargo' => $subdirector, 'pues_titularidad' => false]);
     }
 
     public function test_cargos_coordinaciones_e_instituciones_inactivos_no_se_ofrecen_para_puestos_nuevos(): void

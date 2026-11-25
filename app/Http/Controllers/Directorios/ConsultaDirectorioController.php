@@ -36,8 +36,8 @@ class ConsultaDirectorioController extends Controller
         ['elegido' => $elegido, 'filtros' => $filtros, 'filas' => $filas, 'esInstituciones' => $esInstituciones] = $this->consulta($request);
 
         $encabezados = $esInstituciones
-            ? ['No. de afiliación', 'Institución', 'Universidad', 'Participación', 'Zona', 'Entidad', 'Titular', 'Grado', 'Cargo', 'Teléfonos', 'Correos']
-            : ['Puesto', 'Grado', 'Nombre', 'Institución u organización', 'Teléfonos', 'Correos'];
+            ? ['No. de afiliación', 'Institución', 'Universidad', 'Participación', 'Zona', 'Entidad', 'Titular', 'Grado', 'Cargo', 'Teléfonos', 'Celulares', 'Correos']
+            : ['Puesto', 'Grado', 'Nombre', 'Institución u organización', 'Teléfonos', 'Celulares', 'Correos'];
         $renglon = fn (object $f) => $esInstituciones
             ? [$f->numero, $f->institucion, $f->universidad, $f->participacion, $f->zona, $f->entidad, $f->vacante ? 'Vacante' : $f->nombre, $f->grado, $f->vacante ? '' : $f->puesto]
             : [$f->puesto, $f->grado, $f->vacante ? 'Vacante' : $f->nombre, $f->pertenencia];
@@ -49,7 +49,7 @@ class ConsultaDirectorioController extends Controller
             fwrite($salida, "\u{FEFF}");
             fputcsv($salida, $encabezados, escape: '');
             foreach ($filas as $fila) {
-                $datos = [...$renglon($fila), implode('; ', $fila->telefonos), implode('; ', $fila->correos)];
+                $datos = [...$renglon($fila), implode('; ', $fila->telefonos), implode('; ', $fila->celulares), implode('; ', $fila->correos)];
                 fputcsv($salida, array_map($this->seguroParaHojaDeCalculo(...), $datos), escape: '');
             }
             fclose($salida);

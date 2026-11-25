@@ -140,6 +140,32 @@ class PersonasTest extends TestCase
         $this->assertNull(DB::table('persona')->where('pers_id_persona', $this->persona)->value('pers_curp'));
     }
 
+    public function test_la_misma_persona_con_cuenta_y_en_directorios_se_une_por_su_curp(): void
+    {
+        // Marvin: su cuenta (sin directorios) y, por error, otro registro en los directorios con otra CURP
+        $cuenta = $this->crearCuenta(Rol::ADMINISTRADOR, [], ['pers_nombre' => 'Marvin', 'pers_primer_apellido' => 'Betancourt', 'pers_curp' => 'BEAM000000HDFRLNA2']);
+        $duplicada = (int) $cuenta->usua_id_persona;
+        $directorio = (int) DB::table('persona')->insertGetId(['pers_nombre' => 'Marvin', 'pers_primer_apellido' => 'Betancourt', 'pers_genero' => 'M',
+            'pers_curp' => 'BEAM000000HDFRLNA9', 'pers_id_organizacion' => DB::table('organizacion')->value('orga_id_organizacion')], 'pers_id_persona');
+        $this->enDirectorio($directorio);
+        $datos = $this->datos(['nombre' => 'Marvin', 'primer_apellido' => 'Betancourt', 'segundo_apellido' => '', 'genero' => 'M', 'curp' => 'BEAM000000HDFRLNA2', 'correo' => 'marvin@anfeca.mx']);
+
+        // El administrador recibe la explicación; el superadministrador puede unirlos
+        $this->actingAs($this->admin)->put("/personas/{$directorio}", $datos)
+            ->assertSessionHasErrors(['curp' => 'Esa CURP es de la cuenta de usuario de Marvin Betancourt. Si es la misma persona, pide a un superadministrador que una los dos registros.']);
+        $superadmin = $this->crearCuenta(Rol::SUPERADMINISTRADOR);
+        $this->flushSession();
+        $this->actingAs($superadmin)->put("/personas/{$directorio}", $datos)
+            ->assertSessionHasErrors(['curp' => 'Esa CURP es de la cuenta de usuario de Marvin Betancourt. Si es la misma persona, marca «Unir con su cuenta».']);
+
+        $this->actingAs($superadmin)->put("/personas/{$directorio}", $datos + ['unir_cuenta' => '1'])->assertSessionHasNoErrors();
+
+        // La cuenta queda con el registro de los directorios y el duplicado se borró
+        $this->assertSame($directorio, (int) DB::table('usuario')->where('usua_id_usuario', $cuenta->usua_id_usuario)->value('usua_id_persona'));
+        $this->assertDatabaseMissing('persona', ['pers_id_persona' => $duplicada]);
+        $this->assertSame('BEAM000000HDFRLNA2', DB::table('persona')->where('pers_id_persona', $directorio)->value('pers_curp'));
+    }
+
     public function test_los_textos_peligrosos_se_rechazan(): void
     {
         $this->guardar(['nombre' => '<script>x</script>'])->assertSessionHasErrors('nombre');
